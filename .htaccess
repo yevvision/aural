@@ -1,0 +1,45 @@
+# SPA Routing für React Router in /aural/ Subpath
+RewriteEngine On
+
+# Handle API requests (PHP files)
+RewriteRule ^upload\.php$ upload.php [L]
+RewriteRule ^api/ - [L]
+
+# Handle static assets
+RewriteRule ^assets/ - [L]
+RewriteRule ^uploads/ - [L]
+RewriteRule ^dummy-audio/ - [L]
+
+# SPA Fallback - alle anderen Anfragen zu index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /aural/index.html [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    # CORS für API
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+    
+    # Security headers
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options DENY
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# PHP Upload limits (falls der Server es unterstützt)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 50M
+    php_value post_max_size 50M
+    php_value max_execution_time 300
+</IfModule>
+
+# Dateityp-Konfiguration für Audio
+<IfModule mod_mime.c>
+    AddType audio/mpeg mp3
+    AddType audio/wav wav
+    AddType audio/webm webm
+    AddType audio/ogg ogg
+    AddType audio/mp4 m4a
+</IfModule>

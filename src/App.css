@@ -1,0 +1,108 @@
+/* Aural Mobile App Styles - German Specification */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  color: var(--text-primary, #FFFFFF);
+  overflow-x: hidden;
+}
+
+/* App logo for navigation */
+.app-logo {
+  height: 32px;
+  width: auto;
+  filter: brightness(0) invert(1);
+  transition: filter 300ms ease;
+}
+
+.app-logo:hover {
+  filter: brightness(0) invert(1) drop-shadow(0 0 8px rgba(255, 0, 110, 0.6));
+}
+
+/* Mobile-first responsive design */
+.mobile-container {
+  max-width: 428px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* German spec: Touch-friendly elements */
+.touch-button {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(255, 0, 110, 0.3);
+}
+
+/* German spec: Neon accent underlines for active navigation */
+.nav-active-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #FF006E, #8338EC);
+  border-radius: 1px;
+}
+
+/* Audio waveform animations */
+@keyframes waveform-pulse {
+  0%, 100% {
+    transform: scaleY(0.3);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.waveform-bar {
+  animation: waveform-pulse 1.5s ease-in-out infinite;
+}
+
+.waveform-bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.waveform-bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.waveform-bar:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.waveform-bar:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+/* German spec: Elegant, professional styling */
+.surface-glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Progressive Web App optimizations */
+@media (display-mode: standalone) {
+  .mobile-container {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .surface-glass {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+}

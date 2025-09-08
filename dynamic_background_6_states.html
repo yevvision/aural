@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Custom Organic Morph – 15 States (Mobile Optimized)</title>
+<style>
+  :root{
+    --ui-bg: rgba(0,0,0,.55);
+    --ui-fg: #fff;
+  }
+  html,body{height:100%;margin:0;background:#0a0a0b;overflow:hidden;}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;background:#0a0a0b;}
+  .ui{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:16px;display:flex;gap:6px;align-items:center;
+    padding:.3rem .5rem;border-radius:999px;background:var(--ui-bg);backdrop-filter:blur(8px);
+    flex-wrap:wrap;justify-content:center;max-width:95vw
+  }
+  .dot{
+    width:12px;height:12px;border-radius:50%;background:#666;cursor:pointer;opacity:.9;
+    outline:2px solid transparent;transition:transform .2s ease,background .2s ease,outline .2s ease
+  }
+  .dot:hover{transform:scale(1.15)}
+  .dot.active{background:#ffa24a;outline-color:#ffd099}
+  .label{font:500 12px/1.2 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--ui-fg);opacity:.8}
+
+  /* Mobile optimisation: increase tappable areas and adjust padding for small screens */
+  @media (max-width: 600px) {
+    .ui {
+      bottom: 8px;
+      gap: 4px;
+      padding: .25rem .4rem;
+      max-width: 98vw;
+    }
+    .dot {
+      width: 14px;
+      height: 14px;
+    }
+    .label {
+      font-size: 11px;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ui" id="ui">
+  <span class="label">States</span>
+  <div class="dot active" data-i="0" title="State 1 - Komplett schwarz"></div>
+  <div class="dot" data-i="1" title="State 2 - Sehr dunkel mit orange Licht"></div>
+  <div class="dot" data-i="2" title="State 3 - Horizontale Bänder"></div>
+  <div class="dot" data-i="3" title="State 4 - Vertikale Streifen"></div>
+  <div class="dot" data-i="4" title="State 5 - Große Inseln"></div>
+  <div class="dot" data-i="5" title="State 6 - Keil unten-rechts"></div>
+  <div class="dot" data-i="6" title="State 7 - Keil mit großer Fläche"></div>
+  <div class="dot" data-i="7" title="State 8 - Zentrale Komposition"></div>
+  <div class="dot" data-i="8" title="State 9 - Zentraler Fokus"></div>
+  <div class="dot" data-i="9" title="State 10 - Horizontale Schichtung"></div>
+  <div class="dot" data-i="10" title="State 11 - Diagonale Komposition"></div>
+  <div class="dot" data-i="11" title="State 12 - Kreisförmige Anordnung"></div>
+  <div class="dot" data-i="12" title="State 13 - Fragmentierte Struktur"></div>
+  <div class="dot" data-i="13" title="State 14 - Asymmetrische Komposition"></div>
+  <div class="dot" data-i="14" title="State 15 - Minimalistischer Ansatz"></div>
+</div>
+
+<script>
+(()=>{
+// ---------- Helpers
+const clamp=(x,min,max)=>Math.min(max,Math.max(min,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const easeInOutCubic=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const toRGBA=(h,s,l,a=1)=>{
+  // h[0..360], s/l [0..100]
+  h=(h%360+360)%360; s=clamp(s,0,100); l=clamp(l,0,100);
+  const c=(1-Math.abs(2*l/100-1))*s/100;
+  const X=c*(1-Math.abs((h/60)%2-1));
+  const m=l/100-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=X;b=0}
+  else if(h<120){r=X;g=c;b=0}
+  else if(h<180){r=0;g=c;b=X}
+  else if(h<240){r=0;g=X;b=c}
+  else if(h<300){r=X;g=0;b=c}
+  else{r=c;g=0;b=X}
+  return `rgba(${Math.round((r+m)*255)},${Math.round((g+m)*255)},${Math.round((b+m)*255)},${a})`;
+};
+
+// smooth noise for organic drift
+const n1=(t,seed)=>Math.sin(t*0.9+seed*1.7)*.6+Math.sin(t*0.53+seed*3.1)*.4;
+
+// blob creator
+const makeBlob=(x,y,r,sx,sy,rot,h,s,l,a)=>({x,y,r,sx,sy,rot,h,s,l,a});
+
+// ----------- State definitions (15 states, each with 12 blobs, optimized for mobile portrait)
+// State 1: Mobile-optimiert - Komplett schwarz (ehemals State 6)
+function state1(){
+  // Create 12 blobs with zero alpha and minimal size so they do not render
+  const arr = [];
+  for(let i=0;i<12;i++){
+    arr.push(makeBlob(0.5,0.5,0.1, 1,1, 0, 0, 0, 10, 0));
+  }
+  return arr;
+}
+
+// State 2: Mobile-optimiert - Sehr dunkler Hintergrund mit orangefarbenem Licht an den Seiten (ehemals State 7)
+function state2(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Rot-orange Band Mitte
+    makeBlob(0.50,0.50,0.80, 2.0,0.7, 0.00, 12,85,50,0.90),
+    // Orange Akzente
+    makeBlob(0.30,0.40,0.40, 1.2,1.0, 0.00, 16,75,45,0.85),
+    makeBlob(0.70,0.60,0.40, 1.2,1.0, 0.00, 14,80,48,0.85),
+    makeBlob(0.20,0.55,0.35, 1.0,1.2, 0.00, 18,70,42,0.80),
+    makeBlob(0.80,0.45,0.35, 1.0,1.2, 0.00, 15,75,40,0.80),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+    // Kleine Highlights
+    makeBlob(0.50,0.30,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
+  ];
+}
+
+// State 3: Mobile-optimiert - Große rot-orange Inseln mit dunklen Rändern
+function state3(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Große rot-orange Insel unten
+    makeBlob(0.50,0.70,0.80, 1.6,1.2, 0.00, 12,85,50,0.90),
+    // Rot-orange Inseln
+    makeBlob(0.30,0.45,0.50, 1.3,1.1, 0.00, 14,80,45,0.85),
+    makeBlob(0.70,0.55,0.45, 1.2,1.0, 0.00, 10,85,48,0.88),
+    makeBlob(0.20,0.60,0.40, 1.1,1.2, 0.00, 16,75,42,0.80),
+    makeBlob(0.80,0.40,0.40, 1.1,1.2, 0.00, 15,80,45,0.80),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+    // Kleine Highlights
+    makeBlob(0.50,0.30,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
+  ];
+}
+
+// State 4: Mobile-optimiert - Rot-orange Keil mit dunklen Rändern
+function state4(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Rot-orange Keil unten-rechts
+    makeBlob(0.80,0.80,0.70, 1.5,1.2, 0.00, 12,85,50,0.90),
+    // Orange Akzente
+    makeBlob(0.60,0.60,0.50, 1.3,1.1, 0.00, 14,80,45,0.85),
+    makeBlob(0.40,0.50,0.45, 1.2,1.0, 0.00, 16,75,48,0.88),
+    makeBlob(0.30,0.40,0.40, 1.1,1.2, 0.00, 18,70,42,0.80),
+    makeBlob(0.70,0.45,0.40, 1.1,1.2, 0.00, 15,80,45,0.80),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+    // Kleine Highlights
+    makeBlob(0.50,0.30,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
+  ];
+}
+
+// State 5: Mobile-optimiert - Rot-orange Keil unten-rechts mit dunklen Rändern
+function state5(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Rot-orange Keil unten-rechts
+    makeBlob(0.75,0.85,0.80, 1.6,1.3, 0.00, 12,85,50,0.90),
+    // Große rot-orange Fläche links
+    makeBlob(0.30,0.50,0.70, 1.4,1.2, 0.00, 14,80,45,0.85),
+    // Orange Akzente
+    makeBlob(0.50,0.60,0.50, 1.3,1.1, 0.00, 16,75,48,0.88),
+    makeBlob(0.40,0.40,0.45, 1.2,1.0, 0.00, 18,70,42,0.80),
+    makeBlob(0.60,0.70,0.40, 1.1,1.2, 0.00, 15,80,45,0.80),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+    // Kleine Highlights
+    makeBlob(0.50,0.30,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
+  ];
+}
+
+// State 6: Mobile-optimiert - Rot-orange zentrale Komposition mit dunklen Rändern (ehemals State 1)
+function state6(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.80, 2.0,0.8, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Zentraler rot-orange Bereich
+    makeBlob(0.50,0.50,0.70, 1.4,1.2, 0.00, 12,85,50,0.90),
+    makeBlob(0.35,0.45,0.50, 1.2,1.0, -0.20, 14,80,45,0.85),
+    makeBlob(0.65,0.55,0.45, 1.3,1.1, 0.15, 10,85,48,0.88),
+    // Orange Akzente
+    makeBlob(0.25,0.35,0.35, 1.1,1.2, 0.00, 16,75,40,0.80),
+    makeBlob(0.75,0.65,0.35, 1.1,1.2, 0.00, 18,70,42,0.80),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.80, 2.0,0.8, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+    // Kleine Highlights
+    makeBlob(0.50,0.25,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
+  ];
+}
+
+// State 7: Mobile-optimiert - Sehr dunkler Hintergrund mit orangefarbenem Licht an den Seiten
+function state7(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Orange Licht links (mobile portrait)
+    makeBlob(0.05,0.50,0.50, 0.6,2.0, 0.00, 18,85,45,0.90),
+    makeBlob(0.05,0.30,0.40, 0.6,1.5, 0.00, 20,80,50,0.85),
+    makeBlob(0.05,0.70,0.40, 0.6,1.5, 0.00, 22,75,48,0.85),
+    // Orange Licht rechts (mobile portrait)
+    makeBlob(0.95,0.50,0.50, 0.6,2.0, 0.00, 16,85,45,0.90),
+    makeBlob(0.95,0.30,0.40, 0.6,1.5, 0.00, 18,80,50,0.85),
+    makeBlob(0.95,0.70,0.40, 0.6,1.5, 0.00, 20,75,48,0.85),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 8: Mobile-optimiert - Vertikale rot-orange Streifen mit dunklen Rändern
+function state8(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Vertikale rot-orange Streifen
+    makeBlob(0.20,0.50,0.35, 0.4,1.8, 0.00, 12,85,50,0.90),
+    makeBlob(0.40,0.50,0.35, 0.4,1.8, 0.00, 14,80,48,0.85),
+    makeBlob(0.60,0.50,0.35, 0.4,1.8, 0.00, 10,85,52,0.90),
+    makeBlob(0.80,0.50,0.35, 0.4,1.8, 0.00, 16,75,45,0.85),
+    // Orange Akzente zwischen Streifen
+    makeBlob(0.30,0.40,0.25, 0.6,1.0, 0.00, 18,70,40,0.70),
+    makeBlob(0.50,0.60,0.25, 0.6,1.0, 0.00, 20,75,42,0.70),
+    makeBlob(0.70,0.40,0.25, 0.6,1.0, 0.00, 15,80,38,0.70),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 9: Mobile-optimiert - Zentraler rot-orange Fokus mit dunklen Rändern
+function state9(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Zentraler rot-orange Fokus
+    makeBlob(0.50,0.50,0.80, 1.6,1.4, 0.00, 12,85,50,0.90),
+    // Rot-orange Ring um Zentrum
+    makeBlob(0.50,0.50,0.60, 1.8,1.6, 0.00, 14,80,45,0.85),
+    // Orange Akzente
+    makeBlob(0.30,0.40,0.40, 1.2,1.0, 0.00, 16,75,42,0.80),
+    makeBlob(0.70,0.60,0.40, 1.2,1.0, 0.00, 18,70,40,0.80),
+    makeBlob(0.25,0.60,0.35, 1.0,1.2, 0.00, 15,80,45,0.75),
+    makeBlob(0.75,0.40,0.35, 1.0,1.2, 0.00, 17,75,43,0.75),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 10: Mobile-optimiert - Horizontale rot-orange Schichtung mit dunklen Rändern
+function state10(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Horizontale rot-orange Schichten
+    makeBlob(0.50,0.30,0.70, 2.0,0.5, 0.00, 12,85,50,0.90),
+    makeBlob(0.50,0.50,0.70, 2.0,0.5, 0.00, 14,80,48,0.85),
+    makeBlob(0.50,0.70,0.70, 2.0,0.5, 0.00, 16,75,45,0.88),
+    // Orange Übergänge
+    makeBlob(0.30,0.40,0.30, 1.2,0.8, 0.00, 18,70,40,0.70),
+    makeBlob(0.70,0.60,0.30, 1.2,0.8, 0.00, 20,65,38,0.70),
+    makeBlob(0.20,0.50,0.30, 1.0,1.0, 0.00, 15,80,42,0.70),
+    makeBlob(0.80,0.50,0.30, 1.0,1.0, 0.00, 17,75,40,0.70),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 11: Mobile-optimiert - Diagonale rot-orange Komposition mit dunklen Rändern
+function state11(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Diagonale rot-orange Hauptformen
+    makeBlob(0.30,0.40,0.60, 1.4,1.6, 0.30, 12,85,50,0.90),
+    makeBlob(0.70,0.60,0.60, 1.4,1.6, 0.30, 14,80,48,0.90),
+    // Gegen-diagonale Akzente
+    makeBlob(0.70,0.40,0.50, 1.2,1.4, -0.30, 16,75,45,0.85),
+    makeBlob(0.30,0.60,0.50, 1.2,1.4, -0.30, 18,70,42,0.85),
+    // Orange Verbindungen
+    makeBlob(0.50,0.50,0.35, 1.6,1.0, 0.20, 20,65,40,0.70),
+    makeBlob(0.40,0.30,0.30, 1.0,1.2, 0.00, 15,80,45,0.70),
+    makeBlob(0.60,0.70,0.30, 1.0,1.2, 0.00, 17,75,43,0.70),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 12: Mobile-optimiert - Kreisförmige rot-orange Anordnung mit dunklen Rändern
+function state12(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Zentrale rot-orange Kreise
+    makeBlob(0.50,0.50,0.40, 1.0,1.0, 0.00, 12,85,50,0.90),
+    makeBlob(0.50,0.50,0.25, 1.0,1.0, 0.00, 14,80,45,0.85),
+    // Ringförmige rot-orange Anordnung
+    makeBlob(0.30,0.30,0.30, 1.0,1.0, 0.00, 16,75,48,0.80),
+    makeBlob(0.70,0.30,0.30, 1.0,1.0, 0.00, 18,70,45,0.80),
+    makeBlob(0.30,0.70,0.30, 1.0,1.0, 0.00, 20,65,42,0.80),
+    makeBlob(0.70,0.70,0.30, 1.0,1.0, 0.00, 15,80,48,0.80),
+    // Äußere rot-orange Ringe
+    makeBlob(0.15,0.50,0.25, 1.0,1.0, 0.00, 12,80,40,0.70),
+    makeBlob(0.85,0.50,0.25, 1.0,1.0, 0.00, 14,75,38,0.70),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 13: Mobile-optimiert - Fragmentierte rot-orange Struktur mit dunklen Rändern
+function state13(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Fragmentierte rot-orange Bereiche
+    makeBlob(0.25,0.35,0.35, 1.2,1.0, 0.20, 12,85,50,0.90),
+    makeBlob(0.60,0.25,0.30, 1.0,1.2, -0.15, 14,80,48,0.85),
+    makeBlob(0.80,0.50,0.40, 1.3,1.1, 0.30, 16,75,45,0.88),
+    makeBlob(0.20,0.65,0.35, 1.1,1.3, -0.25, 18,70,42,0.85),
+    makeBlob(0.70,0.75,0.30, 1.0,1.0, 0.10, 20,65,40,0.80),
+    makeBlob(0.40,0.80,0.35, 1.2,1.1, -0.20, 15,80,45,0.82),
+    // Orange Verbindungen
+    makeBlob(0.50,0.50,0.20, 1.5,1.0, 0.00, 17,70,35,0.60),
+    makeBlob(0.30,0.45,0.20, 1.0,1.5, 0.00, 19,65,32,0.60),
+    makeBlob(0.70,0.55,0.20, 1.0,1.5, 0.00, 21,60,30,0.60),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 14: Mobile-optimiert - Asymmetrische rot-orange Komposition mit dunklen Rändern
+function state14(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Asymmetrische rot-orange Hauptformen
+    makeBlob(0.30,0.45,0.70, 1.6,1.2, -0.20, 12,85,50,0.90),
+    makeBlob(0.70,0.55,0.60, 1.4,1.4, 0.30, 14,80,48,0.88),
+    // Warme rot-orange Akzente
+    makeBlob(0.20,0.65,0.40, 1.3,1.1, 0.10, 18,70,45,0.80),
+    makeBlob(0.80,0.35,0.35, 1.2,1.3, -0.15, 20,65,42,0.80),
+    makeBlob(0.45,0.25,0.30, 1.1,1.2, 0.25, 16,75,48,0.75),
+    makeBlob(0.60,0.70,0.35, 1.0,1.1, 0.00, 15,80,45,0.80),
+    makeBlob(0.35,0.60,0.30, 1.0,1.1, 0.00, 17,75,43,0.80),
+    // Subtile rot-orange Verbindungen
+    makeBlob(0.50,0.50,0.25, 1.4,1.0, 0.00, 19,60,30,0.60),
+    makeBlob(0.40,0.40,0.20, 1.0,1.4, 0.00, 21,55,28,0.60),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// State 15: Mobile-optimiert - Minimalistischer rot-orange Ansatz mit dunklen Rändern
+function state15(){
+  return [
+    // Dunkle obere Bereiche (mobile portrait)
+    makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
+    // Minimalistische rot-orange Hauptformen
+    makeBlob(0.35,0.40,0.50, 1.2,1.2, 0.00, 12,85,50,0.85),
+    makeBlob(0.65,0.60,0.50, 1.2,1.2, 0.00, 14,80,48,0.85),
+    // Subtile rot-orange Akzente
+    makeBlob(0.50,0.30,0.30, 1.4,0.8, 0.00, 16,70,45,0.70),
+    makeBlob(0.50,0.70,0.30, 1.4,0.8, 0.00, 18,65,43,0.70),
+    makeBlob(0.25,0.50,0.30, 0.8,1.4, 0.00, 20,60,40,0.70),
+    makeBlob(0.75,0.50,0.30, 0.8,1.4, 0.00, 15,80,48,0.70),
+    makeBlob(0.40,0.35,0.25, 1.0,1.0, 0.00, 17,75,42,0.65),
+    makeBlob(0.60,0.65,0.25, 1.0,1.0, 0.00, 19,70,40,0.65),
+    // Minimale rot-orange Highlights
+    makeBlob(0.50,0.50,0.15, 1.0,1.0, 0.00, 21,60,25,0.50),
+    // Dunkle untere Bereiche (mobile portrait)
+    makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
+    makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
+    makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
+  ];
+}
+
+// States sortiert nach Helligkeit (dunkel zu hell):
+// 1. State 1: Komplett schwarz
+// 2. State 7: Sehr dunkel mit orange Licht
+// 3. State 2: Horizontale Bänder (wenig helle Bereiche)
+// 4. State 8: Vertikale Streifen (wenig helle Bereiche)
+// 5. State 3: Große Inseln (mittlere helle Bereiche)
+// 6. State 4: Keil unten-rechts (mittlere helle Bereiche)
+// 7. State 5: Keil mit großer Fläche (mittlere helle Bereiche)
+// 8. State 6: Zentrale Komposition (mittlere helle Bereiche)
+// 9. State 9: Zentraler Fokus (mehr helle Bereiche)
+// 10. State 10: Horizontale Schichtung (mehr helle Bereiche)
+// 11. State 11: Diagonale Komposition (mehr helle Bereiche)
+// 12. State 12: Kreisförmige Anordnung (mehr helle Bereiche)
+// 13. State 13: Fragmentierte Struktur (viele helle Bereiche)
+// 14. State 14: Asymmetrische Komposition (viele helle Bereiche)
+// 15. State 15: Minimalistischer Ansatz (viele helle Bereiche)
+const states=[state1(),state7(),state2(),state8(),state3(),state4(),state5(),state6(),state9(),state10(),state11(),state12(),state13(),state14(),state15()];
+
+// ---------- Engine
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W=0,H=0,PR=1;
+const resize=()=>{
+  PR=window.devicePixelRatio||1;
+  W=canvas.clientWidth; H=canvas.clientHeight;
+  canvas.width = Math.round(W*PR);
+  canvas.height= Math.round(H*PR);
+  ctx.setTransform(PR,0,0,PR,0,0);
+};
+new ResizeObserver(resize).observe(canvas);
+
+// current/target for smooth morph
+let current = states[0].map(b=>({...b}));
+let target  = states[0].map(b=>({...b}));
+let t0=performance.now();
+let transStart=0, transDur=1600; // ms
+
+// change state smoothly from wherever we are
+function goTo(index){
+  const idx = Math.max(0,Math.min(states.length-1,index|0));
+  // snapshot current
+  snapshotCurrent();
+  target = states[idx].map(b=>({...b}));
+  transStart = performance.now();
+  document.querySelectorAll('.dot').forEach((d,i)=>{
+    d.classList.toggle('active', i===idx);
+  });
+}
+
+// sample eased interpolation at now to keep continuity
+function snapshotCurrent(){
+  const now = performance.now();
+  const tt = clamp((now-transStart)/transDur,0,1);
+  const e = easeInOutCubic(tt);
+  for(let i=0;i<current.length;i++){
+    const c=current[i], g=target[i];
+    c.x = lerp(c.x, g.x, e);
+    c.y = lerp(c.y, g.y, e);
+    c.r = lerp(c.r, g.r, e);
+    c.sx= lerp(c.sx,g.sx,e);
+    c.sy= lerp(c.sy,g.sy,e);
+    c.rot=lerp(c.rot,g.rot,e);
+    c.h = lerp(c.h, g.h, e);
+    c.s = lerp(c.s, g.s, e);
+    c.l = lerp(c.l, g.l, e);
+    c.a = lerp(c.a, g.a, e);
+  }
+  transStart = now;
+}
+
+// draw one blob
+function drawBlob(b, time){
+  // organic drift amplitude
+  const driftAmp = 0.012;
+  const ox = driftAmp * n1(time*0.0007,  3.7 + b.h*0.1);
+  const oy = driftAmp * n1(time*0.0009, -1.2 + b.s*0.1);
+  const x=(b.x+ox)*W, y=(b.y+oy)*H;
+  const base = Math.min(W,H);
+  const r = b.r*base;
+
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(b.rot);
+  ctx.scale(b.sx,b.sy);
+
+  // radial gradient (inner -> outer)
+  const grad = ctx.createRadialGradient(0,0,0, 0,0, r);
+  // Reduce lightness offsets to prevent near‑white highlights. Previously +20/+5/-25
+  // produced very bright areas. Now use +7/+2/-18 to cap brightness around #f4b16c.
+  grad.addColorStop(0,   toRGBA(b.h, b.s, clamp(b.l+7 ,0,100), b.a*0.95));
+  grad.addColorStop(0.25,toRGBA(b.h, b.s, clamp(b.l+2 ,0,100), b.a*0.90));
+  grad.addColorStop(1,   toRGBA(b.h, b.s, clamp(b.l-18,0,100), 0));
+
+  ctx.globalCompositeOperation='lighter';
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// draw vignette
+function drawVignette(){
+  ctx.save();
+  ctx.globalCompositeOperation='multiply';
+  const g = ctx.createRadialGradient(W*0.5,H*0.55, Math.min(W,H)*0.3,
+                                     W*0.5,H*0.55, Math.max(W,H)*0.9);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.85)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+// main animation loop
+function loop(now){
+  // compute interpolation fraction
+  const tt = clamp((now-transStart)/transDur,0,1);
+  const e = easeInOutCubic(tt);
+
+  // clear & apply blur
+  ctx.clearRect(0,0,W,H);
+  const blurPx = Math.max(W,H)*0.14;
+  ctx.filter = `blur(${blurPx}px)`;
+
+  // draw blobs with interpolation
+  for(let i=0;i<current.length;i++){
+    const c=current[i], g=target[i];
+    // update current state by interpolation
+    c.x  = lerp(c.x , g.x , e);
+    c.y  = lerp(c.y , g.y , e);
+    c.r  = lerp(c.r , g.r , e);
+    c.sx = lerp(c.sx, g.sx, e);
+    c.sy = lerp(c.sy, g.sy, e);
+    c.rot= lerp(c.rot,g.rot,e);
+    c.h  = lerp(c.h , g.h , e);
+    c.s  = lerp(c.s , g.s , e);
+    c.l  = lerp(c.l , g.l , e);
+    c.a  = lerp(c.a , g.a , e);
+
+    drawBlob(c, now);
+  }
+  ctx.filter = 'none';
+
+  drawVignette();
+  requestAnimationFrame(loop);
+}
+resize();
+requestAnimationFrame(loop);
+
+// ---------- UI events
+document.querySelectorAll('.dot').forEach(d=>{
+  d.addEventListener('click', ()=>goTo(+d.dataset.i));
+});
+window.addEventListener('keydown',(e)=>{
+  if(e.key>='1' && e.key<='9') goTo(+e.key-1);
+  if(e.key==='0') goTo(9);
+  if(e.key==='a' || e.key==='A') goTo(10);
+  if(e.key==='b' || e.key==='B') goTo(11);
+  if(e.key==='c' || e.key==='C') goTo(12);
+  if(e.key==='d' || e.key==='D') goTo(13);
+  if(e.key==='e' || e.key==='E') goTo(14);
+});
+
+// initial state
+goTo(0);
+})();
+</script>
+</body>
+</html>

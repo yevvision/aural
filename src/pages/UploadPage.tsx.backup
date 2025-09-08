@@ -1,0 +1,776 @@
+import { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Upload, Play, Pause, ArrowLeft, Plus, X, Trash2, Save } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useUserStore } from '../stores/userStore';
+import { useFeedStore } from '../stores/feedStore';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { RealtimeVisualizer } from '../components/ui/RealtimeVisualizer';
+import { validateAudioFile, getAudioDuration, generateId, formatDuration } from '../utils';
+import { 
+  PageTransition, 
+  StaggerWrapper, 
+  StaggerItem, 
+  RevealOnScroll
+} from '../components/ui';
+import type { AudioTrack } from '../types';
+
+// German specification: predefined tags
+const predefinedTags = ['Soft', 'Female', 'Toy', 'Passionated', 'Moan'];
+const genderOptions = [
+  { label: 'Frau', value: 'Female' }, 
+  { label: 'Mann', value: 'Male' },
+  { label: 'Paar', value: 'Couple' },
+  { label: 'Diverse', value: 'Diverse' } // Added Diverse option
+] as const;
+
+export const UploadPage = () => {
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentTrack, isPlaying, play, pause } = useAudioPlayer();
+  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedGender, setSelectedGender] = useState<'Female' | 'Male' | 'Couple' | 'Diverse' | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState('');
+  const [duration, setDuration] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [titleError, setTitleError] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [previewTrack, setPreviewTrack] = useState<AudioTrack | null>(null);
+  
+  const { currentUser, addMyTrack } = useUserStore();
+  const { addTrack } = useFeedStore();
+
+  // Load file from sessionStorage if coming from record page
+  useEffect(() => {
+    const recordingData = sessionStorage.getItem('recordingData');
+    if (recordingData) {
+      console.log('Found recording data in sessionStorage');
+      try {
+        const data = JSON.parse(recordingData);
+        console.log('Parsed recording data', {
+          hasFile: !!data.file,
+          hasData: !!data.file?.data,
+          dataType: typeof data.file?.data,
+          duration: data.duration
+        });
+        
+        // Validate required fields
+        if (!data.file || !data.file.data) {
+          throw new Error('Recording data is incomplete');
+        }
+        
+        // Handle base64 data directly
+        if (data.file.data.startsWith('data:')) {
+          console.log('Processing base64 data');
+          // It's base64 data
+          fetch(data.file.data)
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+              }
+              return res.blob();
+            })
+            .then(blob => {
+              console.log('Created blob from base64', {
+                blobSize: blob.size,
+                blobType: blob.type
+              });
+              
+              if (blob.size === 0) {
+                throw new Error('Converted blob is empty');
+              }
+              
+              const file = new File([blob], data.file.name, { type: data.file.type });
+              setSelectedFile(file);
+              setDuration(data.duration || 0);
+              // Set initial title suggestion with timestamp
+              const now = new Date();
+              const formattedDate = now.toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              setTitle(`Aufnahme ${formattedDate}`);
+              console.log('Successfully loaded recording from sessionStorage');
+            })
+            .catch(err => {
+              console.error('Failed to load recording from base64:', err);
+              setError('Fehler beim Laden der Aufnahme: ' + err.message);
+            });
+        } else {
+          console.log('Processing blob URL data');
+          // It's a blob URL (fallback)
+          fetch(data.file.data)
+            .then(res => {
+              if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+              }
+              return res.blob();
+            })
+            .then(blob => {
+              console.log('Created blob from URL', {
+                blobSize: blob.size,
+                blobType: blob.type
+              });
+              
+              if (blob.size === 0) {
+                throw new Error('Converted blob is empty');
+              }
+              
+              const file = new File([blob], data.file.name, { type: data.file.type });
+              setSelectedFile(file);
+              setDuration(data.duration || 0);
+              // Set initial title suggestion with timestamp
+              const now = new Date();
+              const formattedDate = now.toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              setTitle(`Aufnahme ${formattedDate}`);
+              console.log('Successfully loaded recording from sessionStorage');
+            })
+            .catch(err => {
+              console.error('Failed to load recording from URL:', err);
+              setError('Fehler beim Laden der Aufnahme: ' + err.message);
+            });
+        }
+        
+        // Clear sessionStorage after successful parsing
+        sessionStorage.removeItem('recordingData');
+      } catch (err) {
+        console.error('Failed to parse recording data:', err);
+        setError('Fehler beim Laden der Aufnahme: Ungültige Daten');
+        sessionStorage.removeItem('recordingData'); // Clear invalid data
+      }
+    }
+
+    // Also check old upload file method for compatibility
+    const uploadFile = sessionStorage.getItem('uploadFile');
+    if (uploadFile && !recordingData) {
+      try {
+        const fileData = JSON.parse(uploadFile);
+        fetch(fileData.data)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], fileData.name, { type: fileData.type });
+            setSelectedFile(file);
+            setTitle(fileData.name.replace(/\.[^/.]+$/, ''));
+            getAudioDuration(file).then(setDuration).catch(() => setDuration(0));
+          });
+        sessionStorage.removeItem('uploadFile');
+      } catch (err) {
+        console.error('Failed to load file from session storage:', err);
+      }
+    }
+  }, []);
+
+  // Track form changes for unsaved changes warning
+  useEffect(() => {
+    const hasChanges = title.trim() !== '' || description.trim() !== '' || 
+                      selectedGender !== null || selectedTags.length > 0;
+    setHasUnsavedChanges(hasChanges);
+  }, [title, description, selectedGender, selectedTags]);
+
+  const validateTitle = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setTitleError('Titel ist erforderlich');
+      return false;
+    }
+    if (trimmed.length < 2) {
+      setTitleError('Titel muss mindestens 2 Zeichen haben');
+      return false;
+    }
+    if (trimmed.length > 120) {
+      setTitleError('Titel darf maximal 120 Zeichen haben');
+      return false;
+    }
+    setTitleError('');
+    return true;
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTitle(value);
+    if (value.trim()) {
+      validateTitle(value);
+    } else {
+      setTitleError('');
+    }
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    if (value.length <= 1000) {
+      setDescription(value);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateAudioFile(file);
+    if (!validation.isValid) {
+      setError(validation.error || 'Invalid file');
+      return;
+    }
+
+    setError('');
+    setSelectedFile(file);
+    setTitle(file.name.replace(/\.[^/.]+$/, '')); // Remove file extension
+    
+    try {
+      const fileDuration = await getAudioDuration(file);
+      setDuration(fileDuration);
+      
+      // Create a preview track for the global audio player
+      const previewId = `preview-${Date.now()}`;
+      const fileUrl = URL.createObjectURL(file);
+      
+      const track: AudioTrack = {
+        id: previewId,
+        title: file.name,
+        description: 'Upload Preview',
+        duration: fileDuration,
+        url: fileUrl,
+        user: currentUser!,
+        likes: 0,
+        isLiked: false,
+        createdAt: new Date(),
+        tags: [],
+      };
+      
+      setPreviewTrack(track);
+    } catch (err) {
+      console.error('Failed to get audio duration:', err);
+      setDuration(0);
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (!selectedFile || !previewTrack) return;
+    
+    const isCurrentTrackPlaying = currentTrack?.id === previewTrack.id && isPlaying;
+    
+    if (isCurrentTrackPlaying) {
+      pause();
+    } else {
+      play(previewTrack);
+    }
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
+  const handleAddCustomTag = () => {
+    const tag = customTag.trim();
+    if (!tag) return;
+    
+    // German spec: normalize tag
+    const normalizedTag = tag.toLowerCase()
+      .replace(/\s+/g, '-') // whitespace to dash
+      .replace(/[^a-z0-9\-]/g, '') // only allowed characters
+      .substring(0, 24); // max length
+    
+    if (normalizedTag.length < 2) {
+      setError('Tag muss mindestens 2 Zeichen haben');
+      return;
+    }
+    
+    if (selectedTags.length >= 10) {
+      setError('Maximal 10 Tags erlaubt');
+      return;
+    }
+    
+    // Check for duplicates (case-insensitive)
+    const isDuplicate = selectedTags.some(existingTag => 
+      existingTag.toLowerCase() === normalizedTag
+    );
+    
+    if (isDuplicate) {
+      setError('Dieser Tag wurde bereits hinzugefügt');
+      return;
+    }
+    
+    // Check against predefined tags (case-insensitive)
+    const isDuplicatePredefined = predefinedTags.some(predefinedTag => 
+      predefinedTag.toLowerCase() === normalizedTag
+    );
+    
+    if (isDuplicatePredefined) {
+      setError('Dieser Tag ist bereits in der Liste verfügbar');
+      return;
+    }
+    
+    setError('');
+    setSelectedTags(prev => [...prev, normalizedTag]);
+    setCustomTag('');
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !currentUser) return;
+    
+    // Final validation
+    if (!validateTitle(title)) {
+      return;
+    }
+    
+    setIsUploading(true);
+    setError('');
+    
+    try {
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Convert file to base64 for persistent storage
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          console.log('Base64 conversion completed:', {
+            originalFileName: selectedFile.name,
+            originalSize: selectedFile.size,
+            base64Length: result.length,
+            mimeType: result.substring(5, result.indexOf(';')),
+            isDataURL: result.startsWith('data:')
+          });
+          resolve(result);
+        };
+        reader.onerror = (error) => {
+          console.error('Base64 conversion failed:', error);
+          reject(error);
+        };
+        reader.readAsDataURL(selectedFile);
+      });
+      
+      // German spec: Create data structure
+      const uploadData = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        voice_gender: selectedGender || null,
+        tags: selectedTags,
+        file: {
+          name: selectedFile.name,
+          idOrPath: fileBase64 // Store as base64 for persistence
+        },
+        created_at: new Date().toISOString()
+      };
+      
+      // Create new track for the app
+      const newTrack: AudioTrack = {
+        id: generateId(),
+        title: uploadData.title,
+        description: uploadData.description,
+        duration,
+        url: fileBase64, // Use base64 URL for persistent playback
+        user: currentUser,
+        likes: 0,
+        isLiked: false,
+        createdAt: new Date(),
+        tags: uploadData.tags,
+        gender: selectedGender || undefined, // Convert null to undefined
+        filename: uploadData.file.name,
+        fileSize: selectedFile.size,
+      };
+      
+      console.log('Created new track for upload:', {
+        id: newTrack.id,
+        title: newTrack.title,
+        urlType: typeof newTrack.url,
+        urlStartsWithData: newTrack.url?.startsWith('data:'),
+        urlLength: newTrack.url?.length
+      });
+      
+      // Add to stores
+      addMyTrack(newTrack);
+      addTrack(newTrack);
+      
+      // Show success message
+      // German spec: could trigger analytics events here
+      console.log('Upload successful:', uploadData);
+      
+      // Navigate to profile to show "Meine Aufnahmen" or detail view
+      navigate('/profile');
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setError('Upload fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleReset = () => {
+    // Clean up any object URLs
+    if (previewTrack?.url && previewTrack.url.startsWith('blob:')) {
+      URL.revokeObjectURL(previewTrack.url);
+    }
+    
+    setSelectedFile(null);
+    setTitle('');
+    setDescription('');
+    setSelectedGender(null);
+    setSelectedTags([]);
+    setCustomTag('');
+    setDuration(0);
+    setError('');
+    setPreviewTrack(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      const confirmDiscard = window.confirm('Änderungen verwerfen? Alle eingegebenen Daten gehen verloren.');
+      if (!confirmDiscard) return;
+    }
+    navigate('/record');
+  };
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      {/* Spacer for fixed header */}
+      <div className="h-[72px]"></div>
+
+      <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
+        {/* Header - im Stil der Audio-Detail-Seite */}
+        <div className="flex items-center space-x-2 mb-4">
+          <button
+            onClick={handleBack}
+            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center 
+                     hover:bg-white/20 transition-colors duration-200"
+            aria-label="Zurück"
+          >
+            <ArrowLeft size={20} className="text-white" />
+          </button>
+          <span className="text-gray-400 text-xs">@upload</span>
+        </div>
+
+        {/* Title */}
+        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+          Audio hochladen
+        </h1>
+
+        {/* Description */}
+        <p className="text-gray-400 mb-6 leading-snug text-xs">
+          Gib deiner Aufnahme einen Titel und teile sie mit der Community
+        </p>
+
+        {/* File Upload Area */}
+        {!selectedFile ? (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-500 rounded-xl p-8 text-center 
+                     hover:border-orange-500 hover:bg-orange-500/5 transition-all duration-300 cursor-pointer"
+          >
+            <Upload size={48} className="text-orange-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
+              Audio-Datei wählen
+            </h3>
+            <p className="text-gray-400 text-sm mb-4">
+              MP3, WAV, WebM, OGG, M4A (max 50MB)
+            </p>
+            <div className="inline-flex items-center px-4 py-2 bg-orange-500 rounded-lg text-white font-medium">
+              Dateien durchsuchen
+            </div>
+          </div>
+        ) : (
+            /* File Preview */
+            <RevealOnScroll direction="up" delay={0.1}>
+              <div className="true-black-card">
+                <div className="flex items-center space-x-4 mb-4">
+                  <button
+                    onClick={handlePlayPause}
+                    className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center 
+                             hover:scale-105 active:scale-95 transition-transform duration-200"
+                    aria-label={currentTrack?.id === previewTrack?.id && isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {currentTrack?.id === previewTrack?.id && isPlaying ? (
+                      <Pause size={16} className="text-white" />
+                    ) : (
+                      <Play size={16} className="text-white ml-0.5" />
+                    )}
+                  </button>
+                  
+                  <div className="flex-1">
+                    <h3 className="text-text-primary font-medium truncate">
+                      {selectedFile.name}
+                    </h3>
+                    <p className="text-text-secondary text-sm">
+                      {(selectedFile.size / 1024 / 1024).toFixed(1)} MB • {Math.floor(duration / 60)}:{(duration % 60).toFixed(0).padStart(2, '0')}
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={handleReset}
+                    className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center 
+                             hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
+                    aria-label="Remove file"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                
+                {/* Audio Visualizer for Preview */}
+                <div className="mt-4">
+                  <RealtimeVisualizer
+                    frequencies={currentTrack?.id === previewTrack?.id && isPlaying ? 
+                      // Simulate frequency data during playback
+                      Array.from({ length: 64 }, (_, i) => 
+                        Math.sin(Date.now() * 0.003 + i * 0.15) * 0.6 + 0.4
+                      ) : 
+                      // Static waveform when not playing
+                      Array.from({ length: 64 }, () => Math.random() * 0.4 + 0.2)
+                    }
+                    volume={currentTrack?.id === previewTrack?.id && isPlaying ? 0.6 : 0}
+                    isActive={currentTrack?.id === previewTrack?.id && isPlaying}
+                    style="waveform"
+                    bars={40}
+                    height={50}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </RevealOnScroll>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+        {/* Metadata Form - im Stil der Audio-Detail-Seite */}
+        {selectedFile && (
+          <div className="flex-1 space-y-6">
+            {/* Title Input */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Wie lautet der Titel dieser Aufnahme?
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={handleTitleChange}
+                placeholder="Titel erstellen"
+                className={`w-full px-4 py-3 bg-transparent border rounded-lg 
+                         text-white placeholder-gray-400 
+                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 
+                         transition-all duration-200 ${
+                           titleError ? 'border-red-500/50' : 'border-gray-500'
+                         }`}
+                maxLength={120}
+                required
+              />
+              <div className="flex justify-between items-center mt-1">
+                {titleError && (
+                  <p className="text-red-400 text-xs">{titleError}</p>
+                )}
+                <div className="text-right text-xs text-gray-400 ml-auto">
+                  {title.length}/120
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Füge eine Beschreibung hinzu, wenn du magst
+              </label>
+              <textarea
+                value={description}
+                onChange={handleDescriptionChange}
+                placeholder="Hier eingeben"
+                rows={3}
+                className="w-full px-4 py-3 bg-transparent border border-gray-500 rounded-lg 
+                         text-white placeholder-gray-400 resize-none
+                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 
+                         transition-all duration-200"
+                maxLength={1000}
+              />
+              <div className="text-right text-xs text-gray-400 mt-1">
+                {description.length}/1000
+              </div>
+            </div>
+
+            {/* Gender Selection */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-3">
+                Wer ist auf der Aufnahme zu hören?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {genderOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSelectedGender(
+                      selectedGender === option.value ? null : option.value
+                    )}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      selectedGender === option.value
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-transparent border border-gray-500 text-gray-400 hover:border-orange-500 hover:text-orange-500'
+                    }`}
+                    aria-label={`${option.label} ${
+                      selectedGender === option.value ? 'ausgewählt' : 'nicht ausgewählt'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-white mb-3">
+                Vergib deiner Aufnahme Tags
+              </label>
+              
+              {/* Predefined Tags */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {predefinedTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleTagToggle(tag)}
+                    className={`px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      selectedTags.includes(tag)
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-transparent border border-gray-500 text-gray-400 hover:border-orange-500 hover:text-orange-500'
+                    }`}
+                    aria-label={`Tag: ${tag}, ${
+                      selectedTags.includes(tag) ? 'ausgewählt' : 'nicht ausgewählt'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Tag Input */}
+              <div className="flex space-x-2 mb-3">
+                <input
+                  type="text"
+                  value={customTag}
+                  onChange={(e) => setCustomTag(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTag()}
+                  placeholder="+ Eigenen Tag eingeben"
+                  className="flex-1 px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-sm
+                           text-white placeholder-gray-400 
+                           focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 
+                           transition-all duration-200"
+                  maxLength={24}
+                  aria-label="Eigenen Tag eingeben"
+                />
+                <button
+                  onClick={handleAddCustomTag}
+                  disabled={!customTag.trim() || selectedTags.length >= 10}
+                  className="px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-gray-400 
+                           hover:border-orange-500 hover:text-orange-500 transition-all duration-200
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={selectedTags.length >= 10 ? 'Maximal 10 Tags erlaubt' : 'Tag hinzufügen'}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              {/* Selected Tags */}
+              {selectedTags.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Ausgewählte Tags ({selectedTags.length}/10):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center space-x-1 px-2 py-1 bg-orange-500/20 
+                                 text-orange-500 text-xs rounded-full"
+                      >
+                        <span>{tag}</span>
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-red-400 transition-colors duration-200"
+                          aria-label={`Tag ${tag} entfernen`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTags.length === 0 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Du kannst Tags setzen, um besser gefunden zu werden
+                </p>
+              )}
+            </div>
+
+              {/* File Information */}
+              <RevealOnScroll direction="up" delay={0.6}>
+                <div className="true-black-card">
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    Dateiname:
+                  </label>
+                  <p className="text-text-secondary text-sm px-4 py-3 bg-white/5 border border-white/10 rounded-lg">
+                    {selectedFile.name}
+                  </p>
+                </div>
+              </RevealOnScroll>
+            </div>
+          )}
+
+          {/* Error Messages */}
+          {error && (
+            <RevealOnScroll direction="up">
+              <div className="true-black-card p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            </RevealOnScroll>
+          )}
+
+        {/* Upload Button - im Stil der Audio-Detail-Seite */}
+        {selectedFile && (
+          <div className="mt-8 py-6 px-6 flex items-center justify-center bg-transparent backdrop-blur-sm -mx-6">
+            <button
+              onClick={handleUpload}
+              disabled={!title.trim() || titleError !== '' || isUploading}
+              className="w-[56px] h-[56px] rounded-full border border-orange-500 bg-orange-500/20 flex items-center justify-center 
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Aufnahme hochladen"
+            >
+              {isUploading ? (
+                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Upload size={24} className="text-orange-500" strokeWidth={1.5} />
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
