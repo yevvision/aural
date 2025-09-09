@@ -1,8 +1,9 @@
-import { Clock, Heart, MessageCircle, Trash2, User } from 'lucide-react';
+import { Clock, Heart, MessageCircle, Trash2, User, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useUserStore } from '../../stores/userStore';
+import { useDatabase } from '../../hooks/useDatabase';
 import { formatDuration, sanitizeAudioTrack, sanitizeUser } from '../../utils';
 import { Body } from '../ui/Typography';
 import { ConfirmationDialog } from '../ui';
@@ -23,6 +24,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   const { currentTrack, isPlaying, play, pause } = useAudioPlayer();
   const { reset } = usePlayerStore(); // Add reset function from player store
   const { myTracks } = useUserStore();
+  const { toggleLike, toggleBookmark } = useDatabase('user-1'); // Verwende aktuellen User
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const audioCardRef = useRef<HTMLDivElement>(null);
@@ -32,10 +34,23 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   
   // Create a unique ID for this card instance
   const cardInstanceId = useRef(`${track.id}-${Math.random().toString(36).substr(2, 9)}`).current;
+  
+  // Use ref to store the latest setVisibleAudioCardIds function to avoid dependency issues
+  const setVisibleAudioCardIdsRef = useRef(setVisibleAudioCardIds);
+  setVisibleAudioCardIdsRef.current = setVisibleAudioCardIds;
 
   // Sanitize track and user data
   const safeTrack = sanitizeAudioTrack(track);
   const safeUser = sanitizeUser(track.user);
+
+  // Debug: Log track data
+  console.log('🎵 AudioCard: Track data:', {
+    id: safeTrack.id,
+    title: safeTrack.title,
+    isLiked: safeTrack.isLiked,
+    isBookmarked: safeTrack.isBookmarked,
+    likes: safeTrack.likes
+  });
 
   const isCurrentTrack = currentTrack?.id === safeTrack.id;
   const isTrackPlaying = isCurrentTrack && isPlaying;
@@ -45,7 +60,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setVisibleAudioCardIds(prev => {
+        setVisibleAudioCardIdsRef.current(prev => {
           const newSet = new Set(prev);
           if (entry.isIntersecting && isCurrentTrack) {
             newSet.add(safeTrack.id);
@@ -62,27 +77,28 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
       observer.observe(audioCardRef.current);
     }
     
-    // When this track becomes the current track, immediately add it to visible set
+    // Cleanup function to remove this card from visibility tracking when unmounted
+    return () => {
+      observer.disconnect();
+    };
+  }, [safeTrack.id, isCurrentTrack]);
+
+  // Separate effect for handling current track visibility
+  useEffect(() => {
     if (isCurrentTrack) {
-      setVisibleAudioCardIds(prev => {
+      setVisibleAudioCardIdsRef.current(prev => {
         const newSet = new Set(prev);
         newSet.add(safeTrack.id);
         return newSet;
       });
+    } else {
+      setVisibleAudioCardIdsRef.current(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(safeTrack.id);
+        return newSet;
+      });
     }
-    
-    // Cleanup function to remove this card from visibility tracking when unmounted
-    return () => {
-      observer.disconnect();
-      if (isCurrentTrack) {
-        setVisibleAudioCardIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(safeTrack.id);
-          return newSet;
-        });
-      }
-    };
-  }, [isCurrentTrack, safeTrack.id, setVisibleAudioCardIds]);
+  }, [isCurrentTrack, safeTrack.id]);
 
   const handleCardClick = () => {
     // First click: play and open player
@@ -95,7 +111,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
       play(safeTrack);
       
       // When starting a new track, immediately set it as visible
-      setVisibleAudioCardIds(prev => {
+      setVisibleAudioCardIdsRef.current(prev => {
         const newSet = new Set(prev);
         newSet.add(safeTrack.id);
         return newSet;
@@ -166,15 +182,60 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <span>{safeUser.username}</span>
               </Link>
               
-              <div className="flex items-center space-x-1">
-                <Heart size={12} />
-                <span>{safeTrack.likes}</span>
-              </div>
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('❤️ AudioCard: Like button clicked for track:', safeTrack.id);
+                  const success = toggleLike(safeTrack.id, 'user-1');
+                  console.log('❤️ AudioCard: Like result:', success);
+                }}
+                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+                title={safeTrack.isLiked ? 'Unlike' : 'Like'}
+              >
+                <Heart 
+                  size={12} 
+                  className={safeTrack.isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-400'} 
+                />
+                <span className={safeTrack.isLiked ? 'text-red-500' : 'text-gray-400'}>
+                  {safeTrack.likes}
+                </span>
+              </button>
               
-              <div className="flex items-center space-x-1">
-                <MessageCircle size={12} />
-                <span>{safeTrack.commentsCount || 0}</span>
-              </div>
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('💬 AudioCard: Comment button clicked for track:', safeTrack.id);
+                  // Navigate to player page with this track to add comments
+                  navigate(`/player/${safeTrack.id}`);
+                }}
+                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+                title="Add comment"
+              >
+                <MessageCircle 
+                  size={12} 
+                  className="text-gray-400 hover:text-blue-400" 
+                />
+                <span className="text-gray-400">{safeTrack.commentsCount || 0}</span>
+              </button>
+              
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔖 AudioCard: Bookmark button clicked for track:', safeTrack.id);
+                  const success = toggleBookmark(safeTrack.id, 'user-1');
+                  console.log('🔖 AudioCard: Bookmark result:', success);
+                }}
+                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+                title={safeTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+              >
+                <Bookmark 
+                  size={12} 
+                  className={safeTrack.isBookmarked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 hover:text-yellow-400'} 
+                />
+              </button>
               
               <div className="flex items-center space-x-1">
                 <Clock size={12} />

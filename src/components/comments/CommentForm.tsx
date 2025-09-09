@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Send } from 'lucide-react';
 import { useUserStore } from '../../stores/userStore';
-import { useFeedStore } from '../../stores/feedStore';
+import { useDatabase } from '../../hooks/useDatabase';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/glassmorphism';
 import type { AudioTrack } from '../../types';
@@ -15,7 +15,7 @@ interface CommentFormProps {
 
 export const CommentForm = ({ track, onCommentSubmit, onCancel }: CommentFormProps) => {
   const { currentUser } = useUserStore();
-  const { addComment } = useFeedStore();
+  const { addCommentToTrack } = useDatabase('user-1'); // Verwende aktuellen User
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,11 +24,36 @@ export const CommentForm = ({ track, onCommentSubmit, onCancel }: CommentFormPro
     
     setIsSubmitting(true);
     try {
-      addComment(track.id, commentText.trim());
-      setCommentText('');
-      onCommentSubmit?.();
+      // Erstelle neuen Kommentar
+      const newComment = {
+        id: `comment-${Date.now()}`,
+        content: commentText.trim(),
+        user: currentUser,
+        createdAt: new Date(),
+        likes: 0,
+        isLiked: false
+      };
+
+      console.log('🎯 CommentForm: Füge Kommentar hinzu:', {
+        trackId: track.id,
+        trackTitle: track.title,
+        comment: newComment.content.substring(0, 50)
+      });
+
+      // Füge Kommentar zur zentralen Datenbank hinzu
+      const success = addCommentToTrack(track.id, newComment);
+      
+      if (success) {
+        console.log('✅ CommentForm: Kommentar erfolgreich hinzugefügt');
+        setCommentText('');
+        onCommentSubmit?.();
+      } else {
+        console.error('❌ CommentForm: Fehler beim Hinzufügen des Kommentars');
+        throw new Error('Kommentar konnte nicht hinzugefügt werden');
+      }
     } catch (error) {
-      console.error('Failed to add comment:', error);
+      console.error('❌ CommentForm: Failed to add comment:', error);
+      alert('Fehler beim Hinzufügen des Kommentars. Bitte versuchen Sie es erneut.');
     } finally {
       setIsSubmitting(false);
     }

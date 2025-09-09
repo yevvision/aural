@@ -13,6 +13,8 @@ import { CommentsPage } from './pages/CommentsPage';
 import { CommentTrackPage } from './pages/CommentTrackPage';
 import { RegistrationPage } from './pages/RegistrationPage';
 import { AdminPage } from './pages/AdminPage';
+import { TestPage } from './pages/TestPage';
+import { DebugPage } from './pages/DebugPage';
 import './App.css';
 
 // German spec: Enhanced routing structure for Aural mobile web app
@@ -34,6 +36,8 @@ function App() {
           <Route path="search" element={<SearchPage />} />
           <Route path="news" element={<CommentsPage />} />
           <Route path="comment-track" element={<CommentTrackPage />} />
+          <Route path="test" element={<TestPage />} />
+          <Route path="debug" element={<DebugPage />} />
         </Route>
         
         {/* AURAL ROOT ROUTES */}

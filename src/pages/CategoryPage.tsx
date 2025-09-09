@@ -32,63 +32,68 @@ export const CategoryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [categoryTracks, setCategoryTracks] = useState<any[]>([]);
 
-  useEffect(() => {
+  // German spec: Load and filter tracks for the specific category from database
+  const loadCategoryTracks = () => {
     if (!categoryId) return;
+    
+    setIsLoading(true);
+    
+    // WICHTIG: Verwende nur Datenbank-Tracks für Konsistenz mit Admin-Seite
+    const allTracks = getTracksSorted('createdAt', 'desc');
+    
+    console.log('CategoryPage: Lade Tracks aus Datenbank:', allTracks.length);
+    console.log('CategoryPage: Tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
+    
+    let filteredTracks = allTracks;
 
-    // German spec: Load and filter tracks for the specific category from database
-    const loadCategoryTracks = () => {
-      setIsLoading(true);
-      
-      // Get all tracks from database
-      const allTracks = getTracksSorted('createdAt', 'desc');
-      
-      // Add user's own tracks that aren't in database
-      const userTracksNotInDatabase = myTracks.filter(userTrack => 
-        !allTracks.find(track => track.id === userTrack.id)
-      );
-      
-      const allTracksWithUser = [...userTracksNotInDatabase, ...allTracks];
-      let filteredTracks = allTracksWithUser;
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    switch (categoryId) {
+      case 'new':
+        // Show newest uploads (last 7 days)
+        filteredTracks = allTracks
+          .filter(track => new Date(track.createdAt) > oneWeekAgo)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'bookmarked':
+        // Show only bookmarked tracks
+        filteredTracks = allTracks.filter(track => track.isBookmarked);
+        break;
+      case 'subscribs':
+        // Show tracks from followed users
+        filteredTracks = allTracks.filter(track => track.user && followedUsers.includes(track.user.id));
+        break;
+      case 'top_rated':
+        // Sort by likes
+        filteredTracks = [...allTracks].sort((a, b) => b.likes - a.likes);
+        break;
+      case 'most_commented':
+        // Sort by comments
+        filteredTracks = [...allTracks].sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
+        break;
+      default:
+        filteredTracks = allTracks;
+    }
 
-      const now = new Date();
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      
-      switch (categoryId) {
-        case 'new':
-          // Show newest uploads (last 7 days)
-          filteredTracks = allTracksWithUser
-            .filter(track => new Date(track.createdAt) > oneWeekAgo)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          break;
-        case 'bookmarked':
-          // Show only bookmarked tracks
-          filteredTracks = allTracksWithUser.filter(track => track.isBookmarked);
-          break;
-        case 'subscribs':
-          // Show tracks from followed users
-          filteredTracks = allTracksWithUser.filter(track => track.user && followedUsers.includes(track.user.id));
-          break;
-        case 'top_rated':
-          // Sort by likes
-          filteredTracks = [...allTracksWithUser].sort((a, b) => b.likes - a.likes);
-          break;
-        case 'most_commented':
-          // Sort by comments
-          filteredTracks = [...allTracksWithUser].sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
-          break;
-        default:
-          filteredTracks = allTracksWithUser;
-      }
+    // Limit to 20 tracks
+    filteredTracks = filteredTracks.slice(0, 20);
 
-      // Limit to 20 tracks
-      filteredTracks = filteredTracks.slice(0, 20);
+    setCategoryTracks(filteredTracks);
+    setIsLoading(false);
+  };
 
-      setCategoryTracks(filteredTracks);
-      setIsLoading(false);
-    };
-
+  useEffect(() => {
     loadCategoryTracks();
-  }, [categoryId, myTracks]); // Removed setTracks and tracks dependencies
+  }, [categoryId, getTracksSorted]);
+
+  // WICHTIG: Erzwinge Neuinitialisierung wenn sich die Datenbank ändert
+  useEffect(() => {
+    console.log('CategoryPage: Datenbank hat sich geändert, lade Tracks neu...');
+    if (categoryId) {
+      loadCategoryTracks();
+    }
+  }, [getTracksSorted]); // Removed setTracks and tracks dependencies
 
   const handleBack = () => {
     navigate(-1);

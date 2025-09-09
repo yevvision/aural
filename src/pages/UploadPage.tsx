@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
-import { useFeedStore } from '../stores/feedStore';
+import { useDatabase } from '../hooks/useDatabase';
 import { validateAudioFile, getAudioDuration, generateId, formatDuration } from '../utils';
 import { 
   PageTransition, 
@@ -39,7 +39,7 @@ export const UploadPage = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const { currentUser, addMyTrack } = useUserStore();
-  const { addTrack } = useFeedStore();
+  const { addTrack } = useDatabase();
 
   // Load file from sessionStorage if coming from record page or audio editor
   useEffect(() => {
@@ -304,26 +304,129 @@ export const UploadPage = () => {
         tags: selectedTags
       });
       
-      // Upload to PHP backend
-      const response = await fetch('./upload.php', {
-        method: 'POST',
-        body: formData
-      });
+      // Upload to PHP backend - try different paths
+      let response;
+      try {
+        response = await fetch('/upload.php', {
+          method: 'POST',
+          body: formData
+        });
+      } catch (error) {
+        console.log('Trying alternative upload path...');
+        response = await fetch('./upload.php', {
+          method: 'POST',
+          body: formData
+        });
+      }
+      
+      // Read response body only once
+      const responseText = await response.text();
+      console.log('Response status:', response.status);
+      console.log('Response text:', responseText.substring(0, 200));
       
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Upload failed:', response.status, errorData);
+        console.error('Upload failed:', response.status, responseText);
+        
+        // Check if response is HTML (PHP error page)
+        if (responseText.includes('<?php') || responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
+          console.log('PHP server not available, using local storage fallback...');
+          
+          // Convert audio file to base64 for persistent storage
+          const audioBase64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+          });
+          
+          // Fallback: Store locally and simulate successful upload
+          const localTrack: AudioTrack = {
+            id: generateId(),
+            title: title.trim(),
+            description: description.trim(),
+            url: audioBase64, // Store as base64 data URL
+            duration: duration,
+            user: currentUser,
+            likes: 0,
+            isLiked: false,
+            isBookmarked: false,
+            createdAt: new Date(),
+            tags: selectedTags,
+            gender: selectedGender || undefined,
+            filename: selectedFile.name,
+            fileSize: selectedFile.size,
+            format: selectedFile.type
+          };
+          
+          // Add to stores
+          addMyTrack(localTrack);
+          addTrack(localTrack);
+          
+          // Navigate to feed
+          navigate('/');
+          return;
+        }
         
         try {
-          const errorJson = JSON.parse(errorData);
+          const errorJson = JSON.parse(responseText);
           throw new Error(errorJson.error || 'Upload failed');
         } catch {
-          throw new Error(`Upload failed: ${response.status}`);
+          throw new Error(`Upload failed: ${response.status} - ${responseText.substring(0, 100)}`);
         }
       }
       
-      const result = await response.json();
-      console.log('Upload successful:', result);
+      // Try to parse as JSON
+      let result;
+      try {
+        result = JSON.parse(responseText);
+        console.log('Upload successful:', result);
+      } catch (jsonError) {
+        console.error('JSON parsing failed:', responseText);
+        
+        // If JSON parsing fails, use fallback
+        if (responseText.includes('<?php') || responseText.includes('<html')) {
+          console.log('Server returned HTML instead of JSON, using local storage fallback...');
+          
+          // Convert audio file to base64 for persistent storage
+          const audioBase64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedFile);
+          });
+          
+          const localTrack: AudioTrack = {
+            id: generateId(),
+            title: title.trim(),
+            description: description.trim(),
+            url: audioBase64, // Store as base64 data URL
+            duration: duration,
+            user: currentUser,
+            likes: 0,
+            isLiked: false,
+            isBookmarked: false,
+            createdAt: new Date(),
+            tags: selectedTags,
+            gender: selectedGender || undefined,
+            filename: selectedFile.name,
+            fileSize: selectedFile.size,
+            format: selectedFile.type
+          };
+          
+          addMyTrack(localTrack);
+          addTrack(localTrack);
+          navigate('/');
+          return;
+        }
+        
+        throw new Error('Server antwortete mit ungültigem JSON');
+      }
       
       if (!result.success) {
         throw new Error(result.error || 'Upload failed');
@@ -359,9 +462,19 @@ export const UploadPage = () => {
         fileSize: newTrack.fileSize
       });
       
-      // Add to stores
-      addMyTrack(newTrack);
-      addTrack(newTrack);
+      // ZENTRALE DATENBANK: Füge Track zur einzigen Quelle der Wahrheit hinzu
+      console.log('🎯 UploadPage: Füge Track zur zentralen Datenbank hinzu...');
+      const success = addTrack(newTrack);
+      
+      if (success) {
+        console.log('✅ UploadPage: Track erfolgreich zur Datenbank hinzugefügt');
+        
+        // Auch zu UserStore hinzufügen (für lokale UI-Features wie "Meine Uploads")
+        addMyTrack(newTrack);
+      } else {
+        console.error('❌ UploadPage: Fehler beim Hinzufügen zur Datenbank');
+        throw new Error('Track konnte nicht zur Datenbank hinzugefügt werden');
+      }
       
       // Navigate to feed immediately
       navigate('/');

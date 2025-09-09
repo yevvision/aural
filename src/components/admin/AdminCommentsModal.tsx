@@ -5,12 +5,14 @@ interface AdminCommentsModalProps {
   track: AudioTrack | null;
   isOpen: boolean;
   onClose: () => void;
+  getCommentLikeCount: (commentId: string) => number;
 }
 
 export const AdminCommentsModal: React.FC<AdminCommentsModalProps> = ({
   track,
   isOpen,
-  onClose
+  onClose,
+  getCommentLikeCount
 }) => {
   const formatDate = (date: Date): string => {
     return new Date(date).toLocaleDateString('de-DE', {
@@ -52,8 +54,11 @@ export const AdminCommentsModal: React.FC<AdminCommentsModalProps> = ({
                         <span className="ml-2 text-sm text-gray-500">
                           {formatDate(comment.createdAt)}
                         </span>
+                        <span className="ml-2 text-sm text-gray-500">
+                          • {getCommentLikeCount(comment.id)} Likes
+                        </span>
                       </div>
-                      <p className="text-gray-700">{comment.text}</p>
+                      <p className="text-gray-700">{comment.content}</p>
                     </div>
                   </div>
                 </div>

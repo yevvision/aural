@@ -256,7 +256,7 @@ export const useFeedStore = create<FeedStore>()(
             if (track.id === trackId) {
               const newComment = {
                 id: Date.now().toString(),
-                text: commentText,
+                content: commentText,
                 user: {
                   id: 'current-user',
                   username: 'Du',
@@ -510,9 +510,25 @@ export const useFeedStore = create<FeedStore>()(
         try {
           console.log('FeedStore: Lade Tracks aus Datenbank...');
           const dbTracks = database.getAllTracks();
-          console.log('FeedStore: Geladene Tracks:', dbTracks.length, dbTracks.map(t => ({ id: t.id, title: t.title })));
-          set({ tracks: dbTracks, isLoading: false });
+          console.log('FeedStore: Geladene Tracks:', dbTracks.length, dbTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
+          
+          // Process tracks to ensure base64 URLs are preserved
+          const processedTracks = dbTracks.map(track => {
+            // Log URL type for debugging
+            if (track.url?.startsWith('data:audio/')) {
+              console.log('FeedStore: Found base64 audio URL for track:', track.title);
+            } else if (track.url?.startsWith('blob:')) {
+              console.log('FeedStore: Found blob URL for track:', track.title, '- this will be invalid after page reload');
+            }
+            
+            return track;
+          });
+          
+          set({ tracks: processedTracks, isLoading: false });
           console.log('FeedStore: Tracks erfolgreich gesetzt');
+          
+          // WICHTIG: Speichere Tracks nicht mehr im localStorage - Datenbank ist die Quelle der Wahrheit
+          // localStorage.removeItem('aural-feed-store');
         } catch (error) {
           console.error('Fehler beim Laden der Tracks aus der Datenbank:', error);
           set({ tracks: [], isLoading: false });
@@ -524,24 +540,22 @@ export const useFeedStore = create<FeedStore>()(
       name: 'aural-feed-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Only persist the essential track data without base64 audio
-        tracks: state.tracks.map(track => ({
-          id: track.id,
-          likes: track.likes,
-          isLiked: track.isLiked,
-          isBookmarked: track.isBookmarked,
-          commentsCount: track.commentsCount,
-        })),
+        // Persist minimal data - let the database be the source of truth
         filter: state.filter,
         recentSearches: state.recentSearches,
         searchFilters: state.searchFilters,
+        // Don't persist tracks - they should always be loaded from database
         // Don't persist loading states
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
           if (!error && state) {
-            // Sync with user store after rehydration
+            // Load tracks from database after rehydration
             setTimeout(() => {
+              console.log('FeedStore: Rehydration - lade Tracks aus Datenbank...');
+              const dbTracks = database.getAllTracks();
+              console.log('FeedStore: Rehydration - geladene Tracks:', dbTracks.length);
+              state.setTracks(dbTracks);
               state.syncWithUserStore();
             }, 0);
           }

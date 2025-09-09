@@ -30,12 +30,16 @@ const feedCategories = [
 ];
 
 export const FeedPage = () => {
-  console.log('🎯 FeedPage: Rendering...');
-  const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack } = useDatabase('user-1'); // Verwende aktuellen User
-  const { followedUsers, myTracks } = useUserStore();
+  console.log('FeedPage: Rendering...');
+  const { tracks, isLoading } = useDatabase();
+  const { followedUsers } = useUserStore();
+  const { myTracks } = useUserStore(); // Add user's own tracks
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('couples');
   const navigate = useNavigate();
+
+  // Note: alex_voice is no longer automatically followed
+
 
   // Simplified initialization
   useEffect(() => {
@@ -45,10 +49,13 @@ export const FeedPage = () => {
 
   // Debug: Log tracks to see what's loaded
   useEffect(() => {
-    console.log('🎯 FeedPage: Tracks aktualisiert:', {
-      count: tracks.length,
-      tracks: tracks.map(t => ({ id: t.id, title: t.title, user: t.user?.username }))
-    });
+    console.log('FeedPage tracks:', tracks.map(t => ({ id: t.id, title: t.title, user: t.user?.username })));
+    console.log('FeedPage: Anzahl Tracks:', tracks.length);
+  }, [tracks]);
+
+  // Debug: Log tracks to see what's loaded
+  useEffect(() => {
+    console.log('🎯 FeedPage: Tracks haben sich geändert:', tracks.length);
   }, [tracks]);
 
   // Create notifications for followed users' new uploads
@@ -56,30 +63,53 @@ export const FeedPage = () => {
     if (tracks.length > 0 && followedUsers.length > 0) {
       const { addActivity } = useActivityStore.getState();
       
-      // Find new uploads from followed users (simplified)
+      // Check for new uploads from followed users
       tracks.forEach(track => {
-        if (followedUsers.includes(track.user.id)) {
-          const isRecentUpload = new Date(track.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000;
-          if (isRecentUpload) {
-            addActivity({
-              type: 'follow',
-              trackId: track.id,
-              user: track.user,
-              isRead: false
-            });
+        if (track.user && followedUsers.includes(track.user.id)) {
+          // Check if this is a new upload (created in the last 24 hours)
+          const now = new Date();
+          const trackDate = new Date(track.createdAt);
+          const hoursDiff = (now.getTime() - trackDate.getTime()) / (1000 * 60 * 60);
+          const isFutureTrack = trackDate > now;
+          
+          // For demo purposes, consider tracks as "new" if they're recent or future
+          if (hoursDiff < 24 || isFutureTrack) {
+            // Check if notification already exists for this track
+            const existingNotifications = useActivityStore.getState().activities;
+            const notificationExists = existingNotifications.some(activity => 
+              activity.type === 'followed_user_upload' && 
+              activity.trackId === track.id
+            );
+            
+            if (!notificationExists) {
+              addActivity({
+                type: 'followed_user_upload',
+                user: track.user,
+                trackId: track.id,
+                trackTitle: track.title,
+                isRead: false
+              });
+            }
           }
         }
       });
     }
   }, [tracks, followedUsers]);
 
-  // Add user's own tracks to feed to ensure they show up consistently with preserved state
+  // Watch for changes in user tracks to update the feed
   useEffect(() => {
     if (isInitialized && myTracks.length > 0) {
-      console.log('🎯 FeedPage: User hat eigene Tracks:', myTracks.length);
-      // User tracks are now automatically included via the central database
+      // Add user's own tracks that aren't in feed data
+      const userTracksNotInFeed = myTracks.filter(userTrack => 
+        !tracks.find(track => track.id === userTrack.id)
+      );
+      
+      if (userTracksNotInFeed.length > 0) {
+        const finalTracks = [...userTracksNotInFeed, ...tracks];
+        setTracks(finalTracks);
+      }
     }
-  }, [myTracks, isInitialized, tracks]);
+  }, [myTracks, isInitialized, tracks, setTracks]);
 
   // Fallback: Wenn keine Tracks geladen sind, zeige eine Nachricht
   if (!isInitialized || isLoading) {
@@ -95,7 +125,38 @@ export const FeedPage = () => {
 
   const handleGenderFilterChange = (filterType: string) => {
     setSelectedGenderFilter(filterType);
-    console.log('🎯 FeedPage: Gender-Filter geändert zu:', filterType);
+    setLoading(true);
+    
+    // German spec: Filter tracks by gender while preserving user interactions and including user tracks
+    setTimeout(() => {
+      // Add user's own tracks that aren't in feed data
+      const userTracksNotInFeed = myTracks.filter(userTrack => 
+        !tracks.find(track => track.id === userTrack.id)
+      );
+      
+      const allTracksWithUser = [...userTracksNotInFeed, ...tracks];
+      let filteredTracks = allTracksWithUser;
+      
+      switch (filterType) {
+        case 'couples':
+          filteredTracks = allTracksWithUser.filter(track => track.gender === 'Mixed' || track.gender === 'Couple');
+          break;
+        case 'females':
+          filteredTracks = allTracksWithUser.filter(track => track.gender === 'Female');
+          break;
+        case 'males':
+          filteredTracks = allTracksWithUser.filter(track => track.gender === 'Male');
+          break;
+        case 'diverse':
+          filteredTracks = allTracksWithUser.filter(track => track.gender === 'Diverse');
+          break;
+        default:
+          filteredTracks = allTracksWithUser;
+      }
+      
+      setTracks(filteredTracks);
+      setLoading(false);
+    }, 300);
   };
 
   // Helper function to safely convert to Date for sorting
@@ -119,21 +180,19 @@ export const FeedPage = () => {
       id: t.id,
       title: t.title,
       createdAt: t.createdAt,
+      createdAtType: typeof t.createdAt,
       user: t.user?.username
     })));
     
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
     switch (categoryId) {
       case 'new':
-        // Show tracks from the last week, sorted by date (newest first)
-        categoryTracks = tracks
-          .filter(track => toSafeDate(track.createdAt) > oneWeekAgo)
+        // Show newest uploads - prioritize by creation date (newest first)
+        // Create a new sorted array without mutating the original
+        categoryTracks = [...tracks]
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
         break;
       case 'bookmarked':
-        // Show bookmarked tracks, sorted by bookmark date (newest first)
+        // Show only bookmarked tracks, sorted by date (newest first)
         categoryTracks = [...tracks]
           .filter(track => track.isBookmarked)
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
@@ -212,8 +271,6 @@ export const FeedPage = () => {
           >
             <motion.div 
               className="w-8 h-8 border-2 border-gradient-strong border-t-transparent rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
           </motion.div>
         )}
@@ -231,15 +288,6 @@ export const FeedPage = () => {
                 <div className="text-center py-12">
                   <motion.div 
                     className="text-6xl mb-4"
-                    animate={{ 
-                      scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0]
-                    }}
-                    transition={{ 
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
                   >
                     🎙️
                   </motion.div>
@@ -253,77 +301,77 @@ export const FeedPage = () => {
               </RevealOnScroll>
             ) : (
               <>
-                {/* Enhanced Category Sections with Motion */}
-                {feedCategories.map((category, categoryIndex) => {
-                  const categoryTracks = getCategoryTracks(category.id);
-                  
-                  if (categoryTracks.length === 0) return null;
-                  
-                  return (
-                    <RevealOnScroll 
-                      key={category.id} 
-                      direction="up" 
-                      delay={categoryIndex * 0.1}
-                      className="space-y-3"
-                    >
-                      <motion.div 
-                        className="flex items-center justify-between"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: categoryIndex * 0.1 }}
-                      >
-                        <h2 className="text-lg font-semibold text-text-primary">
-                          {category.name}
-                        </h2>
-                        <motion.button
-                          onClick={() => navigate(`/category/${category.id}`)}
-                          className="flex items-center text-sm text-text-secondary hover:text-gradient-strong transition-colors"
-                          whileHover={{ x: 5 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          Alle anzeigen
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </motion.button>
-                      </motion.div>
-                      
-                      <StaggerWrapper className="space-y-3">
-                        {categoryTracks.map((track, index) => (
-                          <StaggerItem key={track.id}>
-                            <AudioCard track={track} index={index} />
-                          </StaggerItem>
-                        ))}
-                      </StaggerWrapper>
-                    </RevealOnScroll>
-                  );
-                })}
-
-                {/* Enhanced Show All Tracks Section */}
-                <RevealOnScroll direction="up" delay={0.3}>
-                  <motion.div 
-                    className="border-t border-border-light pt-6 mt-8"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-text-primary">
-                        Alle Aufnahmen
-                      </h2>
-                      <span className="text-sm text-text-secondary">
-                        {tracks.length} Aufnahmen
-                      </span>
-                    </div>
+                {/* Enhanced Feed categories with motion - full width with true black cards */}
+                <StaggerWrapper delay={0.1}>
+                  {feedCategories.map((category, categoryIndex) => {
+                    const categoryTracks = getCategoryTracks(category.id);
                     
-                    <StaggerWrapper className="space-y-3">
-                      {tracks
-                        .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime())
-                        .map((track, index) => (
-                          <StaggerItem key={track.id}>
-                            <AudioCard track={track} index={index} />
-                          </StaggerItem>
-                        ))}
-                    </StaggerWrapper>
-                  </motion.div>
+                    // Only render category if it has tracks
+                    if (categoryTracks.length === 0) {
+                      return null;
+                    }
+                    
+                    return (
+                      <StaggerItem key={category.id}>
+                        <RevealOnScroll direction="up" delay={categoryIndex * 0.1}>
+                          <div className="space-y-3">
+                            {/* Category header - no box, "neu" on left, arrow on right */}
+                            <div className="flex items-center justify-between mb-2 mt-1">
+                              <span className="text-base text-white flex-grow">
+                                {category.id === 'new' ? 'neu' : category.name}
+                              </span>
+                              <motion.button 
+                                onClick={() => navigate(`/category/${category.id}`)}
+                                className="flex items-center justify-center w-6 h-6 flex-none"
+                                whileHover={{ scale: 1.1, x: 5 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <ChevronRight size={16} className="text-white" />
+                              </motion.button>
+                            </div>
+                            
+                            {/* Category tracks with stagger - using true black cards */}
+                            <StaggerWrapper className="space-y-1.5">
+                              {categoryTracks.map((track, index) => (
+                                <StaggerItem key={`${category.id}-${track.id}`}>
+                                  <AudioCard 
+                                    track={track} 
+                                    index={index} 
+                                    showDeleteButton={true}
+                                    onDelete={(trackId) => {
+                                      // Delete from user store
+                                      useUserStore.getState().deleteMyTrack(trackId);
+                                      // Delete from feed store
+                                      useFeedStore.getState().setTracks(
+                                        useFeedStore.getState().tracks.filter(t => t.id !== trackId)
+                                      );
+                                    }}
+                                  />
+                                </StaggerItem>
+                              ))}
+                            </StaggerWrapper>
+                          </div>
+                        </RevealOnScroll>
+                      </StaggerItem>
+                    );
+                  })}
+                </StaggerWrapper>
+                
+                {/* Enhanced info section - true black, full width, no shadow */}
+                <RevealOnScroll direction="up" delay={0.4}>
+                  <div className="true-black-card">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 rounded-xl flex items-center justify-center">
+                        <span className="text-2xl">💡</span>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white mb-1">Need Help?</h3>
+                        <p className="text-base text-white/70">
+                          Entdecke neue Stimmen und teile deine eigenen Audio-Aufnahmen!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </RevealOnScroll>
               </>
             )}

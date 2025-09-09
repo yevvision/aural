@@ -1,24 +1,26 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send } from 'lucide-react';
+import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag } from 'lucide-react';
 import { usePlayerStore } from '../stores/playerStore';
-import { useFeedStore } from '../stores/feedStore';
+import { useDatabase } from '../hooks/useDatabase';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { getGlobalAudio } from '../hooks/useGlobalAudioManager';
 import { formatDuration } from '../utils';
 import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
+import { ReportModal } from '../components/ui/ReportModal';
 
 export const PlayerPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentTrack, isPlaying, currentTime, duration, expand, collapse, setCurrentTrack } = usePlayerStore();
-  const { tracks, toggleLike, toggleBookmark, addComment, toggleCommentLike } = useFeedStore();
+  const { tracks, toggleLike, toggleBookmark, addCommentToTrack, addReport, toggleCommentLike, isCommentLikedByUser, getCommentLikeCount } = useDatabase('user-1');
   const { toggle, seek } = useAudioPlayer();
   
   // Get the global audio element for visualization
   const globalAudio = getGlobalAudio();
   
   const [commentText, setCommentText] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Find the track by ID
   const track = useMemo(() => {
@@ -83,7 +85,9 @@ export const PlayerPage = () => {
   };
 
   const handleLike = () => {
-    toggleLike(track.id);
+    console.log('❤️ PlayerPage: Like button clicked for track:', track.id);
+    const success = toggleLike(track.id, 'user-1');
+    console.log('❤️ PlayerPage: Like result:', success);
   };
 
   const handleComment = () => {
@@ -93,19 +97,66 @@ export const PlayerPage = () => {
 
   const handleAddComment = () => {
     if (commentText.trim() && track) {
-      addComment(track.id, commentText.trim());
-      setCommentText('');
+      const newComment = {
+        id: `comment-${Date.now()}`,
+        content: commentText.trim(),
+        user: { id: 'user-1', username: 'yevvo', email: 'yevvo@example.com' },
+        createdAt: new Date(),
+        likes: 0,
+        isLiked: false
+      };
+      console.log('💬 PlayerPage: Adding comment to track:', track.id);
+      const success = addCommentToTrack(track.id, newComment);
+      console.log('💬 PlayerPage: Comment result:', success);
+      if (success) {
+        setCommentText('');
+      }
     }
   };
 
   const handleBookmark = () => {
-    toggleBookmark(track.id);
+    console.log('🔖 PlayerPage: Bookmark button clicked for track:', track.id);
+    const success = toggleBookmark(track.id, 'user-1');
+    console.log('🔖 PlayerPage: Bookmark result:', success);
   };
 
   // Handle comment like interaction
   const handleCommentLike = (commentId: string) => {
-    // Call the store function to toggle comment like
-    toggleCommentLike(track.id, commentId);
+    console.log('Comment like clicked:', commentId);
+    const success = toggleCommentLike(commentId, 'user-1');
+    if (success) {
+      console.log('Comment like toggled successfully');
+    } else {
+      console.error('Failed to toggle comment like');
+    }
+  };
+
+  const handleReportSubmit = (reportData: {
+    type: 'comment' | 'recording' | 'description';
+    targetId: string;
+    targetTitle: string;
+    reason?: string;
+  }) => {
+    console.log('Report submitted:', reportData);
+    
+    const newReport = {
+      id: `report-${Date.now()}`,
+      type: reportData.type,
+      targetId: reportData.targetId,
+      targetTitle: reportData.targetTitle,
+      reporterId: 'user-1',
+      reporterUsername: 'yevvo',
+      reason: reportData.reason,
+      status: 'pending' as const,
+      createdAt: new Date()
+    };
+    
+    const success = addReport(newReport);
+    if (success) {
+      alert('Report submitted successfully. Thank you for helping keep our community safe.');
+    } else {
+      alert('Failed to submit report. Please try again.');
+    }
   };
 
   // Handle play button click with better error handling
@@ -126,16 +177,8 @@ export const PlayerPage = () => {
     }
   };
 
-  // Define a list of sample comments for the demo
-  const sampleComments = useMemo(() => [
-    { id: '1', text: 'Das klingt wunderschön!', user: { username: 'julia89', id: '123' }, likes: 3, isLiked: false, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2) },
-    { id: '2', text: 'Ich liebe deine Stimme! Mehr davon bitte.', user: { username: 'markus_h', id: '124' }, likes: 5, isLiked: true, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24) },
-    { id: '3', text: 'Das hat mich wirklich berührt. Danke fürs Teilen.', user: { username: 'sophie22', id: '125' }, likes: 0, isLiked: false, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48) },
-    { id: '4', text: 'Wow, das ist so gut! Kannst du mehr in diesem Stil machen?', user: { username: 'tobias_m', id: '126' }, likes: 0, isLiked: false, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72) }
-  ], []);
-
-  // Get track comments or use sample comments if none exist
-  const comments = track.comments?.length ? track.comments : sampleComments;
+  // Get track comments - only show real comments, no sample comments
+  const comments = track.comments || [];
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
@@ -239,22 +282,40 @@ export const PlayerPage = () => {
           
           <button
             onClick={handleLike}
-            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center ${track.isLiked ? "border-orange-500 bg-orange-500/20" : ""}`}
+            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+              track.isLiked 
+                ? "border-red-500 bg-red-500/20" 
+                : "hover:border-red-400"
+            }`}
+            title={track.isLiked ? 'Unlike' : 'Like'}
           >
             <Heart 
               size={24} 
-              className={track.isLiked ? "fill-orange-500 text-orange-500" : "text-gray-400"} 
+              className={`transition-all duration-200 ${
+                track.isLiked 
+                  ? "fill-red-500 text-red-500" 
+                  : "text-gray-400 hover:text-red-400"
+              }`}
               strokeWidth={1.5}
             />
           </button>
           
           <button
             onClick={handleBookmark}
-            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center ${track.isBookmarked ? "border-orange-500 bg-orange-500/20" : ""}`}
+            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+              track.isBookmarked 
+                ? "border-yellow-500 bg-yellow-500/20" 
+                : "hover:border-yellow-400"
+            }`}
+            title={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
           >
             <Bookmark 
               size={24} 
-              className={track.isBookmarked ? "fill-orange-500 text-orange-500" : "text-gray-400"} 
+              className={`transition-all duration-200 ${
+                track.isBookmarked 
+                  ? "fill-yellow-500 text-yellow-500" 
+                  : "text-gray-400 hover:text-yellow-400"
+              }`}
               strokeWidth={1.5}
             />
           </button>
@@ -262,32 +323,71 @@ export const PlayerPage = () => {
         
         {/* Comments section - visible when scrolling */}
         <div className="mt-4">
-          <div className="space-y-4">
-            {comments.map((comment) => (
-              <div key={comment.id} className="border-b border-gray-800 pb-4">
-                <div className="flex items-center mb-2">
-                  <span className="text-white text-sm font-medium">{comment.user.username}</span>
-                  <span className="text-gray-500 text-xs ml-2">
-                    {new Date(comment.createdAt).toLocaleDateString('de-DE')}
-                  </span>
-                </div>
-                <p className="text-gray-300 text-sm">{comment.text}</p>
-                <div className="flex items-center mt-2">
-                  <button 
-                    onClick={() => handleCommentLike(comment.id)}
-                    className="flex items-center space-x-1 text-gray-400 hover:text-white"
-                  >
-                    <Heart size={14} className={comment.isLiked ? "fill-red-500 text-red-500" : ""} strokeWidth={1.5} />
-                    {comment.likes > 0 && (
-                      <span className="text-xs">{comment.likes}</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
+          {comments.length > 0 ? (
+            <div className="space-y-4">
+              {comments.map((comment) => {
+                const isLiked = isCommentLikedByUser(comment.id, 'user-1');
+                const likeCount = getCommentLikeCount(comment.id);
+                
+                return (
+                  <div key={comment.id} className="border-b border-gray-800 pb-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-white text-sm font-medium">{comment.user.username}</span>
+                      <span className="text-gray-500 text-xs ml-2">
+                        {new Date(comment.createdAt).toLocaleDateString('de-DE')}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 text-sm">{comment.content}</p>
+                    <div className="flex items-center mt-2">
+                      <button 
+                        onClick={() => handleCommentLike(comment.id)}
+                        className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors"
+                      >
+                        <Heart 
+                          size={14} 
+                          className={isLiked ? "fill-red-500 text-red-500" : ""} 
+                          strokeWidth={1.5} 
+                        />
+                        {likeCount > 0 && (
+                          <span className="text-xs">{likeCount}</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <MessageCircle className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">No comments yet</p>
+              <p className="text-gray-600 text-xs mt-1">Be the first to comment!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Report Link - centered at bottom */}
+        <div className="mt-8 pt-6">
+          <div className="text-center">
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center justify-center space-x-2 text-gray-400 hover:text-red-400 text-sm transition-colors mx-auto"
+            >
+              <Flag size={14} strokeWidth={1.5} />
+              <span>Report inappropriate content</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        onSubmit={handleReportSubmit}
+        track={track}
+        comments={comments}
+      />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import { Play, Pause, ChevronUp, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
-import { useFeedStore } from '../../stores/feedStore';
+import { useDatabase } from '../../hooks/useDatabase';
 import type { AudioTrack } from '../../types';
 import { useEffect, useState, useRef } from 'react';
 
@@ -12,11 +12,20 @@ interface InlineMiniPlayerProps {
 export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
   const navigate = useNavigate();
   const { isPlaying, currentTime, duration, toggle, seek } = useAudioPlayer();
-  const { tracks, toggleLike } = useFeedStore();
+  const { tracks, toggleLike } = useDatabase('user-1'); // Verwende zentrale Datenbank
   
-  // Find the current track in the feed store to get the latest like state
+  // Find the current track in the database to get the latest like state
   const feedTrack = tracks.find(t => t.id === track.id);
   const updatedTrack = feedTrack ? { ...track, ...feedTrack } : track;
+  
+  // Debug: Log track data
+  console.log('🎵 InlineMiniPlayer: Track data:', {
+    id: updatedTrack.id,
+    title: updatedTrack.title,
+    isLiked: updatedTrack.isLiked,
+    likes: updatedTrack.likes,
+    feedTrack: feedTrack ? 'found' : 'not found'
+  });
   
   // Local state for progress and UI
   const [progressWidth, setProgressWidth] = useState(0);
@@ -95,11 +104,14 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('❤️ InlineMiniPlayer: Like button clicked for track:', updatedTrack.id);
+    
     // Set like animation state
     setLikeClicked(true);
     
-    // Update like in store
-    toggleLike(updatedTrack.id);
+    // Update like in central database
+    const success = toggleLike(updatedTrack.id, 'user-1');
+    console.log('❤️ InlineMiniPlayer: Like result:', success);
     
     // Keep the animation state for a short duration
     setTimeout(() => setLikeClicked(false), 300);
@@ -146,16 +158,21 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
         <div className="flex items-center space-x-2">
           <button
             onClick={handleLike}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 ${
               updatedTrack.isLiked 
-                ? 'border border-orange-500 bg-orange-500/20' 
-                : 'border border-white'
+                ? 'border border-red-500 bg-red-500/20' 
+                : 'border border-white hover:border-red-400'
             }`}
             aria-label={updatedTrack.isLiked ? 'Unlike' : 'Like'}
+            title={updatedTrack.isLiked ? 'Unlike' : 'Like'}
           >
             <Heart 
               size={14} 
-              className={updatedTrack.isLiked ? "fill-orange-500 text-orange-500" : "text-white"} 
+              className={`transition-all duration-200 ${
+                updatedTrack.isLiked 
+                  ? "fill-red-500 text-red-500" 
+                  : "text-white hover:text-red-400"
+              }`}
             />
           </button>
           

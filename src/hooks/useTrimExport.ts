@@ -1,5 +1,11 @@
 export async function concatenateSegments(blob: Blob, segments: { start: number; end: number }[]): Promise<Blob> {
-  const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+  // Reuse existing AudioContext or create new one
+  let ac = window.audioContext;
+  if (!ac) {
+    ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+    window.audioContext = ac;
+  }
+  
   const arr = await blob.arrayBuffer();
   const audioBuffer = await new Promise<AudioBuffer>((res, rej) =>
     ac.decodeAudioData(arr.slice(0), res, rej)
@@ -7,6 +13,11 @@ export async function concatenateSegments(blob: Blob, segments: { start: number;
   
   const sr = audioBuffer.sampleRate;
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+  
+  // Check if we have valid segments
+  if (!segments || segments.length === 0) {
+    throw new Error('Keine Segmente ausgewählt. Bitte wähle mindestens einen Bereich aus.');
+  }
   
   // Calculate total length needed
   let totalLength = 0;
@@ -18,7 +29,18 @@ export async function concatenateSegments(blob: Blob, segments: { start: number;
     return { start, end, length };
   });
   
+  // Check if total length is valid
+  if (totalLength <= 0) {
+    throw new Error('Ausgewählte Segmente haben keine gültige Länge.');
+  }
+  
   const totalFrames = Math.floor(totalLength * sr);
+  
+  // Ensure we have at least 1 frame
+  if (totalFrames <= 0) {
+    throw new Error('Ausgewählte Segmente sind zu kurz.');
+  }
+  
   const out = ac.createBuffer(audioBuffer.numberOfChannels, totalFrames, sr);
   
   // Copy each segment to the output buffer
@@ -89,7 +111,13 @@ export async function concatenateSegments(blob: Blob, segments: { start: number;
 }
 
 export async function trimToWav(blob: Blob, startSec: number, endSec: number): Promise<Blob> {
-  const ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+  // Reuse existing AudioContext or create new one
+  let ac = window.audioContext;
+  if (!ac) {
+    ac = new (window.AudioContext || (window as any).webkitAudioContext)();
+    window.audioContext = ac;
+  }
+  
   const arr = await blob.arrayBuffer();
   const audioBuffer = await new Promise<AudioBuffer>((res, rej) =>
     ac.decodeAudioData(arr.slice(0), res, rej)

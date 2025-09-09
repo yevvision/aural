@@ -31,7 +31,7 @@ export default function AudioEditor({
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [waveformDuration, setWaveformDuration] = useState<number>(0);
   const [clickedSelection, setClickedSelection] = useState<{ start: number; end: number } | null>(null);
-  const canExport = selectedSegments.length > 0 || sel !== null;
+  const canExport = selectedSegments.length > 0 || (sel !== null && sel.start < sel.end);
 
   const handleSelectionChange = (selection: { start: number; end: number } | null) => {
     console.log('AudioEditor: Selection changed to:', selection);
@@ -129,17 +129,37 @@ export default function AudioEditor({
   };
 
   const exportSelection = async () => {
-    console.log('Export selection called:', { canExport, selectedSegments, busy });
+    console.log('Export selection called:', { canExport, selectedSegments, sel, busy });
     if (!canExport || busy) return; // Prevent double-click
     
     setBusy(true);
     setError(null);
     
     try {
-      console.log('Starting export with segments:', selectedSegments);
+      // Use current selection if no segments are selected
+      let segmentsToExport = selectedSegments;
+      if (segmentsToExport.length === 0 && sel) {
+        segmentsToExport = [sel];
+      }
+      
+      console.log('Starting export with segments:', segmentsToExport);
+      
+      if (segmentsToExport.length === 0) {
+        throw new Error('Keine Segmente ausgewählt. Bitte wähle mindestens einen Bereich aus.');
+      }
       
       // Sort segments by start time to ensure correct order
-      const sortedSegments = [...selectedSegments].sort((a, b) => a.start - b.start);
+      const sortedSegments = [...segmentsToExport].sort((a, b) => a.start - b.start);
+      
+      // Validate segments
+      for (const segment of sortedSegments) {
+        if (segment.start >= segment.end) {
+          throw new Error('Ungültige Segment-Auswahl: Start-Zeit muss vor End-Zeit liegen.');
+        }
+        if (segment.start < 0 || segment.end > waveformDuration) {
+          throw new Error('Segment-Auswahl liegt außerhalb der Audio-Dauer.');
+        }
+      }
       
       // Concatenate all segments into one audio file
       const wav = await concatenateSegments(recordingBlob, sortedSegments);

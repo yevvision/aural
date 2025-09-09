@@ -1,11 +1,12 @@
 import React from 'react';
 
 interface AdminTabsProps {
-  activeTab: 'uploads' | 'users' | 'comments';
-  setActiveTab: (tab: 'uploads' | 'users' | 'comments') => void;
+  activeTab: 'uploads' | 'users' | 'comments' | 'reports';
+  setActiveTab: (tab: 'uploads' | 'users' | 'comments' | 'reports') => void;
   uploadsCount: number;
   usersCount: number;
   commentsCount: number;
+  reportsCount: number;
 }
 
 export const AdminTabs: React.FC<AdminTabsProps> = ({
@@ -13,7 +14,8 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
   setActiveTab,
   uploadsCount,
   usersCount,
-  commentsCount
+  commentsCount,
+  reportsCount
 }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm mb-6">
@@ -48,6 +50,16 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             }`}
           >
             Kommentare ({commentsCount})
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'reports'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Reports ({reportsCount})
           </button>
         </nav>
       </div>

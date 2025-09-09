@@ -41,7 +41,7 @@ export interface AudioTrack {
 
 export interface Comment {
   id: string;
-  text: string;
+  content: string; // Einheitlich: content statt text
   user: User;
   trackId: string;
   createdAt: Date;
@@ -270,6 +270,21 @@ export interface AppError {
   details?: any;
   timestamp: Date;
   context?: string;
+}
+
+// German spec: Content report system
+export interface ContentReport {
+  id: string;
+  type: 'comment' | 'recording' | 'description';
+  targetId: string; // ID of the reported comment or track
+  targetTitle?: string; // Title of the track or content of the comment
+  reporterId: string;
+  reporterUsername: string;
+  reason?: string; // Optional text description
+  status: 'pending' | 'reviewed' | 'resolved';
+  createdAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
 }
 
 // German spec: API response wrapper

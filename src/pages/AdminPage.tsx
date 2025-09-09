@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useFeedStore } from '../stores/feedStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Filter, Trash2, Plus, BarChart3, Users, Upload, MessageSquare, Flag, ChevronDown, ChevronUp, Play, Pause, Heart, Clock, Calendar, TrendingUp } from 'lucide-react';
 import { useUserStore } from '../stores/userStore';
 import type { AudioTrack, User } from '../types';
 import { MiniPlayer } from '../components/audio/MiniPlayer';
 import { useGlobalAudioManager } from '../hooks/useGlobalAudioManager';
-import { useDatabaseSync } from '../hooks/useDatabaseSync';
+import { useDatabase } from '../hooks/useDatabase';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminFilters } from '../components/admin/AdminFilters';
 import { AdminUploadsTable } from '../components/admin/AdminUploadsTable';
 import { AdminUsersTable } from '../components/admin/AdminUsersTable';
 import { AdminCommentsModal } from '../components/admin/AdminCommentsModal';
 import { DatabaseCleanup } from '../components/admin/DatabaseCleanup';
+import { ReportsTable } from '../components/admin/ReportsTable';
+import { AdminStatistics } from '../components/admin/AdminStatistics';
 
 interface AdminStats {
   totalUsers: number;
@@ -18,26 +21,35 @@ interface AdminStats {
   totalComments: number;
   totalLikes: number;
   totalFileSize: number;
+  totalReports: number;
+  pendingReports: number;
 }
 
 type SortField = 'title' | 'user' | 'likes' | 'comments' | 'date' | 'fileSize' | 'duration';
 type SortOrder = 'asc' | 'desc';
 
 export const AdminPage: React.FC = () => {
-  const { tracks, deleteTracksByUser } = useFeedStore();
-  const { currentUser, myTracks } = useUserStore();
+  const { currentUser } = useUserStore();
   const { play, currentTrack, isPlaying, pause, toggle } = useGlobalAudioManager();
   const { 
+    tracks,
+    users,
+    comments,
+    reports,
+    isLoading,
     deleteTrack, 
-    deleteUser, 
-    getAllUsers, 
-    getTracksSorted, 
-    searchTracks, 
+    deleteAllUserContent,
     getStats,
-    deleteAllUserContent
-  } = useDatabaseSync();
+    getTracksSorted,
+    searchTracks,
+    updateReportStatus,
+    deleteReport,
+    deleteCommentFromTrack,
+    getCommentLikeCount,
+    debug
+  } = useDatabase();
   
-  const [activeTab, setActiveTab] = useState<'uploads' | 'users' | 'comments'>('uploads');
+  const [activeTab, setActiveTab] = useState<'uploads' | 'users' | 'comments' | 'reports' | 'statistics'>('uploads');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedTrack, setSelectedTrack] = useState<AudioTrack | null>(null);
@@ -49,45 +61,48 @@ export const AdminPage: React.FC = () => {
     totalTracks: 0,
     totalComments: 0,
     totalLikes: 0,
-    totalFileSize: 0
+    totalFileSize: 0,
+    totalReports: 0,
+    pendingReports: 0
   });
 
-  // Benutzer aus der Datenbank laden
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-
-  // Lade Daten aus der Datenbank
+  // Lade Statistiken
   useEffect(() => {
-    const users = getAllUsers();
-    setAllUsers(users);
-    
+    console.log('🎯 AdminPage: Lade Statistiken...');
     const dbStats = getStats();
     setStats(dbStats);
-  }, [getAllUsers, getStats]);
+  }, [tracks]); // Aktualisiere Statistiken wenn sich Tracks ändern
 
-  // Alle Tracks aus der Datenbank laden
+  // Alle Tracks mit Filter und Sortierung
   const getAllTracks = (): AudioTrack[] => {
-    // Verwende Datenbank-Funktionen für Sortierung und Suche
-    let dbTracks = getTracksSorted(sortField, sortOrder);
+    console.log('🎯 AdminPage: getAllTracks() mit Filtern...');
     
-    // Kombiniere mit eigenen Tracks
-    let allTracks = [...dbTracks, ...myTracks];
+    let filteredTracks = tracks;
     
     // Benutzer-Filter anwenden
     if (userFilter !== 'all') {
-      allTracks = allTracks.filter(track => track.user.id === userFilter);
+      filteredTracks = filteredTracks.filter(track => track.user.id === userFilter);
+      console.log('🎯 AdminPage: Nach Benutzer-Filter:', filteredTracks.length);
     }
     
     // Suchfilter anwenden
     if (searchQuery) {
       const searchResults = searchTracks(searchQuery);
-      allTracks = searchResults.filter((track, index, self) => 
-        index === self.findIndex(t => t.id === track.id)
-      );
+      filteredTracks = searchResults;
+      console.log('🎯 AdminPage: Nach Suchfilter:', filteredTracks.length);
+    } else {
+      // Sortierung anwenden (nur wenn keine Suche aktiv)
+      filteredTracks = getTracksSorted(sortField, sortOrder);
+      console.log('🎯 AdminPage: Nach Sortierung:', filteredTracks.length);
+      
+      // Benutzer-Filter nochmal anwenden nach Sortierung
+      if (userFilter !== 'all') {
+        filteredTracks = filteredTracks.filter(track => track.user.id === userFilter);
+      }
     }
     
-    return allTracks.filter((track, index, self) => 
-      index === self.findIndex(t => t.id === track.id)
-    );
+    console.log('🎯 AdminPage: Finale Tracks:', filteredTracks.length);
+    return filteredTracks;
   };
 
   // Formatierung der Dateigröße
@@ -122,56 +137,64 @@ export const AdminPage: React.FC = () => {
 
   const handleDeleteTrack = (trackId: string) => {
     if (confirm('Sind Sie sicher, dass Sie diesen Track löschen möchten?')) {
+      console.log('🎯 AdminPage: Lösche Track:', trackId);
       const success = deleteTrack(trackId);
+      
       if (success) {
-        // Aktualisiere Statistiken
-        setTimeout(() => {
-          const dbStats = getStats();
-          setStats(dbStats);
-        }, 100);
+        console.log('✅ AdminPage: Track erfolgreich gelöscht');
+        // Statistiken werden automatisch über useEffect aktualisiert
+      } else {
+        console.error('❌ AdminPage: Fehler beim Löschen des Tracks');
+        alert('Fehler beim Löschen des Tracks. Bitte versuchen Sie es erneut.');
       }
     }
   };
 
   const handleDeleteUser = (userId: string) => {
     if (confirm('Sind Sie sicher, dass Sie diesen Benutzer und alle seine Uploads löschen möchten?')) {
-      const success = deleteUser(userId);
-      if (success) {
-        // Aktualisiere Benutzerliste und Statistiken
-        const users = getAllUsers();
-        setAllUsers(users);
-        const dbStats = getStats();
-        setStats(dbStats);
-      }
+      console.log('🎯 AdminPage: Lösche Benutzer:', userId);
+      
+      // Lösche alle Tracks des Benutzers
+      const userTracks = tracks.filter(track => track.user.id === userId);
+      let deletedCount = 0;
+      
+      userTracks.forEach(track => {
+        const success = deleteTrack(track.id);
+        if (success) deletedCount++;
+      });
+      
+      console.log(`✅ AdminPage: ${deletedCount} Tracks von Benutzer ${userId} gelöscht`);
+      // Statistiken werden automatisch über useEffect aktualisiert
     }
   };
 
   const handleDeleteAllUserContent = () => {
-    console.log('=== ADMIN BUTTON GEDRÜCKT ===');
-    if (confirm('Sind Sie sicher, dass Sie ALLE Benutzer-Inhalte löschen möchten? (Nur Holler die Waldfee bleibt erhalten - auch yevvo wird gelöscht)')) {
-      console.log('Bestätigung erhalten, starte Löschung...');
-      deleteAllUserContent();
+    console.log('🎯 AdminPage: === ADMIN BUTTON GEDRÜCKT ===');
+    if (confirm('Sind Sie sicher, dass Sie ALLE Benutzer-Inhalte löschen möchten? (Nur die ersten 3 Aufnahmen von Holler die Waldfee bleiben erhalten - auch Ihre eigenen Aufnahmen werden gelöscht!)')) {
+      console.log('🎯 AdminPage: Bestätigung erhalten, starte Löschung...');
       
-      // Aktualisiere alle Daten und UI-State
-      setTimeout(() => {
-        console.log('Aktualisiere Daten nach Löschung...');
-        const users = getAllUsers();
-        const dbStats = getStats();
-        console.log('Neue Benutzer:', users);
-        console.log('Neue Statistiken:', dbStats);
-        setAllUsers(users);
-        setStats(dbStats);
+      const success = deleteAllUserContent();
+      
+      if (success) {
+        console.log('✅ AdminPage: Löschung erfolgreich');
         
-        // Setze auch die UI-Filter zurück
+        // Setze UI-Filter zurück
         setSearchQuery('');
         setUserFilter('all');
         setSortField('date');
         setSortOrder('desc');
         
-        console.log('UI-State zurückgesetzt');
-      }, 100);
+        // Statistiken werden automatisch über useEffect aktualisiert
+        console.log('🎯 AdminPage: UI-State zurückgesetzt');
+        
+        // Zeige Erfolgsmeldung
+        alert('Alle Benutzer-Inhalte wurden erfolgreich gelöscht! Nur die ersten 3 Aufnahmen von Holler die Waldfee sind erhalten geblieben.');
+      } else {
+        console.error('❌ AdminPage: Fehler bei der Löschung');
+        alert('Fehler beim Löschen der Inhalte. Bitte versuchen Sie es erneut.');
+      }
     } else {
-      console.log('Löschung abgebrochen');
+      console.log('🎯 AdminPage: Löschung abgebrochen');
     }
   };
 
@@ -190,151 +213,385 @@ export const AdminPage: React.FC = () => {
 
   const handleCleanup = () => {
     // Aktualisiere Daten nach der Bereinigung
-    const users = getAllUsers();
-    setAllUsers(users);
     const dbStats = getStats();
     setStats(dbStats);
   };
 
+  const handleUpdateReportStatus = (reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string) => {
+    console.log('🎯 AdminPage: Update report status:', reportId, status);
+    const success = updateReportStatus(reportId, status, reviewedBy);
+    
+    if (success) {
+      console.log('✅ AdminPage: Report status updated successfully');
+      // Statistiken werden automatisch über useEffect aktualisiert
+    } else {
+      console.error('❌ AdminPage: Failed to update report status');
+      alert('Failed to update report status. Please try again.');
+    }
+  };
+
+  const handleDeleteReport = (reportId: string) => {
+    if (confirm('Are you sure you want to delete this report?')) {
+      console.log('🎯 AdminPage: Delete report:', reportId);
+      const success = deleteReport(reportId);
+      
+      if (success) {
+        console.log('✅ AdminPage: Report deleted successfully');
+        // Statistiken werden automatisch über useEffect aktualisiert
+      } else {
+        console.error('❌ AdminPage: Failed to delete report');
+        alert('Failed to delete report. Please try again.');
+      }
+    }
+  };
+
+  const handleDeleteComment = (trackId: string, commentId: string) => {
+    if (confirm('Sind Sie sicher, dass Sie diesen Kommentar löschen möchten?')) {
+      console.log('🎯 AdminPage: Delete comment:', commentId, 'from track:', trackId);
+      const success = deleteCommentFromTrack(trackId, commentId);
+      
+      if (success) {
+        console.log('✅ AdminPage: Comment deleted successfully');
+        // Statistiken werden automatisch über useEffect aktualisiert
+      } else {
+        console.error('❌ AdminPage: Failed to delete comment');
+        alert('Fehler beim Löschen des Kommentars. Bitte versuchen Sie es erneut.');
+      }
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600">Verwalten Sie Benutzer, Uploads und Inhalte</p>
-        </div>
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
+          <p className="text-text-secondary">Verwalten Sie Benutzer, Uploads und Inhalte</p>
+        </motion.div>
 
         {/* Statistiken */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <motion.div 
+          className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">U</span>
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-white" />
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Benutzer</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalUsers}</p>
+                <p className="text-sm font-medium text-text-secondary">Benutzer</p>
+                <p className="text-2xl font-semibold text-white">{stats.totalUsers}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">T</span>
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <Upload className="w-5 h-5 text-white" />
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Tracks</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalTracks}</p>
+                <p className="text-sm font-medium text-text-secondary">Tracks</p>
+                <p className="text-2xl font-semibold text-white">{stats.totalTracks}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">C</span>
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-white" />
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Kommentare</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalComments}</p>
+                <p className="text-sm font-medium text-text-secondary">Kommentare</p>
+                <p className="text-2xl font-semibold text-white">{stats.totalComments}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">L</span>
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <Heart className="w-5 h-5 text-white" />
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Likes</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalLikes}</p>
+                <p className="text-sm font-medium text-text-secondary">Likes</p>
+                <p className="text-2xl font-semibold text-white">{stats.totalLikes}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">S</span>
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-white" />
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Speicher</p>
-                <p className="text-2xl font-semibold text-gray-900">{formatFileSize(stats.totalFileSize)}</p>
+                <p className="text-sm font-medium text-text-secondary">Speicher</p>
+                <p className="text-2xl font-semibold text-white">{formatFileSize(stats.totalFileSize)}</p>
               </div>
             </div>
+          </motion.div>
+
+          <motion.div 
+            className="panel-floating p-6"
+            whileHover={{ y: -2 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
+                  <Flag className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-text-secondary">Reports</p>
+                <p className="text-2xl font-semibold text-white">{stats.totalReports}</p>
+                {stats.pendingReports > 0 && (
+                  <p className="text-xs text-gradient-strong">{stats.pendingReports} pending</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Subtile Admin-Buttons */}
+        <motion.div 
+          className="flex justify-end gap-4 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <motion.button
+            onClick={() => {/* TODO: Implement create post */}}
+            className="glass-button px-4 py-2 rounded-lg text-text-secondary hover:text-white transition-colors flex items-center gap-2"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Plus className="w-4 h-4" />
+            Neuen Post erstellen
+          </motion.button>
+          
+          <motion.button
+            onClick={handleDeleteAllUserContent}
+            className="glass-button px-4 py-2 rounded-lg text-text-secondary hover:text-red-400 transition-colors flex items-center gap-2"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Trash2 className="w-4 h-4" />
+            Alle Benutzerinhalte löschen
+          </motion.button>
+        </motion.div>
+
+        {/* Toggle-Menü für Tabs */}
+        <motion.div 
+          className="panel-floating mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="flex flex-wrap gap-2 p-4">
+            {[
+              { id: 'uploads', label: 'Uploads', count: tracks.length, icon: Upload },
+              { id: 'users', label: 'Benutzer', count: users.length, icon: Users },
+              { id: 'comments', label: 'Kommentare', count: comments.length, icon: MessageSquare },
+              { id: 'reports', label: 'Reports', count: reports.length, icon: Flag },
+              { id: 'statistics', label: 'Statistiken', count: 0, icon: BarChart3 },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <motion.button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-primary text-white'
+                      : 'glass-surface text-text-secondary hover:text-white hover:bg-white/10'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label} ({tab.count})
+                </motion.button>
+              );
+            })}
           </div>
-        </div>
+        </motion.div>
 
-
-        {/* Datenbank-Bereinigung */}
-        <DatabaseCleanup onCleanup={handleCleanup} />
-
-        {/* Tabs */}
-        <AdminTabs 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-          uploadsCount={tracks.length}
-          usersCount={allUsers.length}
-          commentsCount={0}
-        />
-
-        {/* Filter und Suche */}
-        <AdminFilters
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          sortField={sortField}
-          onSortFieldChange={setSortField}
-          sortOrder={sortOrder}
-          onSortOrderChange={setSortOrder}
-          userFilter={userFilter}
-          onUserFilterChange={setUserFilter}
-          allUsers={allUsers}
-        />
+        {/* Suchfunktion */}
+        <motion.div 
+          className="panel-floating mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
+          <div className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Suchen..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-transparent border border-white/20 rounded-lg text-white placeholder-text-secondary focus:outline-none focus:border-gradient-strong transition-colors"
+              />
+            </div>
+          </div>
+        </motion.div>
 
         {/* Inhalt basierend auf aktivem Tab */}
-        {activeTab === 'uploads' && (
-          <AdminUploadsTable
-            tracks={getAllTracks()}
-            currentTrack={currentTrack}
-            isPlaying={isPlaying}
-            onDeleteTrack={handleDeleteTrack}
-            onPlayTrack={handlePlayTrack}
-            onShowComments={handleShowComments}
-            formatFileSize={formatFileSize}
-            formatDuration={formatDuration}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          {activeTab === 'uploads' && (
+            <motion.div
+              key="uploads"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AdminUploadsTable
+                tracks={getAllTracks()}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onDeleteTrack={handleDeleteTrack}
+                onPlayTrack={handlePlayTrack}
+                onShowComments={handleShowComments}
+                formatFileSize={formatFileSize}
+                formatDuration={formatDuration}
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'users' && (
-          <AdminUsersTable
-            users={allUsers}
-            onDeleteUser={handleDeleteUser}
-          />
-        )}
+          {activeTab === 'users' && (
+            <motion.div
+              key="users"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AdminUsersTable
+                users={users}
+                onDeleteUser={handleDeleteUser}
+              />
+            </motion.div>
+          )}
 
-        {activeTab === 'comments' && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Kommentare</h3>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-500">Wählen Sie einen Track aus der Uploads-Tabelle, um dessen Kommentare anzuzeigen.</p>
-            </div>
-          </div>
-        )}
+          {activeTab === 'comments' && (
+            <motion.div
+              key="comments"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="panel-floating">
+                <div className="px-6 py-4 border-b border-white/10">
+                  <h3 className="text-lg font-medium text-white">Kommentare ({comments.length})</h3>
+                </div>
+                <div className="p-6">
+                  {comments.length === 0 ? (
+                    <p className="text-text-secondary text-center py-8">Keine Kommentare vorhanden.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="border-b border-white/10 pb-4 last:border-b-0">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-white mb-2">{comment.content}</p>
+                              <div className="text-sm text-text-secondary">
+                                <span className="font-medium">{comment.user.username}</span>
+                                <span className="mx-2">•</span>
+                                <span>Track: {comment.trackTitle}</span>
+                                <span className="mx-2">•</span>
+                                <span>{new Date(comment.createdAt).toLocaleDateString('de-DE')}</span>
+                                <span className="mx-2">•</span>
+                                <span>{getCommentLikeCount(comment.id)} Likes</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteComment(comment.trackId, comment.id)}
+                              className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                            >
+                              Löschen
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'reports' && (
+            <motion.div
+              key="reports"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ReportsTable
+                reports={reports}
+                onUpdateStatus={handleUpdateReportStatus}
+                onDeleteReport={handleDeleteReport}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'statistics' && (
+            <motion.div
+              key="statistics"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AdminStatistics onBack={() => setActiveTab('uploads')} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Kommentare Modal */}
         {showCommentsModal && selectedTrack && (
@@ -342,6 +599,7 @@ export const AdminPage: React.FC = () => {
             track={selectedTrack}
             isOpen={showCommentsModal}
             onClose={() => setShowCommentsModal(false)}
+            getCommentLikeCount={getCommentLikeCount}
           />
         )}
 

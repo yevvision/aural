@@ -3,7 +3,7 @@ import { TopNavigation } from './TopNavigation';
 import { MiniPlayer } from '../audio/MiniPlayer';
 import { usePlayerStore } from '../../stores/playerStore';
 import { initializeGlobalAudioManager, useGlobalAudioManager } from '../../hooks/useGlobalAudioManager';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { OrganicOrangeMorphBackground } from './OrganicOrangeMorphBackground';
 import { motion } from 'framer-motion';
 import { useScrollBlur } from '../../hooks/useScrollBlur';
@@ -28,15 +28,14 @@ export const useBackNavigation = () => {
 };
 
 export const AppLayout = () => {
-  console.log('AppLayout: Rendering...');
   const { currentTrack } = usePlayerStore();
   const location = useLocation();
   const [visibleAudioCardIds, setVisibleAudioCardIdsState] = useState<Set<string>>(new Set());
   
-  // Create a wrapper function that matches the expected signature
-  const setVisibleAudioCardIds = (update: (prev: Set<string>) => Set<string>) => {
+  // Create a stable wrapper function that matches the expected signature
+  const setVisibleAudioCardIds = useCallback((update: (prev: Set<string>) => Set<string>) => {
     setVisibleAudioCardIdsState(update);
-  };
+  }, []);
   const [showBackButton, setShowBackButton] = useState(false);
   
   // Add scroll blur effect

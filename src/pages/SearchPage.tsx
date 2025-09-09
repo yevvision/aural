@@ -34,16 +34,15 @@ export const SearchPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const { tracks } = useFeedStore();
   const { getTracksSorted } = useDatabaseSync();
   
   useEffect(() => {
-    if (!tracks.length) {
-      // Load tracks from database instead of dummy data
-      const dbTracks = getTracksSorted('createdAt', 'desc');
-      useFeedStore.getState().setTracks(dbTracks);
-    }
-  }, [tracks, getTracksSorted]);
+    // Always load tracks from database to ensure we have the latest data
+    console.log('SearchPage: Lade Tracks aus Datenbank...');
+    const dbTracks = getTracksSorted('createdAt', 'desc');
+    console.log('SearchPage: Geladene Tracks:', dbTracks.length);
+    useFeedStore.getState().setTracks(dbTracks);
+  }, [getTracksSorted]);
   
   const debouncedSearch = debounce((searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -56,7 +55,10 @@ export const SearchPage = () => {
     
     // Simulate search delay
     setTimeout(() => {
-      let results = tracks.filter(track => {
+      // WICHTIG: Verwende Datenbank-Tracks für Konsistenz
+      const dbTracks = getTracksSorted('createdAt', 'desc');
+      
+      let results = dbTracks.filter(track => {
         const matchesQuery = 
           track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           track.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||

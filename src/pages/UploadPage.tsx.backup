@@ -401,7 +401,10 @@ export const UploadPage = () => {
         urlLength: newTrack.url?.length
       });
       
-      // Add to stores
+      // WICHTIG: Füge Track zur Datenbank hinzu (Single Source of Truth)
+      // addTrackToDatabase(newTrack); // TODO: Implement when needed
+      
+      // Add to stores (für UI-Konsistenz)
       addMyTrack(newTrack);
       addTrack(newTrack);
       

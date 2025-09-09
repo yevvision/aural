@@ -40,7 +40,7 @@ export const CommentList = ({ comments }: CommentListProps) => {
               </Caption>
             </div>
             <Body color="secondary" className="text-sm leading-relaxed break-words">
-              {comment.text}
+              {comment.content}
             </Body>
           </div>
         </motion.div>

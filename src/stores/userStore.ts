@@ -73,6 +73,8 @@ interface UserStore {
   
   // Admin functions
   filterMyTracksByUser: (userId: string) => void;
+  clearAllTracksExceptUser: (userId: string) => void;
+  clearAllTracksExceptHoller: () => void;
   
   logout: () => void;
   reset: () => void;
@@ -386,6 +388,39 @@ export const useUserStore = create<UserStore>()(
             ...state.currentUser,
             totalUploads: filteredTracks.length
           } : null;
+          
+          return {
+            myTracks: filteredTracks,
+            currentUser: updatedUser
+          };
+        });
+      },
+      
+      clearAllTracksExceptUser: (userId) => {
+        set((state) => {
+          const filteredTracks = state.myTracks.filter(track => track.user.id === userId);
+          const updatedUser = state.currentUser ? {
+            ...state.currentUser,
+            totalUploads: filteredTracks.length
+          } : null;
+          
+          return {
+            myTracks: filteredTracks,
+            currentUser: updatedUser
+          };
+        });
+      },
+      
+      clearAllTracksExceptHoller: () => {
+        set((state) => {
+          const hollaUserId = '4';
+          const filteredTracks = state.myTracks.filter(track => track.user.id === hollaUserId);
+          const updatedUser = state.currentUser ? {
+            ...state.currentUser,
+            totalUploads: filteredTracks.length
+          } : null;
+          
+          console.log('UserStore: Lösche alle Tracks außer Holler. Vorher:', state.myTracks.length, 'Nachher:', filteredTracks.length);
           
           return {
             myTracks: filteredTracks,

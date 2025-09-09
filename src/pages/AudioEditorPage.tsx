@@ -16,11 +16,73 @@ export const AudioEditorPage = () => {
   const [exportKbps, setExportKbps] = useState(128);
   const [enableFfmpeg, setEnableFfmpeg] = useState(false);
 
-  // Load recording from sessionStorage - simplified approach
+  // Load recording from sessionStorage
   useEffect(() => {
-    console.log('AudioEditorPage: Creating test audio for demonstration...');
-    // Always create test audio for now to ensure it works
-    createTestAudioBlob();
+    console.log('AudioEditorPage: Loading recording from sessionStorage...');
+    
+    try {
+      const recordingData = sessionStorage.getItem('recordingData');
+      if (recordingData) {
+        const data = JSON.parse(recordingData);
+        console.log('AudioEditorPage: Found recording data:', data);
+        
+        if (data.file && data.file.data) {
+          // If it's a blob URL, fetch the blob
+          if (data.file.data.startsWith('blob:')) {
+            fetch(data.file.data)
+              .then(response => response.blob())
+              .then(blob => {
+                console.log('AudioEditorPage: Loaded blob from URL:', blob.size, 'bytes');
+                setRecordingBlob(blob);
+                setEnableFfmpeg(false); // Disable ffmpeg for now
+              })
+              .catch(error => {
+                console.error('AudioEditorPage: Error loading blob:', error);
+                // Fallback to test audio
+                createTestAudioBlob();
+              });
+          } else {
+            // If it's base64 data URL, convert to blob
+            if (data.file.data.startsWith('data:')) {
+              // It's already a data URL, convert directly to blob
+              fetch(data.file.data)
+                .then(response => response.blob())
+                .then(blob => {
+                  console.log('AudioEditorPage: Created blob from data URL:', blob.size, 'bytes');
+                  setRecordingBlob(blob);
+                  setEnableFfmpeg(false);
+                })
+                .catch(error => {
+                  console.error('AudioEditorPage: Error converting data URL to blob:', error);
+                  createTestAudioBlob();
+                });
+            } else {
+              // It's raw base64, convert to blob
+              const byteCharacters = atob(data.file.data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: data.file.type || 'audio/wav' });
+              console.log('AudioEditorPage: Created blob from base64:', blob.size, 'bytes');
+              setRecordingBlob(blob);
+              setEnableFfmpeg(false);
+            }
+          }
+        } else {
+          console.log('AudioEditorPage: No file data found, creating test audio');
+          createTestAudioBlob();
+        }
+      } else {
+        console.log('AudioEditorPage: No recording data found, creating test audio');
+        createTestAudioBlob();
+      }
+    } catch (error) {
+      console.error('AudioEditorPage: Error loading recording data:', error);
+      // Fallback to test audio
+      createTestAudioBlob();
+    }
   }, [navigate]);
 
   const createTestAudioBlob = () => {

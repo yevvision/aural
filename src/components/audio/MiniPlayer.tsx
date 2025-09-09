@@ -2,7 +2,7 @@ import { Play, Pause, ChevronUp, Heart, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../../stores/playerStore';
-import { useFeedStore } from '../../stores/feedStore';
+import { useDatabase } from '../../hooks/useDatabase';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { Body } from '../ui/Typography';
 import { useEffect, useState, useRef } from 'react';
@@ -15,7 +15,7 @@ interface MiniPlayerProps {
 export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   const navigate = useNavigate();
   const { currentTrack, isPlaying, currentTime, duration, isExpanded } = usePlayerStore();
-  const { tracks, toggleLike } = useFeedStore();
+  const { tracks, toggleLike } = useDatabase('user-1');
   const { toggle, seek } = useAudioPlayer();
   
   // Find the current track in the feed store to get the latest like state
@@ -111,11 +111,14 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('❤️ MiniPlayer: Like button clicked for track:', updatedCurrentTrack.id);
+    
     // Set like animation state
     setLikeClicked(true);
     
-    // Update like in store
-    toggleLike(updatedCurrentTrack.id);
+    // Update like in central database
+    const success = toggleLike(updatedCurrentTrack.id, 'user-1');
+    console.log('❤️ MiniPlayer: Like result:', success);
     
     // Keep the animation state for a short duration
     setTimeout(() => setLikeClicked(false), 300);
@@ -197,12 +200,13 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             onClick={handleLike}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               updatedCurrentTrack.isLiked
-                ? 'border border-orange-500 bg-orange-500/20' 
-                : 'border border-white'
+                ? 'border border-red-500 bg-red-500/20' 
+                : 'border border-white hover:border-red-400'
             }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             aria-label={updatedCurrentTrack.isLiked ? 'Unlike' : 'Like'}
+            title={updatedCurrentTrack.isLiked ? 'Unlike' : 'Like'}
           >
             <motion.div
               animate={likeClicked ? { scale: [1, 1.3, 1] } : {}}
@@ -210,7 +214,11 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             >
               <Heart 
                 size={14} 
-                className={updatedCurrentTrack.isLiked ? "fill-orange-500 text-orange-500" : "text-white"} 
+                className={`transition-all duration-200 ${
+                  updatedCurrentTrack.isLiked 
+                    ? "fill-red-500 text-red-500" 
+                    : "text-white hover:text-red-400"
+                }`}
                 strokeWidth={1.5}
               />
             </motion.div>
