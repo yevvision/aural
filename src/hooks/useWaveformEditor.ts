@@ -87,7 +87,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     if (!container) return;
     create();
     return () => { wsRef.current?.destroy(); wsRef.current = null; };
-  }, [container, create]);
+  }, [container]); // Remove create from dependencies to prevent infinite loop
 
   useEffect(() => {
     if (audioBlob && wsRef.current) {

@@ -75,8 +75,8 @@ export default function WaveformVisualizer({
               Erneut versuchen
             </button>
           </div>
-              </div>
           </div>
+      </div>
     );
   }
 

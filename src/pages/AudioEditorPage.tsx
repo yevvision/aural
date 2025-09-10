@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Settings, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
+import { TopNavigation } from '../components/layout';
 import AudioEditor from '../components/audio/editor/AudioEditor';
 type EncodeFormat = 'mp3' | 'aac';
 
@@ -194,18 +195,26 @@ export const AudioEditorPage = () => {
   if (!recordingBlob) {
     return (
       <PageTransition>
-        <div className="max-w-md mx-auto px-4 py-6 pb-24">
-          <RevealOnScroll direction="up">
-            <div className="true-black-card text-center">
-              <div className="w-8 h-8 border-2 border-gradient-strong border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <h2 className="text-lg font-medium text-text-primary mb-2">
-                Audio wird geladen...
-              </h2>
-              <p className="text-text-secondary text-sm">
-                Bereite deine Aufnahme für die Bearbeitung vor
-              </p>
-            </div>
-          </RevealOnScroll>
+        <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+          {/* Top Navigation */}
+          <TopNavigation />
+          
+          {/* Spacer for fixed header */}
+          <div className="h-[72px]"></div>
+          
+          <div className="px-4 py-6 pb-24">
+            <RevealOnScroll direction="up">
+              <div className="true-black-card text-center">
+                <div className="w-8 h-8 border-2 border-gradient-strong border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <h2 className="text-lg font-medium text-text-primary mb-2">
+                  Audio wird geladen...
+                </h2>
+                <p className="text-text-secondary text-sm">
+                  Bereite deine Aufnahme für die Bearbeitung vor
+                </p>
+              </div>
+            </RevealOnScroll>
+          </div>
         </div>
       </PageTransition>
     );
@@ -213,6 +222,9 @@ export const AudioEditorPage = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      {/* Top Navigation */}
+      <TopNavigation />
+      
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
 
