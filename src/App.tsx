@@ -28,6 +28,7 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="player" element={<PlayerPage />} />
@@ -45,6 +46,7 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="player" element={<PlayerPage />} />
@@ -60,6 +62,7 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="player" element={<PlayerPage />} />
@@ -74,11 +77,9 @@ function App() {
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/record/recorder" element={<RecorderPage />} />
-        <Route path="/audio-editor" element={<AudioEditorPage />} />
         <Route path="/aural/register" element={<RegistrationPage />} />
         <Route path="/aural/admin" element={<AdminPage />} />
         <Route path="/aural/record/recorder" element={<RecorderPage />} />
-        <Route path="/aural/audio-editor" element={<AudioEditorPage />} />
         
         {/* FALLBACK */}
         <Route path="*" element={<FeedPage />} />
