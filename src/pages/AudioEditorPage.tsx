@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Settings, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
-import { TopNavigation } from '../components/layout';
+import { TopNavigation } from '../components/layout/TopNavigation';
 import AudioEditor from '../components/audio/editor/AudioEditor';
 type EncodeFormat = 'mp3' | 'aac';
 
