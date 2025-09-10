@@ -4,16 +4,11 @@ import { Settings, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
 import AudioEditor from '../components/audio/editor/AudioEditor';
-import ExportDialog from '../components/audio/editor/ExportDialog';
 type EncodeFormat = 'mp3' | 'aac';
 
 export const AudioEditorPage = () => {
   const navigate = useNavigate();
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<EncodeFormat>('mp3');
-  const [exportKbps, setExportKbps] = useState(128);
   const [enableFfmpeg, setEnableFfmpeg] = useState(false);
 
   // Load recording from sessionStorage
@@ -27,37 +22,40 @@ export const AudioEditorPage = () => {
         console.log('AudioEditorPage: Found recording data:', data);
         
         if (data.file && data.file.data) {
-          // If it's a blob URL, fetch the blob
+          // If it's a blob URL, try to fetch it, but fallback quickly
           if (data.file.data.startsWith('blob:')) {
             fetch(data.file.data)
-              .then(response => response.blob())
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.blob();
+              })
               .then(blob => {
                 console.log('AudioEditorPage: Loaded blob from URL:', blob.size, 'bytes');
                 setRecordingBlob(blob);
-                setEnableFfmpeg(false); // Disable ffmpeg for now
+                setEnableFfmpeg(false);
               })
               .catch(error => {
-                console.error('AudioEditorPage: Error loading blob:', error);
-                // Fallback to test audio
+                console.error('AudioEditorPage: Error loading blob, using test audio:', error);
+                createTestAudioBlob();
+              });
+          } else if (data.file.data.startsWith('data:')) {
+            // It's a data URL, convert directly to blob
+            fetch(data.file.data)
+              .then(response => response.blob())
+              .then(blob => {
+                console.log('AudioEditorPage: Created blob from data URL:', blob.size, 'bytes');
+                setRecordingBlob(blob);
+                setEnableFfmpeg(false);
+              })
+              .catch(error => {
+                console.error('AudioEditorPage: Error converting data URL, using test audio:', error);
                 createTestAudioBlob();
               });
           } else {
-            // If it's base64 data URL, convert to blob
-            if (data.file.data.startsWith('data:')) {
-              // It's already a data URL, convert directly to blob
-              fetch(data.file.data)
-                .then(response => response.blob())
-                .then(blob => {
-                  console.log('AudioEditorPage: Created blob from data URL:', blob.size, 'bytes');
-                  setRecordingBlob(blob);
-                  setEnableFfmpeg(false);
-                })
-                .catch(error => {
-                  console.error('AudioEditorPage: Error converting data URL to blob:', error);
-                  createTestAudioBlob();
-                });
-            } else {
-              // It's raw base64, convert to blob
+            // It's raw base64, convert to blob
+            try {
               const byteCharacters = atob(data.file.data);
               const byteNumbers = new Array(byteCharacters.length);
               for (let i = 0; i < byteCharacters.length; i++) {
@@ -68,6 +66,9 @@ export const AudioEditorPage = () => {
               console.log('AudioEditorPage: Created blob from base64:', blob.size, 'bytes');
               setRecordingBlob(blob);
               setEnableFfmpeg(false);
+            } catch (error) {
+              console.error('AudioEditorPage: Error converting base64, using test audio:', error);
+              createTestAudioBlob();
             }
           }
         } else {
@@ -80,7 +81,6 @@ export const AudioEditorPage = () => {
       }
     } catch (error) {
       console.error('AudioEditorPage: Error loading recording data:', error);
-      // Fallback to test audio
       createTestAudioBlob();
     }
   }, [navigate]);
@@ -157,19 +157,18 @@ export const AudioEditorPage = () => {
   };
 
 
-  const handleExport = (format: EncodeFormat, kbps: number) => {
-    setExportFormat(format);
-    setExportKbps(kbps);
-    setShowExportDialog(false);
-    setIsExporting(true);
-  };
 
   const handleEditorDone = (processedBlob: Blob) => {
+    console.log('🎯 handleEditorDone called with blob:', {
+      size: processedBlob.size,
+      type: processedBlob.type
+    });
+    
     // Store the processed blob for upload
     const blobUrl = URL.createObjectURL(processedBlob);
     const processedData = {
       file: {
-        name: `edited_${Date.now()}.${exportFormat === 'mp3' ? 'mp3' : exportFormat === 'aac' ? 'aac' : 'wav'}`,
+        name: `edited_${Date.now()}.wav`,
         size: processedBlob.size,
         type: processedBlob.type,
         data: blobUrl // Use blob URL instead of base64
@@ -181,11 +180,13 @@ export const AudioEditorPage = () => {
 
     try {
       sessionStorage.setItem('recordingData', JSON.stringify(processedData));
-      console.log('Processed recording data stored successfully with blob URL');
+      console.log('✅ Processed recording data stored successfully with blob URL');
+      console.log('🚀 Navigating to /upload...');
       navigate('/upload');
     } catch (err) {
-      console.error('Failed to store processed recording:', err);
+      console.error('❌ Failed to store processed recording:', err);
       // Fallback: direct navigation
+      console.log('🚀 Fallback: Navigating to /upload...');
       navigate('/upload');
     }
   };
@@ -234,8 +235,6 @@ export const AudioEditorPage = () => {
               recordingBlob={recordingBlob}
               onDone={handleEditorDone}
               enableFfmpeg={enableFfmpeg}
-              preferredFormat={exportFormat}
-              kbps={exportKbps}
             />
           </div>
         ) : (
@@ -252,13 +251,6 @@ export const AudioEditorPage = () => {
           </div>
         )}
 
-        {/* Export Dialog */}
-        <ExportDialog
-          isOpen={showExportDialog}
-          onClose={() => setShowExportDialog(false)}
-          onExport={handleExport}
-          isExporting={isExporting}
-        />
       </div>
     </div>
   );

@@ -8,8 +8,7 @@ async function ensureFFmpeg() {
   if (ffmpeg) return ffmpeg;
   ffmpeg = new FFmpeg();
   
-  // Use jsdelivr CDN which has proper CORS headers
-  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.4/dist';
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist'; // example CDN
   
   try {
     await ffmpeg.load({

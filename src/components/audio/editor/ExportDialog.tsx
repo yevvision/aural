@@ -1,186 +1,178 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Settings, FileAudio } from 'lucide-react';
-type EncodeFormat = 'mp3' | 'aac';
+import { motion } from 'framer-motion';
+import { Download, X, AlertCircle } from 'lucide-react';
+
+type ExportFormat = 'wav' | 'mp3' | 'aac';
 
 interface ExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (format: EncodeFormat, kbps: number) => void;
+  onExport: (format: ExportFormat, quality: number) => void;
   isExporting?: boolean;
+  error?: string | null;
 }
 
-export default function ExportDialog({ 
-  isOpen, 
-  onClose, 
-  onExport, 
-  isExporting = false 
+export default function ExportDialog({
+  isOpen,
+  onClose,
+  onExport,
+  isExporting = false,
+  error = null
 }: ExportDialogProps) {
-  const [selectedFormat, setSelectedFormat] = useState<EncodeFormat>('mp3');
-  const [selectedKbps, setSelectedKbps] = useState(128);
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('wav');
+  const [quality, setQuality] = useState(128);
 
-  const formats = [
-    { value: 'mp3' as EncodeFormat, label: 'MP3', description: 'Kleinere Dateigröße' },
-    { value: 'aac' as EncodeFormat, label: 'AAC', description: 'Bessere Qualität' },
-  ];
-
-  const kbpsOptions = [96, 128, 192, 256, 320];
+  if (!isOpen) return null;
 
   const handleExport = () => {
-    onExport(selectedFormat, selectedKbps);
+    onExport(selectedFormat, quality);
   };
 
+  const formatOptions = [
+    { value: 'wav' as const, label: 'WAV (unverlustig)', description: 'Beste Qualität, größere Datei' },
+    { value: 'mp3' as const, label: 'MP3', description: 'Kleinere Datei, gute Qualität' },
+    { value: 'aac' as const, label: 'AAC', description: 'Moderne Komprimierung' }
+  ];
+
+  const qualityOptions = [
+    { value: 64, label: '64 kbps', description: 'Niedrige Qualität' },
+    { value: 128, label: '128 kbps', description: 'Standard Qualität' },
+    { value: 192, label: '192 kbps', description: 'Hohe Qualität' },
+    { value: 320, label: '320 kbps', description: 'Sehr hohe Qualität' }
+  ];
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          {/* Backdrop */}
-          <motion.div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+    <motion.div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-gray-900 rounded-xl p-6 w-full max-w-md border border-gray-700"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-white">Export-Optionen</h2>
+          <button
             onClick={onClose}
-          />
-
-          {/* Dialog */}
-          <motion.div
-            className="relative w-full max-w-md bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6"
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            disabled={isExporting}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                  <FileAudio size={20} className="text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Export-Einstellungen</h3>
-                  <p className="text-sm text-white/60">Wähle Format und Qualität</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
-              >
-                <X size={16} strokeWidth={1.5} />
-              </button>
-            </div>
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
 
-            {/* Format Selection */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-white mb-3">
-                  Audio-Format
+        {/* Format Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-3">
+            Audio-Format
+          </label>
+          <div className="space-y-2">
+            {formatOptions.map((option) => (
+              <label
+                key={option.value}
+                className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                  selectedFormat === option.value
+                    ? 'border-orange-500 bg-orange-500/10'
+                    : 'border-gray-600 hover:border-gray-500'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="format"
+                  value={option.value}
+                  checked={selectedFormat === option.value}
+                  onChange={(e) => setSelectedFormat(e.target.value as ExportFormat)}
+                  className="sr-only"
+                />
+                <div className="flex-1">
+                  <div className="text-white font-medium">{option.label}</div>
+                  <div className="text-gray-400 text-sm">{option.description}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Quality Selection (only for compressed formats) */}
+        {selectedFormat !== 'wav' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Qualität
+            </label>
+            <div className="space-y-2">
+              {qualityOptions.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                    quality === option.value
+                      ? 'border-orange-500 bg-orange-500/10'
+                      : 'border-gray-600 hover:border-gray-500'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="quality"
+                    value={option.value}
+                    checked={quality === option.value}
+                    onChange={(e) => setQuality(Number(e.target.value))}
+                    className="sr-only"
+                  />
+                  <div className="flex-1">
+                    <div className="text-white font-medium">{option.label}</div>
+                    <div className="text-gray-400 text-sm">{option.description}</div>
+                  </div>
                 </label>
-                <div className="space-y-2">
-                  {formats.map((format) => (
-                    <motion.button
-                      key={format.value}
-                      onClick={() => setSelectedFormat(format.value)}
-                      className={`w-full p-4 rounded-lg border transition-all touch-manipulation ${
-                        selectedFormat === format.value
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-white/20 bg-white/5 hover:bg-white/10'
-                      }`}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      style={{ minHeight: '60px' }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-left">
-                          <div className="text-white font-medium">{format.label}</div>
-                          <div className="text-white/60 text-sm">{format.description}</div>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 ${
-                          selectedFormat === format.value
-                            ? 'border-red-500 bg-red-500'
-                            : 'border-white/40'
-                        }`}>
-                          {selectedFormat === format.value && (
-                            <div className="w-full h-full rounded-full bg-white scale-50" />
-                          )}
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quality Selection */}
-              <div>
-                <label className="block text-sm font-medium text-white mb-3">
-                  Qualität (kbps)
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {kbpsOptions.map((kbps) => (
-                    <motion.button
-                      key={kbps}
-                      onClick={() => setSelectedKbps(kbps)}
-                      className={`p-4 rounded-lg border text-sm font-medium transition-all touch-manipulation ${
-                        selectedKbps === kbps
-                          ? 'border-red-500 bg-red-500/10 text-red-400'
-                          : 'border-white/20 bg-white/5 text-white/80 hover:bg-white/10'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      style={{ minHeight: '48px', minWidth: '48px' }}
-                    >
-                      {kbps}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
+          </div>
+        )}
 
-            {/* Actions - Mobile Optimized */}
-            <div className="flex gap-3 mt-8">
-              <motion.button
-                onClick={onClose}
-                className="flex-1 py-4 px-4 rounded-lg border border-white/20 text-white font-medium hover:bg-white/10 transition-colors touch-manipulation"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={isExporting}
-                style={{ minHeight: '48px' }}
-              >
-                Abbrechen
-              </motion.button>
-              <motion.button
-                onClick={handleExport}
-                disabled={isExporting}
-                className="flex-1 py-4 px-4 rounded-lg bg-red-500 text-white font-medium flex items-center justify-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50 touch-manipulation"
-                whileHover={!isExporting ? { scale: 1.02 } : {}}
-                whileTap={!isExporting ? { scale: 0.98 } : {}}
-                style={{ minHeight: '48px' }}
-              >
-                {isExporting ? (
-                  <>
-                    <motion.div
-                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
-                    Exportiert...
-                  </>
-                ) : (
-                  <>
-                    <Download size={16} strokeWidth={1.5} />
-                    Exportieren
-                  </>
-                )}
-              </motion.button>
-            </div>
+        {/* Error Display */}
+        {error && (
+          <motion.div
+            className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg mb-4"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+            <span className="text-red-400 text-sm">{error}</span>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={isExporting}
+            className="flex-1 py-3 px-4 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex-1 py-3 px-4 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isExporting ? (
+              <motion.div
+                className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+            ) : (
+              <Download size={16} />
+            )}
+            {isExporting ? 'Exportiert...' : 'Exportieren'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

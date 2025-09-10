@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Scissors, AlertCircle, Trash2, Play } from 'lucide-react';
+import { Scissors, AlertCircle, Trash2, Play, Download, ArrowRight } from 'lucide-react';
 import WaveformVisualizer from './WaveformVisualizer';
-import { concatenateSegments, encodeWithFfmpegWorker } from '../../../hooks/useTrimExport';
+import { concatenateSegments, encodeWithFfmpegWorker, trimToWav } from '../../../hooks/useTrimExport';
 
 type EncodeFormat = 'mp3' | 'aac';
 
@@ -10,14 +10,10 @@ export default function AudioEditor({
   recordingBlob,
   onDone,
   enableFfmpeg = false,
-  preferredFormat = 'mp3' as EncodeFormat,
-  kbps = 128,
 }: {
   recordingBlob: Blob;
   onDone: (out: Blob) => void; // gibt den geschnittenen/encodierten Blob zurück
   enableFfmpeg?: boolean;
-  preferredFormat?: EncodeFormat;
-  kbps?: number;
 }) {
   console.log('AudioEditor: Received recording blob:', {
     size: recordingBlob?.size,
@@ -28,10 +24,11 @@ export default function AudioEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSegments, setSelectedSegments] = useState<{ start: number; end: number }[]>([]);
+  const [allRegions, setAllRegions] = useState<{ start: number; end: number; id: string }[]>([]);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [waveformDuration, setWaveformDuration] = useState<number>(0);
   const [clickedSelection, setClickedSelection] = useState<{ start: number; end: number } | null>(null);
-  const canExport = selectedSegments.length > 0 || (sel !== null && sel.start < sel.end);
+  const canExport = allRegions.length > 0 || selectedSegments.length > 0 || (sel !== null && sel.start < sel.end && sel.end > sel.start);
 
   const handleSelectionChange = (selection: { start: number; end: number } | null) => {
     console.log('AudioEditor: Selection changed to:', selection);
@@ -41,6 +38,22 @@ export default function AudioEditor({
   const handleDurationChange = (duration: number) => {
     console.log('AudioEditor: Duration received from waveform:', duration);
     setWaveformDuration(duration);
+  };
+
+  const handleRegionsChange = (regions: { start: number; end: number; id: string }[]) => {
+    console.log('AudioEditor: Regions changed:', regions);
+    setAllRegions(regions);
+  };
+
+  // Get color for a specific region - all regions are orange now
+  const getRegionColor = (regionId: string) => {
+    return 'rgba(245, 158, 11, 0.25)'; // orange
+  };
+
+  const [removeRegionFn, setRemoveRegionFn] = useState<((start: number, end: number) => void) | null>(null);
+
+  const handleRemoveRegionReady = (removeFn: (start: number, end: number) => void) => {
+    setRemoveRegionFn(() => removeFn);
   };
 
   // Get audio duration when blob is available
@@ -91,8 +104,16 @@ export default function AudioEditor({
     console.log('AudioEditor: Selection clicked:', selection);
   };
 
-  const handleDeleteSelection = () => {
-    if (clickedSelection) {
+  const handleDeleteSelection = (start?: number, end?: number) => {
+    if (start !== undefined && end !== undefined) {
+      // Delete specific region from both state and waveform
+      if (removeRegionFn) {
+        removeRegionFn(start, end);
+      }
+      // The region will be removed from state via the region-removed event
+      console.log('AudioEditor: Region deleted:', { start, end });
+    } else if (clickedSelection) {
+      // Delete clicked selection (legacy)
       setSelectedSegments(prev => prev.filter(segment => 
         segment.start !== clickedSelection.start || segment.end !== clickedSelection.end
       ));
@@ -101,19 +122,22 @@ export default function AudioEditor({
     }
   };
 
-  const handlePlaySelection = () => {
-    if (clickedSelection && recordingBlob) {
+  const handlePlaySelection = (start?: number, end?: number) => {
+    const playStart = start !== undefined ? start : clickedSelection?.start;
+    const playEnd = end !== undefined ? end : clickedSelection?.end;
+    
+    if (playStart !== undefined && playEnd !== undefined && recordingBlob) {
       // Create audio element and play the selected segment
       const audio = new Audio();
       const url = URL.createObjectURL(recordingBlob);
       audio.src = url;
       
       audio.onloadedmetadata = () => {
-        audio.currentTime = clickedSelection.start;
+        audio.currentTime = playStart;
         audio.play();
         
         // Stop at the end of the selection
-        const stopAt = clickedSelection.end;
+        const stopAt = playEnd;
         const checkTime = () => {
           if (audio.currentTime >= stopAt) {
             audio.pause();
@@ -124,25 +148,35 @@ export default function AudioEditor({
         audio.addEventListener('timeupdate', checkTime);
       };
       
-      console.log('AudioEditor: Playing selection:', clickedSelection);
+      console.log('AudioEditor: Playing selection:', { start: playStart, end: playEnd });
     }
   };
 
-  const exportSelection = async () => {
-    console.log('Export selection called:', { canExport, selectedSegments, sel, busy });
-    if (!canExport || busy) return; // Prevent double-click
+  const handleExport = async (format: 'wav' | 'mp3' | 'aac' = 'wav', quality: number = 128) => {
+    console.log('🚀 Export called:', { format, quality, canExport, selectedSegments, sel, busy, allRegions });
+    if (!canExport || busy) {
+      console.log('❌ Export blocked:', { canExport, busy });
+      return; // Prevent double-click
+    }
     
+    console.log('✅ Starting export...');
     setBusy(true);
     setError(null);
     
     try {
-      // Use current selection if no segments are selected
-      let segmentsToExport = selectedSegments;
-      if (segmentsToExport.length === 0 && sel) {
-        segmentsToExport = [sel];
-      }
+      // Use all regions if available, otherwise use selected segments or current selection
+      let segmentsToExport = allRegions.length > 0 
+        ? allRegions.map(region => ({ start: region.start, end: region.end }))
+        : selectedSegments.length > 0 
+          ? selectedSegments 
+          : sel 
+            ? [sel] 
+            : [];
       
-      console.log('Starting export with segments:', segmentsToExport);
+      console.log('📊 Segments to export:', segmentsToExport);
+      console.log('📊 All regions:', allRegions);
+      console.log('📊 Selected segments:', selectedSegments);
+      console.log('📊 Current selection:', sel);
       
       if (segmentsToExport.length === 0) {
         throw new Error('Keine Segmente ausgewählt. Bitte wähle mindestens einen Bereich aus.');
@@ -162,14 +196,15 @@ export default function AudioEditor({
       }
       
       // Concatenate all segments into one audio file
+      console.log('🔄 Concatenating segments...');
       const wav = await concatenateSegments(recordingBlob, sortedSegments);
-      console.log('Concatenated WAV created, size:', wav.size);
+      console.log('✅ Concatenated WAV created, size:', wav.size);
 
       // 2) Optional: MP3/AAC via ffmpeg.wasm im Worker (auf Mobile evtl. langsam)
-      if (enableFfmpeg) {
+      if (format !== 'wav' && enableFfmpeg) {
         console.log('Encoding with ffmpeg...');
         try {
-          const encoded = await encodeWithFfmpegWorker(wav, preferredFormat, kbps);
+          const encoded = await encodeWithFfmpegWorker(wav, format as EncodeFormat, quality);
           console.log('Encoded file size:', encoded.size);
           onDone(encoded);
         } catch (ffmpegError) {
@@ -179,9 +214,11 @@ export default function AudioEditor({
           onDone(wav);
         }
       } else {
-        console.log('Using WAV directly');
+        console.log('🎵 Using WAV directly');
         // Default: WAV zurückgeben (oder WebM-Flow ergänzen)
+        console.log('📤 Calling onDone with WAV blob...');
         onDone(wav);
+        console.log('✅ onDone called successfully');
       }
     } catch (err) {
       console.error('Export failed:', err);
@@ -204,96 +241,93 @@ export default function AudioEditor({
     <div className="flex flex-col gap-6">
       {/* Waveform - im Stil der Audio-Detail-Seite */}
       <div className="bg-transparent">
-        <WaveformVisualizer 
+        <WaveformVisualizer
           blob={recordingBlob} 
           onSelectionChange={handleSelectionChange}
           onDurationChange={handleDurationChange}
           onAddSegment={handleAddSegment}
+          onRegionsChange={handleRegionsChange}
+          onRemoveRegionReady={handleRemoveRegionReady}
         />
       </div>
 
-      {/* Duration Info */}
-      <div className="mt-8 py-4 px-6 bg-transparent backdrop-blur-sm -mx-6">
-        <div className="grid grid-cols-2 gap-4 text-center">
-          {/* Audio Duration */}
-          <div>
-            <div className="text-gray-400 text-xs mb-1">Dauer der Aufnahme:</div>
-            <div className="text-white text-lg font-mono">
-              {formatTime(waveformDuration || audioDuration)}
-            </div>
-            {/* Debug info */}
-            {import.meta.env.DEV && (
-              <div className="text-xs text-gray-500 mt-1">
-                Debug: Audio={audioDuration.toFixed(2)}s, Waveform={waveformDuration.toFixed(2)}s
-              </div>
-            )}
-          </div>
-          
-          {/* Selection Duration */}
-          <div>
-            <div className="text-gray-400 text-xs mb-1">Dauer der Auswahl:</div>
-            <div className="text-white text-lg font-mono">
-              {(() => {
-                // Calculate total duration of all selected segments plus current selection
-                const totalDuration = selectedSegments.reduce((sum, segment) => sum + (segment.end - segment.start), 0);
-                const currentSelectionDuration = sel ? (sel.end - sel.start) : 0;
-                const combinedDuration = totalDuration + currentSelectionDuration;
-                return formatTime(combinedDuration);
-              })()}
-            </div>
-          </div>
-        </div>
-        
-        {/* Selection Details */}
-        {sel && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <motion.div 
-              className={`text-center text-sm cursor-pointer p-2 rounded-lg transition-all duration-200 ${
-                clickedSelection && clickedSelection.start === sel.start && clickedSelection.end === sel.end
-                  ? 'bg-orange-500/20 border border-orange-500/40 text-orange-300'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-gray-300'
-              }`}
-              onClick={() => handleSelectionClick(sel)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Auswahl: {formatTime(sel.start)} → {formatTime(sel.end)}
-            </motion.div>
+
+
+      {/* All Regions - Individual boxes with matching colors */}
+      <div className="space-y-3">
+        {allRegions.length > 0 ? (
+          allRegions.map((region, index) => {
+            // All regions are orange
+            const regionColor = 'rgba(245, 158, 11, 0.25)'; // orange
             
-            {/* Action Buttons for clicked selection */}
-            {clickedSelection && clickedSelection.start === sel.start && clickedSelection.end === sel.end && (
-              <motion.div 
-                className="flex gap-3 mt-3"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+            // All regions are orange
+            const colorVariant = 'orange';
+            
+            return (
+              <div 
+                key={region.id} 
+                className="rounded-lg p-4 border-2"
+                style={{ 
+                  backgroundColor: regionColor,
+                  borderColor: regionColor.replace('0.25', '0.5')
+                }}
               >
-                <motion.button
-                  onClick={handlePlaySelection}
-                  className="flex-1 py-2 px-3 rounded-lg border border-green-500 bg-green-500/20 flex items-center justify-center space-x-2 hover:bg-green-500/30 transition-all duration-200"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Play size={14} className="text-green-500" strokeWidth={1.5} />
-                  <span className="text-green-500 text-xs font-medium">Abspielen</span>
-                </motion.button>
+                <div className="text-center mb-3">
+                  <span className="text-sm font-medium text-white">
+                    Region {index + 1}: {formatTime(region.start)} → {formatTime(region.end)}
+                  </span>
+                </div>
                 
-                <motion.button
-                  onClick={handleDeleteSelection}
-                  className="flex-1 py-2 px-3 rounded-lg border border-red-500 bg-red-500/20 flex items-center justify-center space-x-2 hover:bg-red-500/30 transition-all duration-200"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Trash2 size={14} className="text-red-500" strokeWidth={1.5} />
-                  <span className="text-red-500 text-xs font-medium">Löschen</span>
-                </motion.button>
-              </motion.div>
-            )}
+                {/* Action Buttons - Always visible */}
+                <div className="flex gap-2">
+                  <motion.button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePlaySelection(region.start, region.end);
+                    }}
+                    className="flex-1 py-2 px-3 rounded-full border-2 border-white bg-transparent flex items-center justify-center space-x-2 hover:bg-white/10 transition-all duration-200"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Play size={14} className="text-white" strokeWidth={1.5} />
+                    <span className="text-white text-sm font-medium">Abspielen</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (index !== 0) {
+                        handleDeleteSelection(region.start, region.end);
+                      }
+                    }}
+                    disabled={index === 0}
+                    className={`flex-1 py-2 px-3 rounded-full border-2 flex items-center justify-center space-x-2 transition-all duration-200 ${
+                      index === 0 
+                        ? 'border-white/50 bg-transparent cursor-not-allowed opacity-50'
+                        : 'border-white bg-transparent hover:bg-white/10'
+                    }`}
+                    whileHover={index === 0 ? {} : { scale: 1.02 }}
+                    whileTap={index === 0 ? {} : { scale: 0.98 }}
+                  >
+                    <Trash2 size={14} className={index === 0 ? 'text-white/50' : 'text-white'} strokeWidth={1.5} />
+                    <span className={`text-sm font-medium ${index === 0 ? 'text-white/50' : 'text-white'}`}>
+                      Löschen
+                    </span>
+                  </motion.button>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-sm">
+              Klicken Sie auf "Neue Region" um einen Bereich zu markieren
+            </div>
           </div>
         )}
       </div>
-
 
       {/* Selected Segments Info */}
       {selectedSegments.length > 0 && (
@@ -355,11 +389,25 @@ export default function AudioEditor({
         </div>
       )}
 
+      {/* Instructions when no selection */}
+      {!canExport && !busy && (
+        <div className="text-center py-6 px-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+          <div className="text-blue-400 text-sm font-medium mb-2">
+            🎯 Wählen Sie einen Bereich aus
+          </div>
+          <div className="text-blue-300 text-xs space-y-1">
+            <p>• Ziehen Sie über die Wellenform, um einen Bereich zu markieren</p>
+            <p>• Oder klicken Sie "Region setzen" für eine automatische Auswahl</p>
+            <p>• Fügen Sie mehrere Segmente hinzu, um sie zu kombinieren</p>
+          </div>
+        </div>
+      )}
+
       {/* Full-width Export Button */}
       <motion.button
-        onClick={exportSelection}
+        onClick={() => canExport ? handleExport() : null}
         disabled={!canExport || busy}
-        className="w-full py-4 px-6 rounded-xl border border-orange-500 bg-orange-500/20 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-500/30 transition-all duration-200"
+        className="w-full py-4 px-6 rounded-full border border-orange-500 bg-orange-500/20 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-500/30 transition-all duration-200"
         whileHover={!busy && canExport ? { scale: 1.02 } : {}}
         whileTap={!busy && canExport ? { scale: 0.98 } : {}}
       >
@@ -370,10 +418,10 @@ export default function AudioEditor({
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           />
         ) : (
-          <Scissors size={20} className="text-orange-500" strokeWidth={1.5} />
+          <ArrowRight size={20} className="text-orange-500" strokeWidth={1.5} />
         )}
         <span className="text-orange-500 font-medium">
-          {busy ? 'Wird verarbeitet...' : 'Next step'}
+          {busy ? 'Wird verarbeitet...' : canExport ? 'Exportieren' : 'Bereich auswählen'}
         </span>
       </motion.button>
 
@@ -388,6 +436,7 @@ export default function AudioEditor({
           <span className="text-red-400 text-sm">{error}</span>
         </motion.div>
       )}
+
 
     </div>
   );
