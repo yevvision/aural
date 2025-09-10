@@ -1,11 +1,82 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Settings, Download, Home, MessageCircle, User, Mic, Search, ArrowLeft } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
-import { TopNavigation } from '../components/layout/TopNavigation';
 import AudioEditor from '../components/audio/editor/AudioEditor';
 type EncodeFormat = 'mp3' | 'aac';
+
+// Simple Navigation Component for Audio Editor
+const SimpleNavigation = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const navItems = [
+    { to: '/', icon: Home, label: 'Home', color: 'accent-pink' },
+    { to: '/news', icon: MessageCircle, label: 'News', color: 'accent-violet' },
+    { to: '/profile', icon: User, label: 'Profil', color: 'accent-blue' },
+    { to: '/record', icon: Mic, label: 'Aufnehmen', color: 'accent-orange' },
+    { to: '/search', icon: Search, label: 'Suchen', color: 'accent-green' },
+  ];
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    if (path === '/profile') return location.pathname === '/profile';
+    if (path === '/news') return location.pathname.startsWith('/news');
+    return location.pathname.startsWith(path);
+  };
+
+  return (
+    <motion.nav
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10"
+    >
+      <div className="max-w-md mx-auto px-4 py-3">
+        <div className="flex items-center justify-between">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <ArrowLeft size={20} className="text-white" />
+          </button>
+
+          {/* Logo/Title */}
+          <div className="flex-1 text-center">
+            <h1 className="text-white font-bold text-lg">Audio bearbeiten</h1>
+          </div>
+
+          {/* Placeholder for symmetry */}
+          <div className="w-10"></div>
+        </div>
+
+        {/* Navigation Items */}
+        <div className="flex justify-around mt-3">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.to);
+            
+            return (
+              <button
+                key={item.to}
+                onClick={() => navigate(item.to)}
+                className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
+                  active 
+                    ? 'bg-white/20 text-white' 
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="text-xs font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </motion.nav>
+  );
+};
 
 export const AudioEditorPage = () => {
   const navigate = useNavigate();
@@ -196,11 +267,11 @@ export const AudioEditorPage = () => {
     return (
       <PageTransition>
         <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
-          {/* Top Navigation */}
-          <TopNavigation />
+          {/* Simple Navigation */}
+          <SimpleNavigation />
           
           {/* Spacer for fixed header */}
-          <div className="h-[72px]"></div>
+          <div className="h-[120px]"></div>
           
           <div className="px-4 py-6 pb-24">
             <RevealOnScroll direction="up">
@@ -222,13 +293,13 @@ export const AudioEditorPage = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
-      {/* Top Navigation */}
-      <TopNavigation />
+      {/* Simple Navigation */}
+      <SimpleNavigation />
       
       {/* Spacer for fixed header */}
-      <div className="h-[72px]"></div>
+      <div className="h-[120px]"></div>
 
-      <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
+      <div className="px-6 pb-6 min-h-[calc(100vh-120px)] flex flex-col">
 
         {/* Title */}
         <h1 className="text-white text-4xl font-bold leading-tight mb-4">
