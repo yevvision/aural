@@ -194,7 +194,7 @@ export const AudioEditorPage = () => {
   if (!recordingBlob) {
     return (
       <PageTransition>
-        <div className="px-4 py-6 pb-24">
+        <div className="max-w-md mx-auto px-4 py-6 pb-24">
           <RevealOnScroll direction="up">
             <div className="true-black-card text-center">
               <div className="w-8 h-8 border-2 border-gradient-strong border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -212,7 +212,7 @@ export const AudioEditorPage = () => {
   }
 
   return (
-    <div className="px-6 pb-6 flex flex-col">
+    <div className="max-w-md mx-auto px-6 pb-6 flex flex-col">
 
         {/* Title */}
         <h1 className="text-white text-4xl font-bold leading-tight mb-4">
