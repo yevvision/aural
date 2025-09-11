@@ -116,10 +116,10 @@ export const FeedPage = () => {
   // Fallback: Wenn keine Tracks geladen sind, zeige eine Nachricht
   if (!isInitialized || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Lade Inhalte...</p>
+          <p className="mt-4 text-white">Loading content...</p>
         </div>
       </div>
     );
@@ -317,77 +317,54 @@ export const FeedPage = () => {
               </RevealOnScroll>
             ) : (
               <>
-                {/* Enhanced Category Sections with Motion */}
-                {feedCategories.map((category, categoryIndex) => {
-                  const categoryTracks = getCategoryTracks(category.id);
-                  
-                  // Debug: Log für jede Kategorie
-                  console.log(`🎯 FeedPage: Kategorie ${category.id} - Tracks: ${categoryTracks.length}`);
-                  
-                  // Zeige Kategorie auch wenn leer (für Debugging)
-                  if (categoryTracks.length === 0) {
-                    console.log(`⚠️ FeedPage: Kategorie ${category.id} ist leer - wird trotzdem gerendert für Debugging`);
+                {/* Enhanced Category Sections with Motion - Only show categories with content */}
+                {feedCategories
+                  .map((category, categoryIndex) => {
+                    const categoryTracks = getCategoryTracks(category.id);
+                    return { category, categoryTracks, originalIndex: categoryIndex };
+                  })
+                  .filter(({ categoryTracks }) => categoryTracks.length > 0) // Only show categories with content
+                  .map(({ category, categoryTracks }, filteredIndex) => {
+                    // Debug: Log für jede Kategorie
+                    console.log(`🎯 FeedPage: Kategorie ${category.id} - Tracks: ${categoryTracks.length} (wird angezeigt)`);
+                    
                     return (
                       <RevealOnScroll 
                         key={category.id} 
                         direction="up" 
-                        delay={categoryIndex * 0.1}
+                        delay={filteredIndex * 0.1}
                         className="space-y-3"
                       >
                         <motion.div 
                           className="flex items-center justify-between"
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: categoryIndex * 0.1 }}
+                          transition={{ delay: filteredIndex * 0.1 }}
                         >
                           <h2 className="text-lg font-semibold text-text-primary">
-                            {category.name} (0 Tracks)
+                            {category.name}
                           </h2>
+                          <motion.button
+                            onClick={() => navigate(`/category/${category.id}`)}
+                            className="flex items-center text-sm text-text-secondary hover:text-gradient-strong transition-colors"
+                            whileHover={{ x: 5 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            View all
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </motion.button>
                         </motion.div>
-                        <div className="text-center py-4 text-gray-500">
-                          Keine Tracks in dieser Kategorie
-                        </div>
+                        
+                        <StaggerWrapper className="space-y-3">
+                          {categoryTracks.map((track, index) => (
+                            <StaggerItem key={track.id}>
+                              <AudioCard track={track} index={index} />
+                            </StaggerItem>
+                          ))}
+                        </StaggerWrapper>
                       </RevealOnScroll>
                     );
-                  }
-                  
-                  return (
-                    <RevealOnScroll 
-                      key={category.id} 
-                      direction="up" 
-                      delay={categoryIndex * 0.1}
-                      className="space-y-3"
-                    >
-                      <motion.div 
-                        className="flex items-center justify-between"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: categoryIndex * 0.1 }}
-                      >
-                        <h2 className="text-lg font-semibold text-text-primary">
-                          {category.name}
-                        </h2>
-                        <motion.button
-                          onClick={() => navigate(`/category/${category.id}`)}
-                          className="flex items-center text-sm text-text-secondary hover:text-gradient-strong transition-colors"
-                          whileHover={{ x: 5 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          View all
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </motion.button>
-                      </motion.div>
-                      
-                      <StaggerWrapper className="space-y-3">
-                        {categoryTracks.map((track, index) => (
-                          <StaggerItem key={track.id}>
-                            <AudioCard track={track} index={index} />
-                          </StaggerItem>
-                        ))}
-                      </StaggerWrapper>
-                    </RevealOnScroll>
-                  );
-                })}
+                  })}
 
                 {/* Enhanced Show All Tracks Section */}
                 <RevealOnScroll direction="up" delay={0.3}>

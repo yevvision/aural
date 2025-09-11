@@ -41,7 +41,7 @@
 
 html, body {
   margin: 0;
-  background-color: transparent;
+  background-color: #000000;
   color: var(--text-primary);
   font-family: 'Inter', 'Manrope', system-ui, sans-serif;
   overflow-x: hidden;

@@ -129,12 +129,24 @@ export const useDatabase = (currentUserId?: string) => {
 
   const addCommentToTrack = (trackId: string, comment: any): boolean => {
     console.log('💬 useDatabase: addCommentToTrack()', trackId);
-    return DatabaseService.addCommentToTrack(trackId, comment);
+    const success = DatabaseService.addCommentToTrack(trackId, comment);
+    if (success) {
+      // Nur die Kommentare aktualisieren, nicht alle Daten neu laden
+      const updatedComments = DatabaseService.getComments();
+      setComments(updatedComments);
+    }
+    return success;
   };
 
   const deleteCommentFromTrack = (trackId: string, commentId: string): boolean => {
     console.log('🗑️ useDatabase: deleteCommentFromTrack()', trackId, commentId);
-    return DatabaseService.deleteCommentFromTrack(trackId, commentId);
+    const success = DatabaseService.deleteCommentFromTrack(trackId, commentId);
+    if (success) {
+      // Nur die Kommentare aktualisieren, nicht alle Daten neu laden
+      const updatedComments = DatabaseService.getComments();
+      setComments(updatedComments);
+    }
+    return success;
   };
 
   // =============================================================================
@@ -143,12 +155,38 @@ export const useDatabase = (currentUserId?: string) => {
 
   const toggleLike = (trackId: string, userId: string): boolean => {
     console.log('❤️ useDatabase: toggleLike()', trackId, userId);
-    return DatabaseService.toggleLike(trackId, userId);
+    const success = DatabaseService.toggleLike(trackId, userId);
+    if (success) {
+      // Nur die Tracks aktualisieren, nicht alle Daten neu laden
+      const updatedTracks = DatabaseService.getTracks(currentUserId);
+      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      
+      const allTracksMap = new Map();
+      updatedTracks.forEach(track => allTracksMap.set(track.id, track));
+      localTracks.forEach(track => allTracksMap.set(track.id, track));
+      
+      setTracks(Array.from(allTracksMap.values()));
+    }
+    return success;
   };
 
   const toggleBookmark = (trackId: string, userId: string): boolean => {
     console.log('🔖 useDatabase: toggleBookmark()', trackId, userId);
-    return DatabaseService.toggleBookmark(trackId, userId);
+    const success = DatabaseService.toggleBookmark(trackId, userId);
+    if (success) {
+      // Nur die Tracks aktualisieren, nicht alle Daten neu laden
+      const updatedTracks = DatabaseService.getTracks(currentUserId);
+      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      
+      const allTracksMap = new Map();
+      updatedTracks.forEach(track => allTracksMap.set(track.id, track));
+      localTracks.forEach(track => allTracksMap.set(track.id, track));
+      
+      setTracks(Array.from(allTracksMap.values()));
+    }
+    return success;
   };
 
   const getUserLikedTracks = (userId: string): AudioTrack[] => {

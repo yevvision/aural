@@ -216,21 +216,21 @@ export const AudioEditorPage = () => {
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
 
-      <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
+      <div className="px-4 sm:px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
-        {/* Title */}
-        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+        {/* Mobile-optimized Title */}
+        <h1 className="text-white text-3xl sm:text-4xl font-bold leading-tight mb-3 sm:mb-4">
           Edit Audio
         </h1>
 
-        {/* Description */}
-        <p className="text-gray-400 mb-6 leading-snug text-xs">
+        {/* Mobile-optimized Description */}
+        <p className="text-gray-400 mb-4 sm:mb-6 leading-snug text-sm sm:text-xs">
           Select the desired area and export your recording
         </p>
 
-        {/* Audio Editor */}
+        {/* Audio Editor with mobile optimizations */}
         {recordingBlob ? (
-          <div className="flex-1">
+          <div className="flex-1 space-y-4">
             <AudioEditor
               recordingBlob={recordingBlob}
               onDone={handleEditorDone}
@@ -239,14 +239,14 @@ export const AudioEditorPage = () => {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
+            <div className="text-center px-4">
               <motion.div
                 className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               ></motion.div>
-              <p className="text-gray-400">Loading audio data...</p>
+              <p className="text-gray-400 text-sm">Loading audio data...</p>
             </div>
           </div>
         )}

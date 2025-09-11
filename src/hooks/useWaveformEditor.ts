@@ -35,13 +35,52 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         cursorColor: '#ffffff',
         interact: true,
         normalize: true,
-        minPxPerSec: 50,           // improves touch scrubbing accuracy
+        minPxPerSec: 80,           // increased for better mobile touch accuracy
         autoScroll: true,
         autoCenter: true,
+        // Mobile-specific optimizations
+        responsive: true,
+        fillParent: true,
+        // Better touch handling
+        backend: 'MediaElement',
+        mediaControls: false,
+        // Enhanced mobile touch support
+        cursorWidth: 2,
+        hideScrollbar: true,
+        // Better touch responsiveness
+        pixelRatio: window.devicePixelRatio || 1,
       });
 
-      // Regions plugin
-      const regions = ws.registerPlugin(RegionsPlugin.create());
+      // Regions plugin with mobile optimizations
+      const regions = ws.registerPlugin(RegionsPlugin.create({
+        // Mobile-optimized region settings
+        drag: true,
+        resize: true,
+        // Larger touch targets for mobile
+        minLength: 0.1, // minimum 100ms region
+        // Better visual feedback
+        color: 'rgba(245, 158, 11, 0.25)',
+        borderColor: 'rgba(245, 158, 11, 0.8)',
+        borderWidth: 2,
+        // Mobile-friendly handles
+        handleStyle: {
+          left: {
+            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+            border: '2px solid white',
+            borderRadius: '50%',
+            width: '16px',
+            height: '16px',
+          },
+          right: {
+            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+            border: '2px solid white',
+            borderRadius: '50%',
+            width: '16px',
+            height: '16px',
+          },
+        },
+      }));
+      
       // Touch: regions are draggable/resizable by default
       regions.on('region-created', (r: any) => {
         console.log('Region created:', r);
@@ -70,6 +109,34 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         console.log('WaveSurfer: Ready, duration:', ws.getDuration());
         setIsReady(true);
         setDuration(ws.getDuration());
+        
+        // Add mobile touch event listeners
+        if (container) {
+          // Haptic feedback for touch interactions
+          const triggerHaptic = () => {
+            if ('vibrate' in navigator) {
+              navigator.vibrate(10); // Short vibration for touch feedback
+            }
+          };
+          
+          // Touch start for haptic feedback
+          container.addEventListener('touchstart', triggerHaptic, { passive: true });
+          
+          // Double tap to zoom
+          let lastTap = 0;
+          container.addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0) {
+              // Double tap detected - zoom in/out
+              const currentZoom = ws.getScroll();
+              const newZoom = currentZoom > 1 ? 1 : 2;
+              ws.zoom(newZoom * 80);
+              triggerHaptic();
+            }
+            lastTap = currentTime;
+          }, { passive: true });
+        }
       });
 
       ws.on('error', (error: any) => {

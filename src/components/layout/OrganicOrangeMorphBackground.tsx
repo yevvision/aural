@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Helper functions
@@ -128,7 +128,17 @@ const state13 = () => [
   makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
 ];
 
-const states = [state0(), state4(), state5(), state6(), state13()];
+// State 1: Komplett schwarz (aus HTML State 1) - für /news
+const state1 = () => {
+  // Create 12 blobs with zero alpha and minimal size so they do not render
+  const arr = [];
+  for(let i=0;i<12;i++){
+    arr.push(makeBlob(0.5,0.5,0.1, 1,1, 0, 0, 0, 10, 0));
+  }
+  return arr;
+};
+
+const states = [state0(), state1(), state5(), state6(), state13()];
 
 export const OrganicOrangeMorphBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -140,23 +150,24 @@ export const OrganicOrangeMorphBackground = () => {
   const animationRef = useRef<number>(0);
   const t0Ref = useRef(performance.now());
   const initialLoadRef = useRef(true); // Track initial page load
+  const [isBackgroundReady, setIsBackgroundReady] = useState(false); // Track background readiness
 
   // Map routes to background states (5 states for different pages)
   const getStateIndex = () => {
     // Neue Zuordnung basierend auf den gewünschten Zuständen:
     // State 0: Komplett schwarz (für Aufnahme)
-    // State 1: State 8 aus HTML - Vertikale Streifen (für /news) 
+    // State 1: Komplett schwarz (aus HTML State 1) - für /news 
     // State 2: State 5 aus HTML (für /profile)
     // State 3: State 6 aus HTML (für Startseite)
     // State 4: State 13 aus HTML (für /search)
     
     if (location.pathname === '/') return 3; // Startseite -> State 6 (zentrale Komposition)
-    if (location.pathname.startsWith('/news')) return 1; // News -> State 8 (vertikale Streifen)
+    if (location.pathname.startsWith('/news')) return 1; // News -> State 1 (komplett schwarz aus HTML)
     if (location.pathname.startsWith('/profile')) return 2; // Profile -> State 5 (Keil mit großer Fläche)
     if (location.pathname.startsWith('/record')) return 0; // Record -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/audio-editor')) return 0; // Audio Editor -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/upload')) return 0; // Upload -> State 0 (schwarzer Hintergrund)
-    if (location.pathname.startsWith('/search')) return 4; // Search -> State 13 (fragmentierte Struktur)
+    if (location.pathname.startsWith('/search')) return 0; // Search -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/player') || location.pathname.startsWith('/aufnahme')) return 0; // Player/Aufnahme -> State 0 (schwarz)
     return 3; // default to State 6 (Startseite)
   };
@@ -363,6 +374,9 @@ export const OrganicOrangeMorphBackground = () => {
   };
 
   useEffect(() => {
+    // Immediately set background as ready and transition to the correct state
+    setIsBackgroundReady(true);
+    
     // Only transition after initial render
     if (initialLoadRef.current) {
       // Set transition duration for initial animation

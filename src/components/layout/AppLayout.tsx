@@ -32,6 +32,7 @@ export const AppLayout = () => {
   const { currentTrack } = usePlayerStore();
   const location = useLocation();
   const [visibleAudioCardIds, setVisibleAudioCardIdsState] = useState<Set<string>>(new Set());
+  const [isContentReady, setIsContentReady] = useState(false);
   
   // Create a stable wrapper function that matches the expected signature
   const setVisibleAudioCardIds = useCallback((update: (prev: Set<string>) => Set<string>) => {
@@ -45,6 +46,16 @@ export const AppLayout = () => {
   // Initialize the global audio manager once at the app level
   useEffect(() => {
     initializeGlobalAudioManager();
+  }, []);
+
+  // Load content after background is ready
+  useEffect(() => {
+    // Minimal delay to ensure background is rendered first
+    const timer = setTimeout(() => {
+      setIsContentReady(true);
+    }, 50); // Reduced to 50ms delay to minimize white flash
+
+    return () => clearTimeout(timer);
   }, []);
   
   // Use the audio manager to handle state changes
@@ -78,27 +89,30 @@ export const AppLayout = () => {
         {/* Organic Orange Morph Background - Changes with route navigation */}
         <OrganicOrangeMorphBackground />
         
-        <div className="min-h-screen flex flex-col text-text-primary relative">
-          {/* Top Navigation */}
-          <TopNavigation />
-          
-          {/* Main Content with reduced top padding for category/subpages */}
-          <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') ? 'content-blur-bottom' : ''}`}>
-            <div style={{ minHeight: '100%' }}>
-              <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
-            </div>
-          </main>
-          
-          {/* Mini Player - fixed at bottom of screen when there's a current track and no visible audio card */}
-          {currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') && (
-            <div className="fixed bottom-0 left-0 right-0 z-50">
-              <MiniPlayer displayMode="fixed" />
-            </div>
-          )}
+        {/* Content loads after background is ready */}
+        {isContentReady && (
+          <div className="min-h-screen flex flex-col text-text-primary relative">
+            {/* Top Navigation */}
+            <TopNavigation />
+            
+            {/* Main Content with reduced top padding for category/subpages */}
+            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') ? 'content-blur-bottom' : ''}`}>
+              <div style={{ minHeight: '100%' }}>
+                <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
+              </div>
+            </main>
+            
+            {/* Mini Player - fixed at bottom of screen when there's a current track and no visible audio card */}
+            {currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') && (
+              <div className="fixed bottom-0 left-0 right-0 z-50">
+                <MiniPlayer displayMode="fixed" />
+              </div>
+            )}
 
-          {/* Footer */}
-          <Footer />
-        </div>
+            {/* Footer */}
+            <Footer />
+          </div>
+        )}
       </div>
     </BackNavigationContext.Provider>
   );

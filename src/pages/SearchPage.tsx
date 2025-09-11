@@ -1,17 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, TrendingUp, X, User, Heart, MessageCircle, Bookmark, Filter, Mic } from 'lucide-react';
+import { Search, X, Plus } from 'lucide-react';
 import { AudioCard } from '../components/feed/AudioCard';
-import { useFeedStore } from '../stores/feedStore';
-import { useUserStore } from '../stores/userStore';
-import { useDatabaseSync } from '../hooks/useDatabaseSync';
-import { Button } from '../components/ui/Button';
+import { useDatabase } from '../hooks/useDatabase';
 import { 
   PageTransition, 
   StaggerWrapper, 
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+
+// Gender filters for audio content
+const genderFilters = [
+  { type: 'couples', label: 'Couples' },
+  { type: 'females', label: 'Females' },
+  { type: 'males', label: 'Males' },
+  { type: 'diverse', label: 'Diverse' },
+];
 
 // Simple debounce function
 const debounce = (func: Function, wait: number) => {
@@ -26,24 +31,33 @@ const debounce = (func: Function, wait: number) => {
   };
 };
 
-type SearchFilter = 'all' | 'audio' | 'users' | 'tags';
-
 export const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const { getTracksSorted } = useDatabaseSync();
-  
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('couples');
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [visibleTags, setVisibleTags] = useState<string[]>([]);
+  const [showMoreTags, setShowMoreTags] = useState(false);
+  const { tracks, isLoading } = useDatabase('user-1');
+
+  // Extract all unique tags from tracks
   useEffect(() => {
-    // Always load tracks from database to ensure we have the latest data
-    console.log('SearchPage: Loading tracks from database...');
-    const dbTracks = getTracksSorted('createdAt', 'desc');
-    console.log('SearchPage: Loaded tracks:', dbTracks.length);
-    useFeedStore.getState().setTracks(dbTracks);
-  }, [getTracksSorted]);
-  
+    const tags = new Set<string>();
+    tracks.forEach(track => {
+      if (track.tags && Array.isArray(track.tags)) {
+        track.tags.forEach(tag => {
+          if (tag && typeof tag === 'string') {
+            tags.add(tag.toLowerCase());
+          }
+        });
+      }
+    });
+    const sortedTags = Array.from(tags).sort();
+    setAllTags(sortedTags);
+    setVisibleTags(sortedTags.slice(0, 20));
+  }, [tracks]);
+
   const debouncedSearch = debounce((searchQuery: string) => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -53,21 +67,12 @@ export const SearchPage = () => {
     
     setIsSearching(true);
     
-    // Simulate search delay
     setTimeout(() => {
-      // WICHTIG: Verwende Datenbank-Tracks für Konsistenz
-      const dbTracks = getTracksSorted('createdAt', 'desc');
-      
-      let results = dbTracks.filter(track => {
+      let results = tracks.filter(track => {
         const matchesQuery = 
           track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           track.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (track.tags && track.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())));
-        
-        if (activeFilter === 'all') return matchesQuery;
-        if (activeFilter === 'audio') return matchesQuery && track.title.toLowerCase().includes(searchQuery.toLowerCase());
-        if (activeFilter === 'users') return matchesQuery && track.user?.username?.toLowerCase().includes(searchQuery.toLowerCase());
-        if (activeFilter === 'tags') return matchesQuery && track.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
         
         return matchesQuery;
       });
@@ -86,16 +91,21 @@ export const SearchPage = () => {
     setQuery('');
     setSearchResults([]);
   };
-  
-  const filters: { key: SearchFilter; label: string; icon?: any }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'audio', label: 'Audio', icon: Mic },
-    { key: 'users', label: 'Users', icon: User },
-    { key: 'tags', label: 'Tags' },
-  ];
-  
-  const trendingSearches = ['ASMR', 'Soft', 'Whisper', 'Female', 'Male', 'Gentle'];
-  const recentSearches = ['morning voice', 'bedtime story', 'voice note'];
+
+  const handleGenderFilterChange = (filterType: string) => {
+    setSelectedGenderFilter(filterType);
+  };
+
+  const loadMoreTags = () => {
+    const currentCount = visibleTags.length;
+    const nextTags = allTags.slice(currentCount, currentCount + 20);
+    setVisibleTags(prev => [...prev, ...nextTags]);
+    setShowMoreTags(true);
+  };
+
+  const handleTagClick = (tag: string) => {
+    handleSearch(tag);
+  };
   
   return (
     <PageTransition>
@@ -107,7 +117,7 @@ export const SearchPage = () => {
         >
           {/* Search Header */}
           <RevealOnScroll direction="up">
-            <div className="true-black-card text-center">
+            <div className="text-center">
               <h1 className="text-2xl font-bold text-text-primary mb-2">Search</h1>
               <p className="text-text-secondary">Discover voices and sounds</p>
             </div>
@@ -115,7 +125,7 @@ export const SearchPage = () => {
           
           {/* Search Input */}
           <RevealOnScroll direction="up" delay={0.1}>
-            <div className="true-black-card space-y-3">
+            <div className="space-y-3">
               <div className="relative">
                 <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
                 <input
@@ -125,7 +135,7 @@ export const SearchPage = () => {
                   placeholder="Search for audio, users, tags..."
                   className="w-full pl-10 pr-12 py-3 bg-white/5 border border-white/10 rounded-lg 
                            text-text-primary placeholder-text-secondary 
-                           focus:outline-none focus:border-accent-violet/50 focus:bg-white/10 
+                           focus:outline-none focus:border-gradient-strong/50 focus:bg-white/10 
                            transition-all duration-200"
                 />
                 {query && (
@@ -139,52 +149,28 @@ export const SearchPage = () => {
                   </button>
                 )}
               </div>
-              
-              {/* Filter Toggle */}
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-white/5 rounded-lg 
-                           text-text-secondary hover:text-text-primary hover:bg-white/10 
-                           transition-all duration-200"
+            </div>
+          </RevealOnScroll>
+
+          {/* Gender Filter Toggles */}
+          <RevealOnScroll direction="up" delay={0.2}>
+            <div className="flex flex-wrap gap-2">
+              {genderFilters.map((filterOption) => (
+                <motion.button
+                  key={filterOption.type}
+                  onClick={() => handleGenderFilterChange(filterOption.type)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
+                    selectedGenderFilter === filterOption.type
+                      ? 'bg-gradient-primary text-white'
+                      : 'glass-surface text-text-secondary hover:text-text-primary hover:bg-white/15'
+                  }`}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <Filter size={16} />
-                  <span className="text-sm">Filters</span>
-                </button>
-                {activeFilter !== 'all' && (
-                  <span className="text-xs text-gradient-strong">
-                    Filtering by {activeFilter}
-                  </span>
-                )}
-              </div>
-              
-              {/* Filters */}
-              {showFilters && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-lg border border-white/10"
-                >
-                  {filters.map(({ key, label, icon: Icon }) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setActiveFilter(key);
-                        if (query) debouncedSearch(query);
-                      }}
-                      className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-all duration-200 ${
-                        activeFilter === key
-                          ? 'bg-gradient-primary text-white'
-                          : 'bg-white/10 text-text-secondary hover:bg-white/20 hover:text-text-primary'
-                      }`}
-                    >
-                      {Icon && <Icon size={14} />}
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
+                  <span>{filterOption.label}</span>
+                </motion.button>
+              ))}
             </div>
           </RevealOnScroll>
           
@@ -208,108 +194,63 @@ export const SearchPage = () => {
                 </div>
               ) : searchResults.length === 0 ? (
                 <RevealOnScroll direction="up">
-                  <div className="true-black-card text-center py-8">
+                  <div className="text-center py-8">
                     <Search size={48} className="text-text-secondary mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-text-primary mb-2">
                       No results found
                     </h3>
                     <p className="text-text-secondary mb-4">
-                      Try searching for something else or adjust your filters
+                      Try searching for something else
                     </p>
-                    <button
-                      onClick={() => setActiveFilter('all')}
-                      className="text-accent-blue hover:text-accent-turquoise transition-colors duration-200"
-                    >
-                      Clear filters
-                    </button>
                   </div>
                 </RevealOnScroll>
               ) : (
-                <StaggerWrapper className="space-y-2">
+                <StaggerWrapper className="space-y-3">
                   {searchResults.map((track, index) => (
                     <StaggerItem key={track.id}>
-                      <AudioCard 
-                        track={track} 
-                        index={index} 
-                        showDeleteButton={true}
-                        onDelete={(trackId) => {
-                          // Delete from user store
-                          useUserStore.getState().deleteMyTrack(trackId);
-                          // Delete from feed store
-                          useFeedStore.getState().setTracks(
-                            useFeedStore.getState().tracks.filter(t => t.id !== trackId)
-                          );
-                        }}
-                      />
+                      <AudioCard track={track} index={index} />
                     </StaggerItem>
                   ))}
                 </StaggerWrapper>
               )}
-
             </div>
           ) : (
-            /* Empty State - Trending & Recent */
+            /* Empty State - Show Tags */
             <div className="space-y-6">
-              {/* Trending Searches */}
+              {/* Tags Section */}
               <RevealOnScroll direction="up">
-                <div className="true-black-card">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <TrendingUp size={20} className="text-accent-red" />
-                    <h2 className="text-lg font-medium text-text-primary">
-                      Trending
-                    </h2>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {trendingSearches.map((search) => (
-                      <button
-                        key={search}
-                        onClick={() => handleSearch(search)}
-                        className="px-3 py-2 bg-gradient-to-r from-accent-red/10 to-accent-violet/10 
-                                 border border-accent-red/20 rounded-lg text-text-primary 
-                                 hover:from-accent-red/20 hover:to-accent-violet/20 
-                                 hover:border-accent-red/40 transition-all duration-200"
-                      >
-                        #{search}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </RevealOnScroll>
-              
-              {/* Recent Searches */}
-              <RevealOnScroll direction="up" delay={0.1}>
-                <div className="true-black-card">
+                <div>
                   <h2 className="text-lg font-medium text-text-primary mb-4">
-                    Recent
+                    Popular Tags
                   </h2>
                   
-                  <div className="space-y-2">
-                    {recentSearches.map((search) => (
+                  <div className="flex flex-wrap gap-2">
+                    {visibleTags.map((tag) => (
                       <button
-                        key={search}
-                        onClick={() => handleSearch(search)}
-                        className="w-full flex items-center space-x-3 p-3 bg-white/5 rounded-lg 
-                                 text-left hover:bg-white/10 transition-all duration-200"
+                        key={tag}
+                        onClick={() => handleTagClick(tag)}
+                        className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
+                                 text-text-primary hover:bg-white/10 hover:border-gradient-strong/50 
+                                 transition-all duration-200"
                       >
-                        <Search size={16} className="text-text-secondary" />
-                        <span className="text-text-primary">{search}</span>
+                        #{tag}
                       </button>
                     ))}
                   </div>
-                </div>
-              </RevealOnScroll>
-              
-              {/* Coming Soon */}
-              <RevealOnScroll direction="up" delay={0.2}>
-                <div className="true-black-card text-center py-8">
-                  <div className="text-4xl mb-4">🔍</div>
-                  <h3 className="text-lg font-medium text-text-primary mb-2">
-                    Enhanced Search Coming Soon
-                  </h3>
-                  <p className="text-text-secondary text-sm">
-                    Advanced filters, voice search, and more discovery features
-                  </p>
+                  
+                  {allTags.length > visibleTags.length && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={loadMoreTags}
+                        className="flex items-center space-x-2 px-4 py-2 bg-gradient-primary/10 
+                                 border border-gradient-primary/20 rounded-lg text-gradient-strong 
+                                 hover:bg-gradient-primary/20 transition-all duration-200 mx-auto"
+                      >
+                        <Plus size={16} />
+                        <span>Load more tags</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </RevealOnScroll>
             </div>

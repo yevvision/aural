@@ -122,21 +122,60 @@ export const useGlobalAudioManager = () => {
       format: currentTrack.format
     });
     
+    // Debug: Test if the URL is valid
+    if (currentTrack.url) {
+      console.log('🔍 Testing audio URL validity...');
+      const testAudio = new Audio();
+      testAudio.oncanplay = () => {
+        console.log('✅ Audio URL is valid and can play');
+        testAudio.remove();
+      };
+      testAudio.onerror = (e) => {
+        console.error('❌ Audio URL is invalid:', e);
+        console.error('❌ Error details:', {
+          code: testAudio.error?.code,
+          message: testAudio.error?.message,
+          src: testAudio.src
+        });
+        testAudio.remove();
+      };
+      testAudio.src = currentTrack.url;
+    }
+    
     // Ensure we have a valid URL
     if (currentTrack.url) {
       // Reset audio element before setting new source
       audio.src = '';
       audio.load();
       
-      audio.src = currentTrack.url;
-      audio.load();
-      
-      // Add extra logging for base64 URLs
+      // Validate base64 data URLs
       if (currentTrack.url.startsWith('data:audio/')) {
         console.log('Loading base64 audio, first 100 chars:', currentTrack.url.substring(0, 100));
+        
+        // Check if base64 data is valid
+        try {
+          const base64Data = currentTrack.url.split(',')[1];
+          if (!base64Data || base64Data.length === 0) {
+            console.error('❌ Base64 data is empty');
+            setLoading(false);
+            return;
+          }
+          
+          // Try to decode a small portion to validate
+          atob(base64Data.substring(0, 100));
+          console.log('✅ Base64 data appears valid');
+        } catch (error) {
+          console.error('❌ Base64 data is invalid:', error);
+          setLoading(false);
+          return;
+        }
+        
         // For base64 audio, set a longer timeout since it might take longer to decode
         audio.preload = 'auto';
       }
+      
+      audio.src = currentTrack.url;
+      audio.load();
     } else {
       console.error('Track has no URL:', currentTrack);
       setLoading(false);

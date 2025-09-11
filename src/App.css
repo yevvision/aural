@@ -4,7 +4,7 @@
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  background-color: transparent;
+  background-color: #000000;
   color: var(--text-primary, #FFFFFF);
   overflow-x: hidden;
 }
