@@ -15,6 +15,7 @@ interface ActivityStore {
   markAsRead: (activityId: string) => void;
   markAllAsRead: () => void;
   clearActivities: () => void;
+  removeUserActivitiesFromNotifications: () => void;
   getActivitiesByType: (type: 'like' | 'comment' | 'follow' | 'bookmark' | 'followed_user_upload' | 'upload') => NotificationActivity[];
   
   // Actions for user's own activities
@@ -71,6 +72,19 @@ export const useActivityStore = create<ActivityStore>()(
         set({ activities: [], unreadCount: 0 });
       },
       
+      // Remove user's own activities from notifications (they should only be in userActivities)
+      removeUserActivitiesFromNotifications: () => {
+        set((state) => {
+          const filteredActivities = state.activities.filter(activity => 
+            activity.user.id !== 'self' && activity.user.username !== 'Du'
+          );
+          return {
+            activities: filteredActivities,
+            unreadCount: filteredActivities.filter(a => !a.isRead).length
+          };
+        });
+      },
+      
       getActivitiesByType: (type) => {
         return get().activities.filter(activity => activity.type === type);
       },
@@ -92,7 +106,7 @@ export const useActivityStore = create<ActivityStore>()(
       
       // Function to add user's own activity to notifications as well
       addUserActivityAsNotification: (activityData) => {
-        // Add to user's own activities (no notification dot for these)
+        // Only add to user's own activities, NOT to notifications
         const newActivity: UserActivity = {
           ...activityData,
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -100,31 +114,10 @@ export const useActivityStore = create<ActivityStore>()(
           isRead: false
         };
         
-        // Also add to notifications with a special type to indicate it's the user's own interaction
-        const notificationActivity: NotificationActivity = {
-          ...activityData,
-          id: 'notification-' + Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          createdAt: new Date(),
-          isRead: false,
-          user: {
-            id: 'self',
-            username: 'Du',
-            totalLikes: 0,
-            totalUploads: 0,
-            createdAt: new Date()
-          },
-          type: activityData.type === 'my_like' ? 'like' : 
-                activityData.type === 'my_comment' ? 'comment' : 
-                activityData.type === 'my_bookmark' ? 'bookmark' : 
-                activityData.type === 'my_upload' ? 'upload' : 'like'
-        };
-        
         set((state) => ({
           userActivities: [newActivity, ...state.userActivities].slice(0, 100),
-          userUnreadCount: state.userUnreadCount + 1,
-          // Add to notifications but mark as read immediately to avoid notification dot
-          activities: [{ ...notificationActivity, isRead: true }, ...state.activities].slice(0, 100),
-          unreadCount: state.unreadCount // Don't increment unread count for user's own activities
+          userUnreadCount: state.userUnreadCount + 1
+          // Do NOT add to notifications - only user activities
         }));
       },
       

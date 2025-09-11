@@ -156,13 +156,46 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
           <button
             onClick={handleDeleteClick}
             className="absolute top-4 right-4 text-gray-500 hover:text-gray-300 transition-colors z-30"
-            aria-label="Aufnahme löschen"
+            aria-label="Delete recording"
           >
             <Trash2 size={16} />
           </button>
         )}
         
-        <div className="flex items-start space-x-4 relative z-20">
+        <div className="flex items-start space-x-6 relative z-20">
+          {/* SVG Icon */}
+          <div className="flex-shrink-0 mt-1">
+            <svg 
+              version="1.1" 
+              id="Ebene_1" 
+              xmlns="http://www.w3.org/2000/svg" 
+              xmlnsXlink="http://www.w3.org/1999/xlink" 
+              x="0px" 
+              y="0px"
+              viewBox="0 0 87.733 86.526" 
+              style={{enableBackground:"new 0 0 87.733 86.526"}} 
+              xmlSpace="preserve"
+              className="w-9 h-9 text-orange-500"
+            >
+              <g>
+                <g>
+                  <g>
+                    <circle 
+                      style={{fill:"none",stroke:"#f97316",strokeWidth:"3.8739",strokeMiterlimit:"10"}} 
+                      cx="43.866" 
+                      cy="42.242" 
+                      r="40.577"
+                    />
+                  </g>
+                  <path 
+                    style={{fill:"none",stroke:"#f97316",strokeWidth:"3.8739",strokeMiterlimit:"10"}} 
+                    d="M51.459,25.293l-4.025-4.025c-4.387-4.387-11.5-4.387-15.887,0s-4.387,11.5,0,15.887l4.025,4.025l-4.025,4.025c-4.387,4.387-4.387,11.5,0,15.887s11.5,4.387,15.887,0l4.025-4.025L67.346,41.18L51.459,25.293z"
+                  />
+                </g>
+              </g>
+            </svg>
+          </div>
+          
           {/* Track info with unified typography */}
           <div className="flex-1 min-w-0">
             
@@ -195,9 +228,9 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
               >
                 <Heart 
                   size={12} 
-                  className={safeTrack.isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-400'} 
+                  className="text-gray-400 hover:text-gray-300" 
                 />
-                <span className={safeTrack.isLiked ? 'text-red-500' : 'text-gray-400'}>
+                <span className="text-gray-400">
                   {safeTrack.likes}
                 </span>
               </button>
@@ -218,23 +251,6 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                   className="text-gray-400 hover:text-blue-400" 
                 />
                 <span className="text-gray-400">{safeTrack.commentsCount || 0}</span>
-              </button>
-              
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('🔖 AudioCard: Bookmark button clicked for track:', safeTrack.id);
-                  const success = toggleBookmark(safeTrack.id, 'user-1');
-                  console.log('🔖 AudioCard: Bookmark result:', success);
-                }}
-                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
-                title={safeTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
-              >
-                <Bookmark 
-                  size={12} 
-                  className={safeTrack.isBookmarked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 hover:text-yellow-400'} 
-                />
               </button>
               
               <div className="flex items-center space-x-1">
@@ -269,10 +285,10 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteConfirm}
-        title="Aufnahme löschen"
-        message={`Möchtest du die Aufnahme "${safeTrack.title}" wirklich löschen?`}
-        confirmText="Löschen"
-        cancelText="Abbrechen"
+        title="Delete Recording"
+        message={`Do you really want to delete the recording "${safeTrack.title}"?`}
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </>
   );

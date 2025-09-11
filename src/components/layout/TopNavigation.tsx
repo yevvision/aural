@@ -18,9 +18,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/', icon: Home, label: 'Home', color: 'accent-pink' },
   { to: '/news', icon: MessageCircle, label: 'News', color: 'accent-violet', badge: true },
-  { to: '/profile', icon: User, label: 'Profil', color: 'accent-turquoise' },
-  { to: '/record', icon: Mic, label: 'Aufnehmen', color: 'accent-red' },
-  { to: '/search', icon: Search, label: 'Suche', color: 'accent-blue' },
+  { to: '/profile', icon: User, label: 'Profile', color: 'accent-turquoise' },
+  { to: '/record', icon: Mic, label: 'Record', color: 'accent-red' },
+  { to: '/search', icon: Search, label: 'Search', color: 'accent-blue' },
 ];
 
 export const TopNavigation = () => {

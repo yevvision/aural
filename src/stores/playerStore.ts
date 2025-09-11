@@ -123,6 +123,17 @@ export const usePlayerStore = create<PlayerStore>()(
       },
       
       reset: () => {
+        // Stop audio playback before resetting state
+        const audio = document.querySelector('audio');
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+          // Clear the audio source to prevent any further playback
+          audio.src = '';
+          audio.load();
+        }
+        
+        // Reset state immediately
         set({ ...initialState, queue: [], history: [] });
       },
       

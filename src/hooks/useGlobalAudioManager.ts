@@ -58,9 +58,11 @@ export const initializeGlobalAudioManager = () => {
   
   const handleEnded = () => {
     console.log('Audio playback ended');
+    const currentState = store.getState();
     store.setCurrentTime(0);
-    // Only toggle play if currently playing to avoid state issues
-    if (store.isPlaying) {
+    // Always set isPlaying to false when audio ends
+    if (currentState.isPlaying) {
+      console.log('Setting isPlaying to false after audio ended');
       store.togglePlay(); // This will set isPlaying to false
     }
   };
@@ -145,9 +147,18 @@ export const useGlobalAudioManager = () => {
   // Play/pause control
   useEffect(() => {
     const audio = getGlobalAudio();
-    if (!audio || !currentTrack) {
+    if (!audio) {
       if (isPlaying) {
-        console.warn('Audio element or track not available but trying to play');
+        console.warn('Audio element not available but trying to play');
+      }
+      return;
+    }
+    
+    // If no current track, ensure audio is paused
+    if (!currentTrack) {
+      if (!audio.paused) {
+        console.log('No current track, pausing audio');
+        audio.pause();
       }
       return;
     }
@@ -259,6 +270,29 @@ export const useGlobalAudioManager = () => {
       audio.currentTime = currentTime;
     }
   }, [currentTime]);
+
+  // Handle audio ended event
+  useEffect(() => {
+    const audio = getGlobalAudio();
+    if (!audio) return;
+
+    const handleEnded = () => {
+      console.log('Audio playback ended in useGlobalAudioManager');
+      const currentState = usePlayerStore.getState();
+      usePlayerStore.getState().setCurrentTime(0);
+      // Always set isPlaying to false when audio ends
+      if (currentState.isPlaying) {
+        console.log('Setting isPlaying to false after audio ended');
+        usePlayerStore.getState().togglePlay();
+      }
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [currentTrack]);
 
   const play = useCallback((track?: AudioTrack) => {
     if (track && track.id !== currentTrack?.id) {

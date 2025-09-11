@@ -1,4 +1,4 @@
-import { Play, Pause, ChevronUp, Heart } from 'lucide-react';
+import { Play, Pause, ChevronUp, Heart, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useDatabase } from '../../hooks/useDatabase';
@@ -12,7 +12,7 @@ interface InlineMiniPlayerProps {
 export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
   const navigate = useNavigate();
   const { isPlaying, currentTime, duration, toggle, seek } = useAudioPlayer();
-  const { tracks, toggleLike } = useDatabase('user-1'); // Verwende zentrale Datenbank
+  const { tracks, toggleLike, toggleBookmark } = useDatabase('user-1'); // Verwende zentrale Datenbank
   
   // Find the current track in the database to get the latest like state
   const feedTrack = tracks.find(t => t.id === track.id);
@@ -30,6 +30,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
   // Local state for progress and UI
   const [progressWidth, setProgressWidth] = useState(0);
   const [likeClicked, setLikeClicked] = useState(false);
+  const [bookmarkClicked, setBookmarkClicked] = useState(false);
   
   const progressInterval = useRef<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -42,9 +43,10 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Calculate progress percentage
-  const progressPercent = duration && duration > 0 && typeof currentTime === 'number' 
-    ? Math.min(100, (currentTime / duration) * 100) 
+  // Calculate progress percentage - use duration from player store first, then track
+  const trackDuration = duration || updatedTrack?.duration || 0;
+  const progressPercent = trackDuration > 0 && typeof currentTime === 'number' 
+    ? Math.min(100, (currentTime / trackDuration) * 100) 
     : 0;
 
   // Update progress bar width
@@ -60,7 +62,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     // Start progress update interval when playing
     if (isPlaying) {
       let startTime = currentTime || 0;
-      const trackDuration = updatedTrack?.duration || 0;
+      const trackDuration = duration || updatedTrack?.duration || 0;
       const startTimestamp = Date.now();
       
       // Update progress every 33ms for smooth animation (30fps)
@@ -88,12 +90,13 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
   }, [isPlaying, currentTime, duration, updatedTrack, progressPercent]);
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!updatedTrack?.duration) return;
+    const trackDuration = duration || updatedTrack?.duration || 0;
+    if (!trackDuration) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
-    const newTime = percentage * updatedTrack.duration;
+    const newTime = percentage * trackDuration;
     
     // Update local state immediately for responsive feel
     setProgressWidth(percentage * 100);
@@ -115,6 +118,23 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     
     // Keep the animation state for a short duration
     setTimeout(() => setLikeClicked(false), 300);
+  };
+
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🔖 InlineMiniPlayer: Bookmark button clicked for track:', updatedTrack.id);
+    
+    // Set bookmark animation state
+    setBookmarkClicked(true);
+    
+    // Update bookmark in central database
+    const success = toggleBookmark(updatedTrack.id, 'user-1');
+    console.log('🔖 InlineMiniPlayer: Bookmark result:', success);
+    
+    // Keep the animation state for a short duration
+    setTimeout(() => setBookmarkClicked(false), 300);
   };
 
   return (
@@ -151,7 +171,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
         <div className="flex-1 mx-3 flex justify-center text-xs text-white/70">
           <span>{formatTime(currentTime || 0)}</span>
           <span className="mx-1">/</span>
-          <span>{formatTime(updatedTrack?.duration || 0)}</span>
+          <span>{formatTime(duration || updatedTrack?.duration || 0)}</span>
         </div>
         
         {/* Controls */}
@@ -172,6 +192,26 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
                 updatedTrack.isLiked 
                   ? "fill-red-500 text-red-500" 
                   : "text-white hover:text-red-400"
+              }`}
+            />
+          </button>
+          
+          <button
+            onClick={handleBookmark}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 ${
+              updatedTrack.isBookmarked 
+                ? 'border border-yellow-500 bg-yellow-500/20' 
+                : 'border border-white hover:border-yellow-400'
+            }`}
+            aria-label={updatedTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+            title={updatedTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+          >
+            <Bookmark 
+              size={14} 
+              className={`transition-all duration-200 ${
+                updatedTrack.isBookmarked 
+                  ? "fill-yellow-500 text-yellow-500" 
+                  : "text-white hover:text-yellow-400"
               }`}
             />
           </button>

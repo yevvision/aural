@@ -13,13 +13,13 @@ import {
 } from '../components/ui';
 import type { AudioTrack } from '../types';
 
-// German specification: predefined tags
-const predefinedTags = ['Soft', 'Female', 'Toy', 'Passionated', 'Moan'];
+// Predefined tags for audio content
+const predefinedTags = ['Soft', 'Female', 'Toy', 'Passionate', 'Moan'];
 const genderOptions = [
-  { label: 'Frau', value: 'Female' }, 
-  { label: 'Mann', value: 'Male' },
-  { label: 'Paar', value: 'Couple' },
-  { label: 'Diverse', value: 'Diverse' } // Added Diverse option
+  { label: 'Female', value: 'Female' }, 
+  { label: 'Male', value: 'Male' },
+  { label: 'Couple', value: 'Couple' },
+  { label: 'Diverse', value: 'Diverse' }
 ] as const;
 
 export const UploadPage = () => {
@@ -82,7 +82,7 @@ export const UploadPage = () => {
               })
               .catch(err => {
                 console.error('Error loading recording data from blob URL:', err);
-                setError('Fehler beim Laden der Aufnahme');
+                setError('Error loading recording');
               });
           } else {
             // Convert base64 back to blob (legacy support)
@@ -116,7 +116,7 @@ export const UploadPage = () => {
               })
               .catch(err => {
                 console.error('Error loading recording data from base64:', err);
-                setError('Fehler beim Laden der Aufnahme');
+                setError('Error loading recording');
               });
           }
         } else {
@@ -143,15 +143,15 @@ export const UploadPage = () => {
   const validateTitle = (title: string): boolean => {
     const trimmed = title.trim();
     if (!trimmed) {
-      setTitleError('Titel ist erforderlich');
+      setTitleError('Title is required');
       return false;
     }
     if (trimmed.length < 2) {
-      setTitleError('Titel muss mindestens 2 Zeichen haben');
+      setTitleError('Title must be at least 2 characters');
       return false;
     }
     if (trimmed.length > 85) {
-      setTitleError('Titel darf maximal 85 Zeichen haben');
+      setTitleError('Title must not exceed 85 characters');
       return false;
     }
     setTitleError('');
@@ -165,7 +165,7 @@ export const UploadPage = () => {
     
     // Validate title length
     if (value.length > 85) {
-      setTitleError('Titel darf maximal 85 Zeichen lang sein');
+      setTitleError('Title must not exceed 85 characters');
     } else {
       setTitleError('');
     }
@@ -195,7 +195,7 @@ export const UploadPage = () => {
       setDuration(dur);
     } catch (err) {
       console.error('Error getting duration:', err);
-      setError('Fehler beim Laden der Datei');
+      setError('Error loading file');
     }
   };
 
@@ -241,7 +241,7 @@ export const UploadPage = () => {
     }
     
     if (selectedTags.length >= 10) {
-      setError('Maximal 10 Tags erlaubt');
+      setError('Maximum 10 tags allowed');
       return;
     }
     
@@ -473,7 +473,7 @@ export const UploadPage = () => {
         addMyTrack(newTrack);
       } else {
         console.error('❌ UploadPage: Fehler beim Hinzufügen zur Datenbank');
-        throw new Error('Track konnte nicht zur Datenbank hinzugefügt werden');
+        throw new Error('Track could not be added to database');
       }
       
       // Navigate to feed immediately
@@ -481,7 +481,7 @@ export const UploadPage = () => {
       
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : 'Fehler beim Hochladen. Bitte versuche es erneut.');
+      setError(err instanceof Error ? err.message : 'Upload error. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -497,7 +497,7 @@ export const UploadPage = () => {
 
         {/* Title */}
         <h1 className="text-white text-4xl font-bold leading-tight mb-4">
-          Audio hochladen
+          Upload Audio
         </h1>
 
 
@@ -510,7 +510,7 @@ export const UploadPage = () => {
           >
             <Upload size={48} className="text-orange-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">
-              Audio-Datei wählen
+              Select Audio File
             </h3>
             <p className="text-gray-400 text-sm mb-4">
               MP3, WAV, WebM, OGG, M4A (max 50MB)
@@ -538,13 +538,13 @@ export const UploadPage = () => {
             {/* Title Input */}
             <div>
               <label className="block text-sm font-medium text-white mb-2">
-                Wie lautet der Titel dieser Aufnahme?
+                What is the title of this recording?
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
-                placeholder="Titel erstellen"
+                placeholder="Create title"
                 className={`w-full px-4 py-3 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
                          focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
@@ -567,7 +567,7 @@ export const UploadPage = () => {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-white mb-2">
-                Füge eine Beschreibung hinzu, wenn du magst
+                Add a description if you like
               </label>
               <textarea
                 value={description}
@@ -588,7 +588,7 @@ export const UploadPage = () => {
             {/* Gender Selection */}
             <div>
               <label className="block text-sm font-medium text-white mb-3">
-                Wer ist auf der Aufnahme zu hören?
+                Who is on the recording?
               </label>
               <div className="flex flex-wrap gap-2">
                 {genderOptions.map((option) => (
@@ -615,7 +615,7 @@ export const UploadPage = () => {
             {/* Tags */}
             <div>
               <label className="block text-sm font-medium text-white mb-3">
-                Vergib deiner Aufnahme Tags
+                Add tags to your recording
               </label>
 
               {/* Predefined Tags */}
@@ -630,7 +630,7 @@ export const UploadPage = () => {
                         : 'bg-transparent border border-gray-500 text-gray-400 hover:border-orange-500 hover:text-orange-500'
                     }`}
                     aria-label={`Tag: ${tag}, ${
-                      selectedTags.includes(tag) ? 'ausgewählt' : 'nicht ausgewählt'
+                      selectedTags.includes(tag) ? 'selected' : 'not selected'
                     }`}
                   >
                     {tag}
@@ -645,13 +645,13 @@ export const UploadPage = () => {
                   value={customTag}
                   onChange={(e) => setCustomTag(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTag()}
-                  placeholder="+ Eigenen Tag eingeben"
+                  placeholder="+ Enter your own tag"
                   className="flex-1 px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-sm
                            text-white placeholder-gray-400
                            focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
                            transition-all duration-200"
                   maxLength={24}
-                  aria-label="Eigenen Tag eingeben"
+                  aria-label="Enter your own tag"
                 />
                 <button
                   onClick={handleAddCustomTag}
@@ -659,7 +659,7 @@ export const UploadPage = () => {
                   className="px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-gray-400
                            hover:border-orange-500 hover:text-orange-500 transition-all duration-200
                            disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={selectedTags.length >= 10 ? 'Maximal 10 Tags erlaubt' : 'Tag hinzufügen'}
+                  title={selectedTags.length >= 10 ? 'Maximum 10 tags allowed' : 'Add tag'}
                 >
                   <Plus size={16} />
                 </button>
@@ -694,7 +694,7 @@ export const UploadPage = () => {
 
               {selectedTags.length === 0 && (
                 <p className="text-xs text-gray-400 mt-2">
-                  Du kannst Tags setzen, um besser gefunden zu werden
+                  You can set tags to be found better
                 </p>
               )}
             </div>

@@ -38,9 +38,9 @@ export const SearchPage = () => {
   
   useEffect(() => {
     // Always load tracks from database to ensure we have the latest data
-    console.log('SearchPage: Lade Tracks aus Datenbank...');
+    console.log('SearchPage: Loading tracks from database...');
     const dbTracks = getTracksSorted('createdAt', 'desc');
-    console.log('SearchPage: Geladene Tracks:', dbTracks.length);
+    console.log('SearchPage: Loaded tracks:', dbTracks.length);
     useFeedStore.getState().setTracks(dbTracks);
   }, [getTracksSorted]);
   

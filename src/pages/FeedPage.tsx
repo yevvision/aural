@@ -12,19 +12,19 @@ import {
   RevealOnScroll
 } from '../components/ui';
 
-// German spec: Show me filter (Couples, Females, Males)
+// Gender filters for audio content
 const genderFilters = [
-  { type: 'couples', label: 'Paare' },
+  { type: 'couples', label: 'Couples' },
   { type: 'females', label: 'Females' },
   { type: 'males', label: 'Males' },
   { type: 'diverse', label: 'Diverse' },
 ];
 
-// German spec: Feed categories with red sections
+// Feed categories with accent colors
 const feedCategories = [
-  { id: 'new', name: 'Neu', color: 'accent-red' }, // New category
-  { id: 'bookmarked', name: 'Gemerkt', color: 'accent-red' }, // Bookmarked category
-  { id: 'subscribs', name: 'Subscribs', color: 'accent-red' },
+  { id: 'new', name: 'New', color: 'accent-red' },
+  { id: 'bookmarked', name: 'Bookmarked', color: 'accent-red' },
+  { id: 'subscribs', name: 'Following', color: 'accent-red' },
   { id: 'top_rated', name: 'Top Rated', color: 'accent-red' },
   { id: 'most_commented', name: 'Most Commented', color: 'accent-red' },
 ];
@@ -179,6 +179,26 @@ export const FeedPage = () => {
   return (
     <div className="w-full">
       <div className="max-w-md mx-auto px-4 py-6 pb-24">
+        {/* Concept Explanation Box */}
+        <RevealOnScroll direction="up" className="mb-6">
+          <motion.div 
+            className="glass-surface rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="text-center">
+              <h1 className="text-xl font-bold text-text-primary mb-2">
+                Hear desire, live fantasy
+              </h1>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Aural is the platform for erotic audio. Listen, explore, and publish recordings — 
+                anonymous, sensual, and free from images.
+              </p>
+            </div>
+          </motion.div>
+        </RevealOnScroll>
+
         {/* Enhanced "Show me" Filter tabs with animations - with transparent background */}
         <RevealOnScroll direction="up" className="mb-6">
           <StaggerWrapper className="flex flex-wrap gap-2 overflow-visible">
@@ -244,10 +264,10 @@ export const FeedPage = () => {
                     🎙️
                   </motion.div>
                   <h3 className="text-xl font-medium text-text-primary mb-2">
-                    Keine Audio-Inhalte gefunden
+                    No audio content found
                   </h3>
                   <p className="text-base text-text-secondary">
-                    Sei der Erste, der seine Stimme teilt!
+                    Be the first to share your voice!
                   </p>
                 </div>
               </RevealOnScroll>
@@ -281,7 +301,7 @@ export const FeedPage = () => {
                           whileHover={{ x: 5 }}
                           transition={{ duration: 0.2 }}
                         >
-                          Alle anzeigen
+                          View all
                           <ChevronRight className="w-4 h-4 ml-1" />
                         </motion.button>
                       </motion.div>
@@ -307,10 +327,10 @@ export const FeedPage = () => {
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-text-primary">
-                        Alle Aufnahmen
+                        All Recordings
                       </h2>
                       <span className="text-sm text-text-secondary">
-                        {tracks.length} Aufnahmen
+                        {tracks.length} recordings
                       </span>
                     </div>
                     

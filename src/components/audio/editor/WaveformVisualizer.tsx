@@ -110,7 +110,7 @@ export default function WaveformVisualizer({
       {isReady && !selection && (
         <div className="mt-2 text-center">
           <p className="text-sm text-gray-400">
-            💡 Ziehen Sie über die Wellenform oder klicken Sie "Region setzen" um einen Bereich auszuwählen
+            💡 Drag over the waveform or click "Set Region" to select an area
           </p>
         </div>
       )}

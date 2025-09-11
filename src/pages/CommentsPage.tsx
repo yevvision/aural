@@ -19,7 +19,7 @@ export const CommentsPage = () => {
   const { currentUser } = useUserStore();
   const { tracks, addComment } = useFeedStore();
   const { setCurrentTrack } = usePlayerStore();
-  const { activities, markAllAsRead, userActivities, markAllUserActivitiesAsRead } = useActivityStore();
+  const { activities, markAllAsRead, userActivities, markAllUserActivitiesAsRead, removeUserActivitiesFromNotifications } = useActivityStore();
   
   const [selectedTrack, setSelectedTrack] = useState<AudioTrack | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -35,6 +35,11 @@ export const CommentsPage = () => {
       }
     }
   }, [trackId, tracks]);
+  
+  // Remove user's own activities from notifications on component mount
+  useEffect(() => {
+    removeUserActivitiesFromNotifications();
+  }, [removeUserActivitiesFromNotifications]);
   
   // Mark activities as read when leaving the page (cleanup function)
   useEffect(() => {
@@ -131,7 +136,7 @@ export const CommentsPage = () => {
                       : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                   }`}
                 >
-                  Benachrichtigungen
+                  Notifications
                 </button>
                 <button
                   onClick={() => setViewMode('my_activity')}
@@ -141,7 +146,7 @@ export const CommentsPage = () => {
                       : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                   }`}
                 >
-                  Meine Aktivitäten
+                  My Activities
                 </button>
               </div>
             </div>
@@ -154,12 +159,12 @@ export const CommentsPage = () => {
                 <div className="text-center py-12">
                   <MessageCircle size={48} className="text-text-secondary mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-text-primary mb-2">
-                    {viewMode === 'my_activity' ? 'Noch keine eigenen Aktivitäten' : 'Noch keine Benachrichtigungen'}
+                    {viewMode === 'my_activity' ? 'No own activities yet' : 'No notifications yet'}
                   </h3>
                   <p className="text-text-secondary">
                     {viewMode === 'my_activity' 
-                      ? 'Wenn du Tracks likest, kommentierst, merkst oder hochlädst, siehst du es hier'
-                      : 'Wenn andere mit deinen Aufnahmen interagieren, siehst du es hier'
+                      ? 'When you like, comment, bookmark or upload tracks, you\'ll see it here'
+                      : 'When others interact with your recordings, you\'ll see it here'
                     }
                   </p>
                 </div>
@@ -190,18 +195,19 @@ export const CommentsPage = () => {
                           {viewMode === 'my_activity' ? (
                             // User's own activities
                             <>
-                              Du hast
+                              You have
                               {activity.type === 'my_like' && (
                                 <>
+                                  {' '}liked{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 ml-1 cursor-pointer"
+                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
                                   {activity.trackUser && (
                                     <>
-                                      {' '}von{' '}
+                                      {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
                                         className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
@@ -210,20 +216,20 @@ export const CommentsPage = () => {
                                       </span>
                                     </>
                                   )}
-                                  {' '}geliked
                                 </>
                               )}
                               {activity.type === 'my_comment' && (
                                 <>
+                                  {' '}commented on{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 ml-1 cursor-pointer"
+                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
                                   {activity.trackUser && (
                                     <>
-                                      {' '}von{' '}
+                                      {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
                                         className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
@@ -232,20 +238,20 @@ export const CommentsPage = () => {
                                       </span>
                                     </>
                                   )}
-                                  {' '}kommentiert
                                 </>
                               )}
                               {activity.type === 'my_bookmark' && (
                                 <>
+                                  {' '}bookmarked{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 ml-1 cursor-pointer"
+                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
                                   {activity.trackUser && (
                                     <>
-                                      {' '}von{' '}
+                                      {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
                                         className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
@@ -254,29 +260,28 @@ export const CommentsPage = () => {
                                       </span>
                                     </>
                                   )}
-                                  {' '}gemerkt
                                 </>
                               )}
                               {activity.type === 'my_upload' && (
                                 <>
+                                  {' '}uploaded{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 ml-1 cursor-pointer"
+                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
-                                  {' '}hochgeladen
                                 </>
                               )}
                               {activity.type === 'my_follow' && (
                                 <>
+                                  {' '}started following{' '}
                                   <span
                                     onClick={() => handleUserClick(activity.followedUser?.id || '')}
-                                    className="font-medium hover:text-gradient-strong transition-colors duration-200 ml-1 cursor-pointer"
+                                    className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
                                   >
                                     {activity.followedUser?.username}
                                   </span>
-                                  {' '}gefolgt
                                 </>
                               )}
                             </>
@@ -288,14 +293,14 @@ export const CommentsPage = () => {
                                 className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
                               >
                                 {(activity as NotificationActivity).user.id === 'self' 
-                                  ? 'Du hast' 
+                                  ? 'You have' 
                                   : `${(activity as NotificationActivity).user.username}`}
                               </span>
-                              {activity.type === 'like' ? ' hat' : 
-                               activity.type === 'bookmark' ? ' hat' : 
-                               activity.type === 'follow' ? ' folgt dir jetzt' :
-                               activity.type === 'followed_user_upload' ? ' hat' :
-                               activity.type === 'upload' ? ' hat' : ' hat'}
+                              {activity.type === 'like' ? ' liked' : 
+                               activity.type === 'bookmark' ? ' bookmarked' : 
+                               activity.type === 'follow' ? ' is now following you' :
+                               activity.type === 'followed_user_upload' ? ' uploaded' :
+                               activity.type === 'upload' ? ' uploaded' : ' commented on'}
                               {activity.type !== 'follow' && (
                                 <>
                                   {' '}
@@ -305,10 +310,10 @@ export const CommentsPage = () => {
                                   >
                                     {activity.type === 'followed_user_upload' ? '' : '„'}{activity.trackTitle}{activity.type === 'followed_user_upload' ? '' : '"'}
                                   </span>
-                                  {activity.type === 'like' ? ' geliked' : 
-                                   activity.type === 'bookmark' ? ' gemerkt' : 
-                                   activity.type === 'followed_user_upload' ? ' hochgeladen' :
-                                   activity.type === 'upload' ? ' hochgeladen' : ' kommentiert'}
+                                  {activity.type === 'like' ? ' liked' : 
+                                   activity.type === 'bookmark' ? ' bookmarked' : 
+                                   activity.type === 'followed_user_upload' ? ' uploaded' :
+                                   activity.type === 'upload' ? ' uploaded' : ' commented'}
                                 </>
                               )}
                             </>

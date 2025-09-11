@@ -169,7 +169,7 @@ export default function ExportDialog({
             ) : (
               <Download size={16} />
             )}
-            {isExporting ? 'Exportiert...' : 'Exportieren'}
+            {isExporting ? 'Exporting...' : 'Export'}
           </button>
         </div>
       </motion.div>

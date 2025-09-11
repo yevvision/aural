@@ -216,13 +216,13 @@ export const RecordPage = () => {
           {!isRecording && (
             <div className="text-center">
               <Body color="secondary" className="text-sm text-white/60">
-                Alternativ zur Aufnahme kannst du auch eine Audiodatei von deinem Gerät hochladen.
+                Alternatively to recording, you can also upload an audio file from your device.
               </Body>
               <button
                 onClick={handleUploadClick}
                 className="mt-2 text-orange-500 hover:text-orange-400 text-sm underline transition-colors duration-200"
               >
-                Datei hochladen
+                Upload file
               </button>
             </div>
           )}

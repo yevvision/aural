@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from './TopNavigation';
+import { Footer } from './Footer';
 import { MiniPlayer } from '../audio/MiniPlayer';
 import { usePlayerStore } from '../../stores/playerStore';
 import { initializeGlobalAudioManager, useGlobalAudioManager } from '../../hooks/useGlobalAudioManager';
@@ -94,6 +95,9 @@ export const AppLayout = () => {
               <MiniPlayer displayMode="fixed" />
             </div>
           )}
+
+          {/* Footer */}
+          <Footer />
         </div>
       </div>
     </BackNavigationContext.Provider>

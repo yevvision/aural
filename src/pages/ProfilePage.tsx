@@ -257,7 +257,7 @@ export const ProfilePage = () => {
                       {totalLikes}
                     </span>
                   </div>
-                  <div className="text-xs text-text-secondary">Gesamt Likes</div>
+                  <div className="text-xs text-text-secondary">Total Likes</div>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center space-x-1 mb-1">
@@ -266,7 +266,7 @@ export const ProfilePage = () => {
                       {finalUser.totalUploads}
                     </span>
                   </div>
-                  <div className="text-xs text-text-secondary">Aufnahmen</div>
+                  <div className="text-xs text-text-secondary">Recordings</div>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center space-x-1 mb-1">
@@ -275,7 +275,7 @@ export const ProfilePage = () => {
                       {formatSafeDate(finalUser.createdAt, { month: 'short', year: '2-digit' })}
                     </span>
                   </div>
-                  <div className="text-xs text-text-secondary">Beigetreten</div>
+                  <div className="text-xs text-text-secondary">Joined</div>
                 </div>
               </div>
             </div>
@@ -318,7 +318,7 @@ export const ProfilePage = () => {
                     <>
                       <div className="text-4xl mb-4">🎙️</div>
                       <h3 className="text-lg font-medium text-text-primary mb-2">
-                        Noch keine Aufnahmen
+                        No recordings yet
                       </h3>
                       <p className="text-text-secondary mb-4">
                         Teile deine erste Sprachaufnahme!
@@ -335,7 +335,7 @@ export const ProfilePage = () => {
                     <>
                       <User size={48} className="text-text-secondary mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-text-primary mb-2">
-                        Keine öffentlichen Aufnahmen
+                        No public recordings
                       </h3>
                       <p className="text-text-secondary">
                         Dieser Benutzer hat noch keine Audios geteilt.

@@ -220,12 +220,12 @@ export const AudioEditorPage = () => {
 
         {/* Title */}
         <h1 className="text-white text-4xl font-bold leading-tight mb-4">
-          Audio bearbeiten
+          Edit Audio
         </h1>
 
         {/* Description */}
         <p className="text-gray-400 mb-6 leading-snug text-xs">
-          Markiere den gewünschten Bereich und exportiere deine Aufnahme
+          Select the desired area and export your recording
         </p>
 
         {/* Audio Editor */}
@@ -246,7 +246,7 @@ export const AudioEditorPage = () => {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               ></motion.div>
-              <p className="text-gray-400">Lade Audio-Daten...</p>
+              <p className="text-gray-400">Loading audio data...</p>
             </div>
           </div>
         )}

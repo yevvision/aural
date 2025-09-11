@@ -291,7 +291,7 @@ export default function AudioEditor({
                     whileTap={{ scale: 0.98 }}
                   >
                     <Play size={14} className="text-white" strokeWidth={1.5} />
-                    <span className="text-white text-sm font-medium">Abspielen</span>
+                    <span className="text-white text-sm font-medium">Play</span>
                   </motion.button>
                   
                   <motion.button
@@ -313,7 +313,7 @@ export default function AudioEditor({
                   >
                     <Trash2 size={14} className={index === 0 ? 'text-white/50' : 'text-white'} strokeWidth={1.5} />
                     <span className={`text-sm font-medium ${index === 0 ? 'text-white/50' : 'text-white'}`}>
-                      Löschen
+                      Delete
                     </span>
                   </motion.button>
                 </div>
@@ -323,7 +323,7 @@ export default function AudioEditor({
         ) : (
           <div className="text-center py-8">
             <div className="text-gray-400 text-sm">
-              Klicken Sie auf "Neue Region" um einen Bereich zu markieren
+              Click "New Area" to mark a region
             </div>
           </div>
         )}
@@ -368,7 +368,7 @@ export default function AudioEditor({
                         whileTap={{ scale: 0.98 }}
                       >
                         <Play size={12} className="text-green-500" strokeWidth={1.5} />
-                        <span className="text-green-500 text-xs font-medium">Abspielen</span>
+                        <span className="text-green-500 text-xs font-medium">Play</span>
                       </motion.button>
                       
                       <motion.button
@@ -378,7 +378,7 @@ export default function AudioEditor({
                         whileTap={{ scale: 0.98 }}
                       >
                         <Trash2 size={12} className="text-red-500" strokeWidth={1.5} />
-                        <span className="text-red-500 text-xs font-medium">Löschen</span>
+                        <span className="text-red-500 text-xs font-medium">Delete</span>
                       </motion.button>
                     </motion.div>
                   )}
@@ -396,9 +396,9 @@ export default function AudioEditor({
             🎯 Wählen Sie einen Bereich aus
           </div>
           <div className="text-blue-300 text-xs space-y-1">
-            <p>• Ziehen Sie über die Wellenform, um einen Bereich zu markieren</p>
-            <p>• Oder klicken Sie "Region setzen" für eine automatische Auswahl</p>
-            <p>• Fügen Sie mehrere Segmente hinzu, um sie zu kombinieren</p>
+            <p>• Drag over the waveform to mark an area</p>
+            <p>• Or click "Set Region" for automatic selection</p>
+            <p>• Add multiple segments to combine them</p>
           </div>
         </div>
       )}
@@ -421,7 +421,7 @@ export default function AudioEditor({
           <ArrowRight size={20} className="text-orange-500" strokeWidth={1.5} />
         )}
         <span className="text-orange-500 font-medium">
-          {busy ? 'Wird verarbeitet...' : canExport ? 'Exportieren' : 'Bereich auswählen'}
+          {busy ? 'Processing...' : canExport ? 'Export' : 'Select area'}
         </span>
       </motion.button>
 

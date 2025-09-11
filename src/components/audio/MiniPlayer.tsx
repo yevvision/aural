@@ -1,4 +1,4 @@
-import { Play, Pause, ChevronUp, Heart, Clock } from 'lucide-react';
+import { Play, Pause, ChevronUp, Heart, Clock, Bookmark } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -15,7 +15,7 @@ interface MiniPlayerProps {
 export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   const navigate = useNavigate();
   const { currentTrack, isPlaying, currentTime, duration, isExpanded } = usePlayerStore();
-  const { tracks, toggleLike } = useDatabase('user-1');
+  const { tracks, toggleLike, toggleBookmark } = useDatabase('user-1');
   const { toggle, seek } = useAudioPlayer();
   
   // Find the current track in the feed store to get the latest like state
@@ -26,6 +26,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   const [progressWidth, setProgressWidth] = useState(0);
   const [displayDuration, setDisplayDuration] = useState('0:00');
   const [likeClicked, setLikeClicked] = useState(false);
+  const [bookmarkClicked, setBookmarkClicked] = useState(false);
   
   const progressInterval = useRef<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -124,6 +125,23 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     setTimeout(() => setLikeClicked(false), 300);
   };
 
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🔖 MiniPlayer: Bookmark button clicked for track:', updatedCurrentTrack.id);
+    
+    // Set bookmark animation state
+    setBookmarkClicked(true);
+    
+    // Update bookmark in central database
+    const success = toggleBookmark(updatedCurrentTrack.id, 'user-1');
+    console.log('🔖 MiniPlayer: Bookmark result:', success);
+    
+    // Keep the animation state for a short duration
+    setTimeout(() => setBookmarkClicked(false), 300);
+  };
+
   // Calculate thumb position based on progress width
   const thumbPosition = `calc(${progressWidth}% - 0px)`;
 
@@ -218,6 +236,35 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
                   updatedCurrentTrack.isLiked 
                     ? "fill-red-500 text-red-500" 
                     : "text-white hover:text-red-400"
+                }`}
+                strokeWidth={1.5}
+              />
+            </motion.div>
+          </motion.button>
+
+          {/* Bookmark button with enhanced visual feedback */}
+          <motion.button
+            onClick={handleBookmark}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+              updatedCurrentTrack.isBookmarked
+                ? 'border border-yellow-500 bg-yellow-500/20' 
+                : 'border border-white hover:border-yellow-400'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label={updatedCurrentTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+            title={updatedCurrentTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+          >
+            <motion.div
+              animate={bookmarkClicked ? { scale: [1, 1.3, 1] } : {}}
+              transition={{ duration: 0.3 }}
+            >
+              <Bookmark 
+                size={14} 
+                className={`transition-all duration-200 ${
+                  updatedCurrentTrack.isBookmarked 
+                    ? "fill-yellow-500 text-yellow-500" 
+                    : "text-white hover:text-yellow-400"
                 }`}
                 strokeWidth={1.5}
               />
