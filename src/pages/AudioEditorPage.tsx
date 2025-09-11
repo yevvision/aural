@@ -212,7 +212,11 @@ export const AudioEditorPage = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto px-6 pb-6 flex flex-col">
+    <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      {/* Spacer for fixed header */}
+      <div className="h-[72px]"></div>
+
+      <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
         {/* Title */}
         <h1 className="text-white text-4xl font-bold leading-tight mb-4">
@@ -247,6 +251,7 @@ export const AudioEditorPage = () => {
           </div>
         )}
 
+      </div>
     </div>
   );
 };
