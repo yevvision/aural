@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Aktueller Zustand</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
+        .track { margin: 10px 0; padding: 10px; background: #333; border-radius: 4px; }
+        .step { margin: 10px 0; padding: 10px; background: #444; border-left: 4px solid #007bff; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug: Aktueller Zustand der App</h1>
+    
+    <div class="section">
+        <h2>📊 Aktueller Zustand</h2>
+        <button class="button" onclick="showCurrentState()">🔍 Zustand anzeigen</button>
+        <div id="currentState"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🧪 Test: Upload → Approval → Display</h2>
+        <button class="button" onclick="testCompleteWorkflow()">🔄 Kompletten Workflow testen</button>
+        <div id="workflowResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>📝 Console Log</h2>
+        <div id="consoleLog" style="background: #000; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; max-height: 200px; overflow-y: auto;"></div>
+        <button class="button" onclick="clearLog()">🗑️ Log löschen</button>
+    </div>
+
+    <script>
+        // Console Logging
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('consoleLog');
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : type === 'warning' ? '#ffd43b' : '#74c0fc';
+            logElement.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('consoleLog').innerHTML = '';
+        }
+
+        // Simuliere die echten Services
+        const DatabaseService = {
+            tracks: [],
+            addTrack: function(track) {
+                this.tracks.push(track);
+                log(`✅ Track zur DB hinzugefügt: ${track.title} (ID: ${track.id})`, 'success');
+                return true;
+            },
+            getTracks: function() {
+                log(`📚 DB getTracks() - Anzahl: ${this.tracks.length}`, 'info');
+                return [...this.tracks];
+            },
+            getTrack: function(id) {
+                const track = this.tracks.find(t => t.id === id);
+                log(`🔍 DB getTrack(${id}) - ${track ? 'Gefunden' : 'Nicht gefunden'}`, track ? 'success' : 'warning');
+                return track;
+            }
+        };
+
+        function showCurrentState() {
+            log('🔍 Zeige aktuellen Zustand...', 'info');
+            
+            // Prüfe localStorage
+            const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            const pendingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            const centralDBData = JSON.parse(localStorage.getItem('central-database') || '{}');
+            
+            log(`📊 localStorage aural_tracks: ${localTracks.length}`, 'info');
+            log(`📊 localStorage aural_pending_uploads: ${Object.keys(pendingUploads).length}`, 'info');
+            log(`📊 localStorage central-database: ${Object.keys(centralDBData).length}`, 'info');
+            
+            // Prüfe DatabaseService
+            const dbTracks = DatabaseService.getTracks();
+            
+            let html = `
+                <div class="step">
+                    <h3>📊 Aktueller Zustand:</h3>
+                    <p><strong>DatabaseService Tracks:</strong> ${dbTracks.length}</p>
+                    <p><strong>localStorage aural_tracks:</strong> ${localTracks.length}</p>
+                    <p><strong>localStorage aural_pending_uploads:</strong> ${Object.keys(pendingUploads).length}</p>
+                    <p><strong>localStorage central-database:</strong> ${Object.keys(centralDBData).length}</p>
+                </div>
+            `;
+            
+            if (dbTracks.length > 0) {
+                html += '<div class="step"><h4>DatabaseService Tracks:</h4>';
+                dbTracks.forEach(track => {
+                    const isRecent = new Date(track.createdAt) > new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+                    html += `<div class="track">
+                        <strong>${track.title}</strong> (ID: ${track.id})<br>
+                        CreatedAt: ${track.createdAt.toISOString()}<br>
+                        Is Recent (2 weeks): ${isRecent ? '✅' : '❌'}<br>
+                        URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            if (localTracks.length > 0) {
+                html += '<div class="step"><h4>localStorage aural_tracks:</h4>';
+                localTracks.forEach(track => {
+                    const isRecent = new Date(track.createdAt) > new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+                    html += `<div class="track">
+                        <strong>${track.title}</strong> (ID: ${track.id})<br>
+                        CreatedAt: ${track.createdAt.toISOString()}<br>
+                        Is Recent (2 weeks): ${isRecent ? '✅' : '❌'}<br>
+                        URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            if (Object.keys(pendingUploads).length > 0) {
+                html += '<div class="step"><h4>Pending Uploads:</h4>';
+                Object.values(pendingUploads).forEach(upload => {
+                    html += `<div class="track">
+                        <strong>${upload.title}</strong> (ID: ${upload.uploadId})<br>
+                        Status: ${upload.status}<br>
+                        Reason: ${upload.reason}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            document.getElementById('currentState').innerHTML = html;
+        }
+
+        async function testCompleteWorkflow() {
+            log('🧪 Starte kompletten Workflow-Test...', 'info');
+            
+            // 1. Upload simulieren
+            log('📤 Schritt 1: Upload simulieren', 'info');
+            const uploadId = 'test_upload_' + Date.now();
+            const audioBlob = new Blob(['fake audio data'], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            const pendingUpload = {
+                uploadId: uploadId,
+                filename: 'test_audio.mp3',
+                originalName: 'Test Audio Recording.mp3',
+                size: 1024000,
+                mimeType: 'audio/mpeg',
+                url: audioUrl,
+                title: 'Test Audio ' + new Date().toLocaleTimeString(),
+                description: 'Test-Beschreibung',
+                gender: 'couples',
+                tags: ['test', 'debug'],
+                uploadedAt: new Date().toISOString(),
+                status: 'pending_review',
+                reason: 'Test-Upload',
+                duplicateCount: 0,
+                deviceId: 'device_123',
+                userId: 'user-1',
+                username: 'TestUser',
+                duration: 30
+            };
+            
+            const pendingData = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            pendingData[uploadId] = pendingUpload;
+            localStorage.setItem('aural_pending_uploads', JSON.stringify(pendingData));
+            log(`✅ Upload simuliert: ${pendingUpload.title}`, 'success');
+            
+            // 2. Admin Approval simulieren
+            log('✅ Schritt 2: Admin Approval simulieren', 'info');
+            
+            // Konvertiere Blob-URL zu Base64
+            let audioDataUrl = pendingUpload.url;
+            if (pendingUpload.url && pendingUpload.url.startsWith('blob:')) {
+                try {
+                    const response = await fetch(pendingUpload.url);
+                    const blob = await response.blob();
+                    audioDataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    log('✅ Audio-Daten zu Base64 konvertiert', 'success');
+                } catch (error) {
+                    log(`❌ Fehler beim Konvertieren: ${error.message}`, 'error');
+                }
+            }
+            
+            // Erstelle approved Track
+            const approvedTrack = {
+                id: pendingUpload.uploadId,
+                title: pendingUpload.title,
+                description: pendingUpload.description,
+                url: audioDataUrl,
+                duration: pendingUpload.duration || 0,
+                user: {
+                    id: pendingUpload.userId,
+                    username: pendingUpload.username,
+                    email: '',
+                    avatar: '',
+                    createdAt: new Date(),
+                    isAdmin: false
+                },
+                likes: 0,
+                isLiked: false,
+                isBookmarked: false,
+                createdAt: new Date(), // WICHTIG: Aktuelles Datum
+                tags: pendingUpload.tags,
+                gender: pendingUpload.gender,
+                filename: pendingUpload.filename,
+                fileSize: pendingUpload.size,
+                format: pendingUpload.mimeType
+            };
+            
+            // Speichere in DatabaseService
+            DatabaseService.addTrack(approvedTrack);
+            
+            // Speichere auch in localStorage
+            const existingTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            existingTracks.push(approvedTrack);
+            localStorage.setItem('aural_tracks', JSON.stringify(existingTracks));
+            
+            // Entferne aus Pending-Liste
+            delete pendingData[uploadId];
+            localStorage.setItem('aural_pending_uploads', JSON.stringify(pendingData));
+            
+            log(`✅ Upload approved: ${approvedTrack.title}`, 'success');
+            
+            // 3. FeedPage Simulation
+            log('🏠 Schritt 3: FeedPage Simulation', 'info');
+            
+            // Lade Daten wie useDatabase
+            const dbTracks = DatabaseService.getTracks();
+            const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            // Kombiniere und dedupliziere
+            const allTracksMap = new Map();
+            dbTracks.forEach(track => allTracksMap.set(track.id, track));
+            localTracks.forEach(track => allTracksMap.set(track.id, track));
+            const allTracks = Array.from(allTracksMap.values());
+            
+            log(`🏠 FeedPage - Alle Tracks: ${allTracks.length}`, 'info');
+            
+            // Simuliere "New" Kategorie Filter
+            const now = new Date();
+            const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+            
+            const newTracks = allTracks
+                .filter(track => new Date(track.createdAt) > twoWeeksAgo)
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            log(`🆕 New Kategorie - Gefilterte Tracks: ${newTracks.length}`, 'info');
+            log(`📅 Two weeks ago: ${twoWeeksAgo.toISOString()}`, 'info');
+            
+            let html = `
+                <div class="step">
+                    <h3>🧪 Workflow-Test Ergebnis:</h3>
+                    <p><strong>Alle Tracks:</strong> ${allTracks.length}</p>
+                    <p><strong>New Kategorie (2 Wochen):</strong> ${newTracks.length}</p>
+                    <p><strong>Two weeks ago:</strong> ${twoWeeksAgo.toISOString()}</p>
+                </div>
+            `;
+            
+            if (newTracks.length > 0) {
+                html += '<div class="step"><h4>New Kategorie Tracks:</h4>';
+                newTracks.forEach(track => {
+                    const isRecent = new Date(track.createdAt) > twoWeeksAgo;
+                    html += `<div class="track">
+                        <strong>${track.title}</strong> (ID: ${track.id})<br>
+                        CreatedAt: ${track.createdAt.toISOString()}<br>
+                        Is Recent: ${isRecent ? '✅' : '❌'}<br>
+                        URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                    </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="warning">⚠️ Keine Tracks in der "New" Kategorie gefunden!</div>';
+            }
+            
+            document.getElementById('workflowResult').innerHTML = html;
+            
+            log('✅ Workflow-Test abgeschlossen', 'success');
+        }
+
+        // Initialisierung
+        log('🚀 Debug System initialisiert', 'success');
+    </script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Tracks Display</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .debug-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .track-item {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #555;
+        }
+        .debug-info {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Tracks Display</h1>
+    
+    <div class="debug-section">
+        <h2>📊 Datenbank-Status</h2>
+        <button onclick="checkDatabase()">Datenbank prüfen</button>
+        <button onclick="clearDatabase()">Datenbank leeren</button>
+        <div id="db-status" class="debug-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🎵 Gespeicherte Tracks</h2>
+        <button onclick="loadTracks()">Tracks laden</button>
+        <div id="tracks-list"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>🔄 FeedPage Simulation</h2>
+        <button onclick="simulateFeedPage()">FeedPage simulieren</button>
+        <div id="feed-simulation"></div>
+    </div>
+
+    <script>
+        function checkDatabase() {
+            const status = document.getElementById('db-status');
+            const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            status.innerHTML = `
+                <div style="color: #4ecdc4">=== DATENBANK STATUS ===</div>
+                <div>localStorage Tracks: ${localTracks.length}</div>
+                <div>localStorage Key: aural_tracks</div>
+                <div style="color: #ffd93d">=== TRACKS ===</div>
+                <div>${JSON.stringify(localTracks, null, 2)}</div>
+            `;
+        }
+
+        function loadTracks() {
+            const list = document.getElementById('tracks-list');
+            const tracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            list.innerHTML = tracks.map(track => `
+                <div class="track-item">
+                    <h4>${track.title}</h4>
+                    <p><strong>ID:</strong> ${track.id}</p>
+                    <p><strong>User:</strong> ${track.user?.username || 'Unknown'}</p>
+                    <p><strong>URL-Typ:</strong> ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}</p>
+                    <p><strong>URL-Länge:</strong> ${track.url?.length || 0} Zeichen</p>
+                    <p><strong>Erstellt:</strong> ${new Date(track.createdAt).toLocaleString()}</p>
+                    <p><strong>Format:</strong> ${track.format || 'Unknown'}</p>
+                </div>
+            `).join('');
+        }
+
+        function simulateFeedPage() {
+            const simulation = document.getElementById('feed-simulation');
+            const tracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            // Simuliere die FeedPage-Logik
+            const now = new Date();
+            const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            const newTracks = tracks.filter(track => {
+                const trackDate = new Date(track.createdAt);
+                return trackDate > oneWeekAgo;
+            }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            simulation.innerHTML = `
+                <div class="track-item">
+                    <h4>FeedPage Simulation</h4>
+                    <p><strong>Alle Tracks:</strong> ${tracks.length}</p>
+                    <p><strong>Neue Tracks (letzte Woche):</strong> ${newTracks.length}</p>
+                    <p><strong>Zeitraum:</strong> ${oneWeekAgo.toLocaleString()} - ${now.toLocaleString()}</p>
+                </div>
+                ${newTracks.map(track => `
+                    <div class="track-item">
+                        <h4>${track.title}</h4>
+                        <p><strong>Erstellt:</strong> ${new Date(track.createdAt).toLocaleString()}</p>
+                        <p><strong>User:</strong> ${track.user?.username || 'Unknown'}</p>
+                        <p><strong>URL-Typ:</strong> ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}</p>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function clearDatabase() {
+            localStorage.removeItem('aural_tracks');
+            document.getElementById('db-status').innerHTML = 'Datenbank geleert';
+            document.getElementById('tracks-list').innerHTML = '';
+            document.getElementById('feed-simulation').innerHTML = '';
+        }
+
+        // Initial load
+        checkDatabase();
+        loadTracks();
+        simulateFeedPage();
+    </script>
+</body>
+</html>

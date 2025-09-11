@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Einfach</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
+        .track { margin: 10px 0; padding: 10px; background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug: Einfach</h1>
+    
+    <div class="section">
+        <h2>📊 localStorage Zustand</h2>
+        <button class="button" onclick="checkLocalStorage()">🔍 localStorage prüfen</button>
+        <div id="localStorageResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🧪 Test: Track hinzufügen</h2>
+        <button class="button" onclick="addTestTrack()">➕ Test Track hinzufügen</button>
+        <div id="addTrackResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🏠 FeedPage Simulation</h2>
+        <button class="button" onclick="simulateFeedPage()">🏠 FeedPage simulieren</button>
+        <div id="feedPageResult"></div>
+    </div>
+
+    <script>
+        function checkLocalStorage() {
+            console.log('🔍 Prüfe localStorage...');
+            
+            const keys = Object.keys(localStorage);
+            let html = `<h3>📊 localStorage Keys: ${keys.length}</h3>`;
+            
+            keys.forEach(key => {
+                try {
+                    const value = localStorage.getItem(key);
+                    const parsed = JSON.parse(value);
+                    
+                    html += `<div style="margin: 10px 0; padding: 10px; background: #333; border-radius: 4px;">
+                        <h4>🔑 ${key}</h4>
+                        <p><strong>Type:</strong> ${typeof parsed}</p>
+                        <p><strong>Size:</strong> ${value.length} Zeichen</p>
+                    `;
+                    
+                    if (key === 'aural-central-database' && parsed.tracks) {
+                        html += `<p><strong>Tracks:</strong> ${parsed.tracks.length}</p>`;
+                        if (parsed.tracks.length > 0) {
+                            html += '<h5>Neueste Tracks:</h5>';
+                            parsed.tracks.slice(0, 3).forEach(track => {
+                                const isRecent = new Date(track.createdAt) > new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+                                html += `<div style="margin: 5px 0; padding: 5px; background: #444; border-radius: 4px;">
+                                    <strong>${track.title}</strong> (ID: ${track.id})<br>
+                                    CreatedAt: ${track.createdAt}<br>
+                                    Is Recent (2 weeks): ${isRecent ? '✅' : '❌'}<br>
+                                    URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                                </div>`;
+                            });
+                        }
+                    } else if (key === 'aural_pending_uploads') {
+                        const pendingCount = Object.keys(parsed).length;
+                        html += `<p><strong>Pending Uploads:</strong> ${pendingCount}</p>`;
+                    }
+                    
+                    html += '</div>';
+                } catch (error) {
+                    html += `<div style="margin: 10px 0; padding: 10px; background: #2d1b1b; border-radius: 4px;">
+                        <h4>🔑 ${key}</h4>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>`;
+                }
+            });
+            
+            document.getElementById('localStorageResult').innerHTML = html;
+        }
+
+        function addTestTrack() {
+            console.log('➕ Füge Test Track hinzu...');
+            
+            const testTrack = {
+                id: 'test_track_' + Date.now(),
+                title: 'Test Track ' + new Date().toLocaleTimeString(),
+                description: 'Test-Beschreibung',
+                url: 'data:audio/mpeg;base64,test',
+                duration: 30,
+                user: {
+                    id: 'user-1',
+                    username: 'TestUser',
+                    email: '',
+                    avatar: '',
+                    createdAt: new Date(),
+                    isAdmin: false
+                },
+                likes: 0,
+                isLiked: false,
+                isBookmarked: false,
+                createdAt: new Date(), // Aktuelles Datum
+                tags: ['test'],
+                gender: 'couples',
+                filename: 'test.mp3',
+                fileSize: 1024,
+                format: 'audio/mpeg'
+            };
+            
+            // Speichere in zentraler DB
+            const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+            if (!Array.isArray(centralDBData.tracks)) {
+                centralDBData.tracks = [];
+            }
+            centralDBData.tracks.push(testTrack);
+            localStorage.setItem('aural-central-database', JSON.stringify(centralDBData));
+            
+            console.log('✅ Test Track hinzugefügt:', testTrack.title);
+            
+            document.getElementById('addTrackResult').innerHTML = 
+                `<div class="success">✅ Test Track hinzugefügt: ${testTrack.title}</div>
+                 <pre>${JSON.stringify(testTrack, null, 2)}</pre>`;
+        }
+
+        function simulateFeedPage() {
+            console.log('🏠 Simuliere FeedPage...');
+            
+            // Lade Daten wie useDatabase
+            const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+            const allTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+            
+            console.log(`🏠 FeedPage - Alle Tracks: ${allTracks.length}`);
+            
+            // Simuliere "New" Kategorie Filter
+            const now = new Date();
+            const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+            
+            const newTracks = allTracks
+                .filter(track => new Date(track.createdAt) > twoWeeksAgo)
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            console.log(`🆕 New Kategorie - Gefilterte Tracks: ${newTracks.length}`);
+            console.log(`📅 Two weeks ago: ${twoWeeksAgo.toISOString()}`);
+            
+            let html = `
+                <div style="margin: 10px 0; padding: 10px; background: #444; border-radius: 4px;">
+                    <h3>🏠 FeedPage Simulation:</h3>
+                    <p><strong>Alle Tracks:</strong> ${allTracks.length}</p>
+                    <p><strong>New Kategorie (2 Wochen):</strong> ${newTracks.length}</p>
+                    <p><strong>Two weeks ago:</strong> ${twoWeeksAgo.toISOString()}</p>
+                </div>
+            `;
+            
+            if (allTracks.length > 0) {
+                html += '<div style="margin: 10px 0; padding: 10px; background: #444; border-radius: 4px;"><h4>Alle Tracks:</h4>';
+                allTracks.forEach(track => {
+                    const isRecent = new Date(track.createdAt) > twoWeeksAgo;
+                    html += `<div class="track">
+                        <strong>${track.title}</strong> (ID: ${track.id})<br>
+                        CreatedAt: ${track.createdAt}<br>
+                        Is Recent (2 weeks): ${isRecent ? '✅' : '❌'}<br>
+                        URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            
+            if (newTracks.length > 0) {
+                html += '<div style="margin: 10px 0; padding: 10px; background: #444; border-radius: 4px;"><h4>New Kategorie Tracks:</h4>';
+                newTracks.forEach(track => {
+                    const isRecent = new Date(track.createdAt) > twoWeeksAgo;
+                    html += `<div class="track">
+                        <strong>${track.title}</strong> (ID: ${track.id})<br>
+                        CreatedAt: ${track.createdAt}<br>
+                        Is Recent: ${isRecent ? '✅' : '❌'}<br>
+                        URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                    </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="warning">⚠️ Keine Tracks in der "New" Kategorie gefunden!</div>';
+            }
+            
+            document.getElementById('feedPageResult').innerHTML = html;
+        }
+
+        // Initialisierung
+        console.log('🚀 Einfaches Debug System initialisiert');
+    </script>
+</body>
+</html>

@@ -14,6 +14,7 @@ import { AdminCommentsModal } from '../components/admin/AdminCommentsModal';
 import { DatabaseCleanup } from '../components/admin/DatabaseCleanup';
 import { ReportsTable } from '../components/admin/ReportsTable';
 import { AdminStatistics } from '../components/admin/AdminStatistics';
+import { PendingUploadsQueue } from '../components/admin/PendingUploadsQueue';
 
 interface AdminStats {
   totalUsers: number;
@@ -25,7 +26,7 @@ interface AdminStats {
   pendingReports: number;
 }
 
-type SortField = 'title' | 'user' | 'likes' | 'comments' | 'date' | 'fileSize' | 'duration';
+type SortField = 'title' | 'user' | 'likes' | 'date' | 'fileSize' | 'duration';
 type SortOrder = 'asc' | 'desc';
 
 export const AdminPage: React.FC = () => {
@@ -49,7 +50,8 @@ export const AdminPage: React.FC = () => {
     debug
   } = useDatabase();
   
-  const [activeTab, setActiveTab] = useState<'uploads' | 'users' | 'comments' | 'reports' | 'statistics'>('uploads');
+  const [activeTab, setActiveTab] = useState<'uploads' | 'users' | 'comments' | 'reports' | 'statistics' | 'pending'>('uploads');
+  const [pendingCount, setPendingCount] = useState(0);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedTrack, setSelectedTrack] = useState<AudioTrack | null>(null);
@@ -72,6 +74,30 @@ export const AdminPage: React.FC = () => {
     const dbStats = getStats();
     setStats(dbStats);
   }, [tracks]); // Aktualisiere Statistiken wenn sich Tracks ändern
+
+  // Lade Pending Count
+  useEffect(() => {
+    loadPendingCount();
+  }, []);
+
+  // Load pending count
+  const loadPendingCount = () => {
+    try {
+      const pendingUploadsData = localStorage.getItem('aural_pending_uploads');
+      if (pendingUploadsData) {
+        const uploads = JSON.parse(pendingUploadsData);
+        const pendingList = Object.values(uploads).filter((upload: any) => 
+          upload.status === 'pending_review'
+        );
+        setPendingCount(pendingList.length);
+      } else {
+        setPendingCount(0);
+      }
+    } catch (error) {
+      console.error('Failed to load pending count:', error);
+      setPendingCount(0);
+    }
+  };
 
   // Alle Tracks mit Filter und Sortierung
   const getAllTracks = (): AudioTrack[] => {
@@ -434,6 +460,7 @@ export const AdminPage: React.FC = () => {
               { id: 'users', label: 'Benutzer', count: users.length, icon: Users },
               { id: 'comments', label: 'Kommentare', count: comments.length, icon: MessageSquare },
               { id: 'reports', label: 'Reports', count: reports.length, icon: Flag },
+              { id: 'pending', label: 'Warteschlange', count: pendingCount, icon: Clock },
               { id: 'statistics', label: 'Statistiken', count: 0, icon: BarChart3 },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -445,12 +472,15 @@ export const AdminPage: React.FC = () => {
                     activeTab === tab.id
                       ? 'bg-gradient-primary text-white'
                       : 'glass-surface text-text-secondary hover:text-white hover:bg-white/10'
-                  }`}
+                  } ${tab.id === 'pending' && tab.count > 0 ? 'border-2 border-red-500/50 bg-red-500/10' : ''}`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label} ({tab.count})
+                  {tab.id === 'pending' && tab.count > 0 && (
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  )}
                 </motion.button>
               );
             })}
@@ -589,6 +619,40 @@ export const AdminPage: React.FC = () => {
               transition={{ duration: 0.3 }}
             >
               <AdminStatistics onBack={() => setActiveTab('uploads')} />
+            </motion.div>
+          )}
+
+          {activeTab === 'pending' && (
+            <motion.div
+              key="pending"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    loadData();
+                    loadPendingCount();
+                    console.log('🔄 Manual refresh triggered');
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  🔄 Daten aktualisieren
+                </button>
+              </div>
+              <PendingUploadsQueue
+                onUploadProcessed={(uploadId, action) => {
+                  console.log(`Upload ${action}: ${uploadId}`);
+                  // Aktualisiere Pending-Count nach Verarbeitung
+                  loadPendingCount();
+                  // Lade Daten neu um freigegebene Tracks zu zeigen
+                  setTimeout(() => {
+                    loadData();
+                  }, 100);
+                }}
+              />
             </motion.div>
           )}
         </AnimatePresence>

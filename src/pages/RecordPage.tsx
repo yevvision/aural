@@ -78,16 +78,56 @@ export const RecordPage = () => {
     }
   }, [recordedBlob, duration, resetRecording]);
 
-  // Update recording duration - only when recording and not paused
+  // Update recording duration - only when recording and not paused, with page visibility support
   useEffect(() => {
     let interval: number;
+    let hiddenStartTime = 0;
+    let lastUpdateTime = Date.now();
+    
+    const updateDuration = () => {
+      if (isRecording && !isPaused) {
+        const now = Date.now();
+        const timeDiff = now - lastUpdateTime;
+        setRecordingDuration(prev => prev + (timeDiff / 1000));
+        lastUpdateTime = now;
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page became hidden - store the time
+        hiddenStartTime = Date.now();
+        console.log('📱 RecordPage: Page became hidden, pausing timer updates');
+      } else {
+        // Page became visible - adjust for hidden time
+        if (hiddenStartTime > 0) {
+          const hiddenDuration = Date.now() - hiddenStartTime;
+          console.log('📱 RecordPage: Page became visible, adjusting for hidden time:', hiddenDuration, 'ms');
+          hiddenStartTime = 0;
+        }
+        // Reset last update time to prevent large jumps
+        lastUpdateTime = Date.now();
+        // Immediately update duration when page becomes visible
+        updateDuration();
+      }
+    };
+    
     if (isRecording && !isPaused) {
-      interval = window.setInterval(() => {
-        setRecordingDuration(prev => prev + 0.1);
-      }, 100);
+      interval = window.setInterval(updateDuration, 100);
+      
+      // Listen for page visibility changes
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Also listen for window focus/blur events as backup
+      window.addEventListener('focus', handleVisibilityChange);
+      window.addEventListener('blur', handleVisibilityChange);
     }
+    
     return () => {
       if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
     };
   }, [isRecording, isPaused]);
 

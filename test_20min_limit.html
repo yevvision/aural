@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: 20-Minuten-Limit</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
+        .upload { margin: 10px 0; padding: 10px; background: #333; border-radius: 4px; }
+        .upload.allowed { border-left: 4px solid #28a745; }
+        .upload.blocked { border-left: 4px solid #dc3545; }
+        .upload.review { border-left: 4px solid #ffc107; }
+        input[type="file"] { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>⏰ Test: 20-Minuten-Limit</h1>
+    
+    <div class="section">
+        <h2>📊 Aktuelle Limits</h2>
+        <div class="info">
+            <h3>📋 Upload-Limits</h3>
+            <p><strong>Mindestdauer:</strong> 15 Sekunden</p>
+            <p><strong>Maximaldauer:</strong> 20 Minuten (1200 Sekunden)</p>
+            <p><strong>30-Minuten-Limit:</strong> max. 3 Uploads</p>
+            <p><strong>Tages-Limit:</strong> max. 5 Uploads</p>
+            <p><strong>Audio-Minuten-Limit:</strong> max. 120 Minuten/Tag</p>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>🔄 Upload simulieren</h2>
+        <input type="file" id="testFile" accept="audio/*" />
+        <button class="button" onclick="simulateUpload()">📤 Upload simulieren</button>
+        <div id="uploadResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>⏱️ Dauer-Test: Verschiedene Längen</h2>
+        <button class="button" onclick="testDifferentDurations()">⏱️ Verschiedene Längen testen</button>
+        <div id="durationTestResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>🔄 Reset</h2>
+        <button class="button" onclick="resetAll()">🔄 Alles zurücksetzen</button>
+        <div id="resetResult"></div>
+    </div>
+
+    <script>
+        // Simuliere die UploadSecurityManager Klasse
+        class MockUploadSecurityManager {
+            constructor() {
+                this.limits = {
+                    maxUploadsPer30Min: 3,
+                    maxUploadsPerDay: 5,
+                    maxAudioMinutesPerDay: 120,
+                    maxDuplicateCount: 5,
+                    minAudioDuration: 15, // 15 Sekunden
+                    maxAudioDuration: 1200 // 20 Minuten
+                };
+            }
+            
+            generateDeviceId() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Device fingerprint', 2, 2);
+                }
+
+                const fingerprint = [
+                    navigator.userAgent,
+                    navigator.language,
+                    screen.width + 'x' + screen.height,
+                    new Date().getTimezoneOffset(),
+                    canvas.toDataURL()
+                ].join('|');
+
+                let hash = 0;
+                for (let i = 0; i < fingerprint.length; i++) {
+                    const char = fingerprint.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                return Math.abs(hash).toString(36);
+            }
+            
+            async calculateFileHash(file) {
+                const buffer = await file.arrayBuffer();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+            
+            loadDeviceStats(deviceId) {
+                try {
+                    const key = `aural_device_stats_${deviceId}`;
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        const stats = JSON.parse(data);
+                        if (stats.lastUpload30Min) stats.lastUpload30Min = new Date(stats.lastUpload30Min);
+                        if (stats.lastUploadToday) stats.lastUploadToday = new Date(stats.lastUploadToday);
+                        if (stats.lastReset) stats.lastReset = new Date(stats.lastReset);
+                        return stats;
+                    }
+                } catch (error) {
+                    console.warn('Failed to load device stats:', error);
+                }
+                return null;
+            }
+            
+            createNewDeviceStats(deviceId) {
+                return {
+                    deviceId,
+                    uploads30Min: 0,
+                    uploadsToday: 0,
+                    audioMinutesToday: 0,
+                    lastUpload30Min: null,
+                    lastUploadToday: null,
+                    fileHashes: {},
+                    lastReset: new Date()
+                };
+            }
+            
+            persistDeviceStats(deviceStats) {
+                try {
+                    const key = `aural_device_stats_${deviceStats.deviceId}`;
+                    localStorage.setItem(key, JSON.stringify(deviceStats));
+                } catch (error) {
+                    console.warn('Failed to persist device stats:', error);
+                }
+            }
+            
+            checkRateLimits(deviceStats, duration) {
+                const now = new Date();
+                
+                // 30-Minuten-Limit prüfen
+                if (deviceStats.lastUpload30Min) {
+                    const timeDiff30Min = (now.getTime() - deviceStats.lastUpload30Min.getTime()) / (1000 * 60);
+                    
+                    if (timeDiff30Min < 30) {
+                        if (deviceStats.uploads30Min >= this.limits.maxUploadsPer30Min) {
+                            return {
+                                allowed: false,
+                                reason: 'Deine Aufnahme wird jetzt geprüft. Das dauert nur einen Moment.',
+                                requiresReview: true
+                            };
+                        }
+                    } else {
+                        deviceStats.uploads30Min = 0;
+                        deviceStats.lastUpload30Min = null;
+                    }
+                }
+
+                // Tages-Limit prüfen (vereinfacht für Test)
+                if (deviceStats.lastUploadToday) {
+                    const timeDiffToday = (now.getTime() - deviceStats.lastUploadToday.getTime()) / (1000 * 60 * 60 * 24);
+                    if (timeDiffToday < 1) {
+                        if (deviceStats.uploadsToday >= this.limits.maxUploadsPerDay) {
+                            return {
+                                allowed: false,
+                                reason: 'Deine Aufnahme wird jetzt geprüft. Das dauert nur einen Moment.',
+                                requiresReview: true
+                            };
+                        }
+                    } else {
+                        deviceStats.uploadsToday = 0;
+                        deviceStats.audioMinutesToday = 0;
+                        deviceStats.lastUploadToday = null;
+                    }
+                }
+
+                return { allowed: true, requiresReview: false };
+            }
+            
+            updateDeviceStatsAfterUpload(deviceStats, fileHash, duration) {
+                const now = new Date();
+                
+                deviceStats.uploads30Min++;
+                deviceStats.uploadsToday++;
+                deviceStats.audioMinutesToday += Math.round(duration / 60);
+                
+                deviceStats.lastUpload30Min = now;
+                deviceStats.lastUploadToday = now;
+                
+                deviceStats.fileHashes[fileHash] = (deviceStats.fileHashes[fileHash] || 0) + 1;
+                
+                this.persistDeviceStats(deviceStats);
+            }
+            
+            async checkUploadSecurity(file, duration) {
+                const deviceId = this.generateDeviceId();
+                const fileHash = await this.calculateFileHash(file);
+                
+                let deviceStats = this.loadDeviceStats(deviceId);
+                if (!deviceStats) {
+                    deviceStats = this.createNewDeviceStats(deviceId);
+                }
+                
+                console.log('🔐 Security Check - Duration:', duration, 'seconds');
+
+                // 15-Sekunden-Mindestdauer prüfen
+                if (duration < this.limits.minAudioDuration) {
+                    return {
+                        allowed: true,
+                        reason: 'Deine Aufnahme wird jetzt geprüft. Das dauert nur einen Moment.',
+                        requiresReview: true,
+                        duplicateCheck: { isDuplicate: false, duplicateCount: 0, isSuspicious: false },
+                        deviceStats
+                    };
+                }
+
+                // 20-Minuten-Maximaldauer prüfen
+                if (duration > this.limits.maxAudioDuration) {
+                    return {
+                        allowed: true,
+                        reason: 'Deine Aufnahme wird jetzt geprüft. Das dauert nur einen Moment.',
+                        requiresReview: true,
+                        duplicateCheck: { isDuplicate: false, duplicateCount: 0, isSuspicious: false },
+                        deviceStats
+                    };
+                }
+
+                const rateLimitCheck = this.checkRateLimits(deviceStats, duration);
+                if (!rateLimitCheck.allowed) {
+                    return {
+                        allowed: false,
+                        reason: rateLimitCheck.reason,
+                        requiresReview: true,
+                        duplicateCheck: { isDuplicate: false, duplicateCount: 0, isSuspicious: false },
+                        deviceStats
+                    };
+                }
+
+                const duplicateCount = deviceStats.fileHashes[fileHash] || 0;
+                const duplicateCheck = {
+                    isDuplicate: duplicateCount > 0,
+                    duplicateCount,
+                    isSuspicious: duplicateCount >= this.limits.maxDuplicateCount
+                };
+
+                const requiresReview = duplicateCheck.isSuspicious || rateLimitCheck.requiresReview;
+                const allowed = rateLimitCheck.allowed && !duplicateCheck.isSuspicious;
+
+                return {
+                    allowed,
+                    reason: allowed ? undefined : (rateLimitCheck.reason || 'Suspicious duplicate uploads'),
+                    requiresReview,
+                    duplicateCheck,
+                    deviceStats
+                };
+            }
+        }
+
+        const securityManager = new MockUploadSecurityManager();
+
+        async function simulateUpload() {
+            const fileInput = document.getElementById('testFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                document.getElementById('uploadResult').innerHTML = '<div class="error">❌ Bitte wählen Sie eine Audio-Datei aus</div>';
+                return;
+            }
+            
+            const duration = 30; // Simuliere 30 Sekunden
+            const result = await securityManager.checkUploadSecurity(file, duration);
+            
+            let statusClass = 'allowed';
+            if (!result.allowed) statusClass = 'blocked';
+            else if (result.requiresReview) statusClass = 'review';
+            
+            let html = `
+                <div class="upload ${statusClass}">
+                    <h4>Upload-Ergebnis</h4>
+                    <p><strong>Dauer:</strong> ${duration} Sekunden</p>
+                    <p><strong>Status:</strong> ${result.allowed ? '✅ Erlaubt' : '❌ Blockiert'}</p>
+                    <p><strong>Review erforderlich:</strong> ${result.requiresReview ? 'Ja' : 'Nein'}</p>
+                    <p><strong>Grund:</strong> ${result.reason || 'Kein Grund angegeben'}</p>
+                </div>
+            `;
+            
+            if (result.allowed) {
+                const fileHash = await securityManager.calculateFileHash(file);
+                securityManager.updateDeviceStatsAfterUpload(result.deviceStats, fileHash, duration);
+                html += '<div class="success">✅ Device-Stats aktualisiert</div>';
+            }
+            
+            document.getElementById('uploadResult').innerHTML = html;
+        }
+
+        async function testDifferentDurations() {
+            const durations = [
+                { duration: 10, name: '10 Sekunden (zu kurz)' },
+                { duration: 30, name: '30 Sekunden (OK)' },
+                { duration: 300, name: '5 Minuten (OK)' },
+                { duration: 900, name: '15 Minuten (OK)' },
+                { duration: 1200, name: '20 Minuten (OK)' },
+                { duration: 1300, name: '21,7 Minuten (zu lang)' },
+                { duration: 1800, name: '30 Minuten (zu lang)' }
+            ];
+            
+            let html = '<div class="info"><h3>⏱️ Dauer-Test: Verschiedene Längen</h3></div>';
+            
+            for (const test of durations) {
+                const result = await securityManager.checkUploadSecurity(new File([''], 'test.wav'), test.duration);
+                
+                let statusClass = 'allowed';
+                if (!result.allowed) statusClass = 'blocked';
+                else if (result.requiresReview) statusClass = 'review';
+                
+                const status = result.allowed ? (result.requiresReview ? '⚠️ Review' : '✅ OK') : '❌ Blockiert';
+                
+                html += `
+                    <div class="upload ${statusClass}">
+                        <h4>${test.name}</h4>
+                        <p><strong>Status:</strong> ${status}</p>
+                        <p><strong>Grund:</strong> ${result.reason || 'Kein Grund'}</p>
+                        <p><strong>Review erforderlich:</strong> ${result.requiresReview ? 'Ja' : 'Nein'}</p>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('durationTestResult').innerHTML = html;
+        }
+
+        function resetAll() {
+            const deviceId = securityManager.generateDeviceId();
+            const key = `aural_device_stats_${deviceId}`;
+            localStorage.removeItem(key);
+            document.getElementById('resetResult').innerHTML = '<div class="success">✅ Alle Zähler zurückgesetzt</div>';
+        }
+
+        // Initialisierung
+        console.log('🚀 20-Minuten-Limit Test System initialisiert');
+    </script>
+</body>
+</html>

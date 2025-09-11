@@ -57,23 +57,56 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
     checkSupport();
   }, []);
 
-  // Duration tracking - fixed to handle pause correctly
+  // Duration tracking - fixed to handle pause correctly and page visibility
   useEffect(() => {
     let interval: number | null = null;
+    let lastUpdateTime = Date.now();
+    let hiddenStartTime = 0;
+    
+    const updateDuration = () => {
+      if (!isPaused && isRecording) {
+        const now = Date.now();
+        const currentElapsed = (now - startTimeRef.current - pausedDurationRef.current) / 1000;
+        setDuration(currentElapsed);
+        lastUpdateTime = now;
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page became hidden - store the time
+        hiddenStartTime = Date.now();
+        console.log('📱 Page became hidden, pausing timer updates');
+      } else {
+        // Page became visible - adjust for hidden time
+        if (hiddenStartTime > 0) {
+          const hiddenDuration = Date.now() - hiddenStartTime;
+          pausedDurationRef.current += hiddenDuration;
+          console.log('📱 Page became visible, adjusting for hidden time:', hiddenDuration, 'ms');
+          hiddenStartTime = 0;
+        }
+        // Immediately update duration when page becomes visible
+        updateDuration();
+      }
+    };
     
     if (isRecording) {
-      interval = setInterval(() => {
-        if (!isPaused) {
-          // Only update duration when not paused
-          const currentElapsed = (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000;
-          setDuration(currentElapsed);
-        }
-        // When paused, don't update duration - it should stay at the current value
-      }, 100);
+      // Start the interval
+      interval = setInterval(updateDuration, 100);
+      
+      // Listen for page visibility changes
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Also listen for window focus/blur events as backup
+      window.addEventListener('focus', handleVisibilityChange);
+      window.addEventListener('blur', handleVisibilityChange);
     }
     
     return () => {
       if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('blur', handleVisibilityChange);
     };
   }, [isRecording, isPaused, setDuration]);
 

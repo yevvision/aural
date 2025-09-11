@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Approval Workflow</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .track { margin: 10px 0; padding: 10px; background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug: Approval Workflow</h1>
+    
+    <div class="section">
+        <h2>1. Simuliere Upload mit Pending Status</h2>
+        <button class="button" onclick="simulateUpload()">📤 Upload simulieren</button>
+        <div id="uploadResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Zeige Pending Uploads</h2>
+        <button class="button" onclick="showPendingUploads()">📋 Pending Uploads anzeigen</button>
+        <div id="pendingResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Simuliere Admin Approval</h2>
+        <button class="button" onclick="simulateApproval()">✅ Approval simulieren</button>
+        <div id="approvalResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. Zeige alle Tracks</h2>
+        <button class="button" onclick="showAllTracks()">🎵 Alle Tracks anzeigen</button>
+        <div id="tracksResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>5. Teste "New" Kategorie Filter</h2>
+        <button class="button" onclick="testNewCategory()">🆕 "New" Kategorie testen</button>
+        <div id="newCategoryResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>6. Event Listener Test</h2>
+        <button class="button" onclick="testEventListeners()">🎧 Event Listener testen</button>
+        <div id="eventResult"></div>
+    </div>
+
+    <script>
+        // Simuliere die Datenbank-Services
+        const DatabaseService = {
+            tracks: [],
+            addTrack: function(track) {
+                this.tracks.push(track);
+                console.log('✅ Track zur DB hinzugefügt:', track.title);
+                return true;
+            },
+            getTracks: function() {
+                return [...this.tracks];
+            },
+            getTrack: function(id) {
+                return this.tracks.find(t => t.id === id);
+            }
+        };
+
+        // Simuliere localStorage
+        const localStorage = {
+            data: {},
+            getItem: function(key) {
+                return this.data[key] || null;
+            },
+            setItem: function(key, value) {
+                this.data[key] = value;
+                console.log('💾 localStorage gesetzt:', key, value);
+            }
+        };
+
+        function simulateUpload() {
+            const uploadId = 'upload_' + Date.now();
+            const audioBlob = new Blob(['fake audio data'], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            const pendingUpload = {
+                uploadId: uploadId,
+                filename: 'test_audio.mp3',
+                originalName: 'Test Audio Recording.mp3',
+                size: 1024000,
+                mimeType: 'audio/mpeg',
+                url: audioUrl,
+                title: 'Test Audio ' + new Date().toLocaleTimeString(),
+                description: 'Test-Beschreibung für Debugging',
+                gender: 'couples',
+                tags: ['test', 'debug'],
+                uploadedAt: new Date().toISOString(),
+                status: 'pending_review',
+                reason: 'Test-Upload für Debugging',
+                duplicateCount: 0,
+                deviceId: 'device_123',
+                userId: 'user-1',
+                username: 'TestUser',
+                duration: 30
+            };
+            
+            // Speichere in localStorage
+            const pendingData = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            pendingData[uploadId] = pendingUpload;
+            localStorage.setItem('aural_pending_uploads', JSON.stringify(pendingData));
+            
+            document.getElementById('uploadResult').innerHTML = 
+                `<div class="success">✅ Upload simuliert: ${pendingUpload.title}</div>
+                 <pre>${JSON.stringify(pendingUpload, null, 2)}</pre>`;
+        }
+
+        function showPendingUploads() {
+            const pendingData = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            const pendingUploads = Object.values(pendingData);
+            
+            let html = `<div class="info">📋 ${pendingUploads.length} Pending Uploads gefunden:</div>`;
+            pendingUploads.forEach(upload => {
+                html += `<div class="track">
+                    <strong>${upload.title}</strong><br>
+                    ID: ${upload.uploadId}<br>
+                    User: ${upload.username}<br>
+                    Status: ${upload.status}<br>
+                    URL: ${upload.url ? 'Blob URL vorhanden' : 'Keine URL'}
+                </div>`;
+            });
+            
+            document.getElementById('pendingResult').innerHTML = html;
+        }
+
+        async function simulateApproval() {
+            const pendingData = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            const pendingUploads = Object.values(pendingData);
+            
+            if (pendingUploads.length === 0) {
+                document.getElementById('approvalResult').innerHTML = 
+                    '<div class="error">❌ Keine Pending Uploads gefunden. Führe zuerst einen Upload durch.</div>';
+                return;
+            }
+            
+            const uploadToApprove = pendingUploads[0];
+            console.log('🔄 Approving upload:', uploadToApprove.uploadId);
+            
+            // Konvertiere Blob-URL zu Base64 (simuliert)
+            let audioDataUrl = uploadToApprove.url;
+            if (uploadToApprove.url && uploadToApprove.url.startsWith('blob:')) {
+                try {
+                    const response = await fetch(uploadToApprove.url);
+                    const blob = await response.blob();
+                    audioDataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    console.log('✅ Audio-Daten zu Base64 konvertiert');
+                } catch (error) {
+                    console.error('❌ Fehler beim Konvertieren:', error);
+                }
+            }
+            
+            // Erstelle approved Track
+            const approvedTrack = {
+                id: uploadToApprove.uploadId,
+                title: uploadToApprove.title,
+                description: uploadToApprove.description,
+                url: audioDataUrl,
+                duration: uploadToApprove.duration || 0,
+                user: {
+                    id: uploadToApprove.userId,
+                    username: uploadToApprove.username,
+                    email: '',
+                    avatar: '',
+                    createdAt: new Date(),
+                    isAdmin: false
+                },
+                likes: 0,
+                isLiked: false,
+                isBookmarked: false,
+                createdAt: new Date(), // WICHTIG: Aktuelles Datum für "New" Kategorie
+                tags: uploadToApprove.tags,
+                gender: uploadToApprove.gender,
+                filename: uploadToApprove.filename,
+                fileSize: uploadToApprove.size,
+                format: uploadToApprove.mimeType
+            };
+            
+            // Speichere in zentraler DB
+            const success = DatabaseService.addTrack(approvedTrack);
+            
+            // Speichere auch in localStorage
+            const existingTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            existingTracks.push(approvedTrack);
+            localStorage.setItem('aural_tracks', JSON.stringify(existingTracks));
+            
+            // Entferne aus Pending-Liste
+            delete pendingData[uploadToApprove.uploadId];
+            localStorage.setItem('aural_pending_uploads', JSON.stringify(pendingData));
+            
+            // Dispatch Event
+            window.dispatchEvent(new CustomEvent('trackApproved', {
+                detail: { trackId: approvedTrack.id, track: approvedTrack }
+            }));
+            
+            document.getElementById('approvalResult').innerHTML = 
+                `<div class="success">✅ Upload approved: ${approvedTrack.title}</div>
+                 <div class="info">📅 CreatedAt: ${approvedTrack.createdAt.toISOString()}</div>
+                 <div class="info">🔗 URL Type: ${approvedTrack.url.startsWith('data:') ? 'Base64' : 'Blob'}</div>
+                 <pre>${JSON.stringify(approvedTrack, null, 2)}</pre>`;
+        }
+
+        function showAllTracks() {
+            const dbTracks = DatabaseService.getTracks();
+            const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            let html = `<div class="info">🎵 Tracks in zentraler DB: ${dbTracks.length}</div>`;
+            dbTracks.forEach(track => {
+                html += `<div class="track">
+                    <strong>${track.title}</strong><br>
+                    ID: ${track.id}<br>
+                    CreatedAt: ${track.createdAt.toISOString()}<br>
+                    URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                </div>`;
+            });
+            
+            html += `<div class="info">💾 Tracks in localStorage: ${localTracks.length}</div>`;
+            localTracks.forEach(track => {
+                html += `<div class="track">
+                    <strong>${track.title}</strong><br>
+                    ID: ${track.id}<br>
+                    CreatedAt: ${track.createdAt.toISOString()}<br>
+                    URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                </div>`;
+            });
+            
+            document.getElementById('tracksResult').innerHTML = html;
+        }
+
+        function testNewCategory() {
+            const allTracks = [
+                ...DatabaseService.getTracks(),
+                ...JSON.parse(localStorage.getItem('aural_tracks') || '[]')
+            ];
+            
+            // Dedupliziere
+            const tracksMap = new Map();
+            allTracks.forEach(track => tracksMap.set(track.id, track));
+            const uniqueTracks = Array.from(tracksMap.values());
+            
+            const now = new Date();
+            const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+            
+            const newTracks = uniqueTracks
+                .filter(track => new Date(track.createdAt) > twoWeeksAgo)
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            let html = `<div class="info">🆕 "New" Kategorie Test:</div>`;
+            html += `<div class="info">📊 Total Tracks: ${uniqueTracks.length}</div>`;
+            html += `<div class="info">📅 Two weeks ago: ${twoWeeksAgo.toISOString()}</div>`;
+            html += `<div class="info">🆕 New Tracks (last 2 weeks): ${newTracks.length}</div>`;
+            
+            newTracks.forEach(track => {
+                const isRecent = new Date(track.createdAt) > twoWeeksAgo;
+                html += `<div class="track">
+                    <strong>${track.title}</strong><br>
+                    CreatedAt: ${track.createdAt.toISOString()}<br>
+                    Is Recent: ${isRecent ? '✅' : '❌'}<br>
+                    URL: ${track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'}
+                </div>`;
+            });
+            
+            document.getElementById('newCategoryResult').innerHTML = html;
+        }
+
+        function testEventListeners() {
+            let eventReceived = false;
+            
+            const handleTrackApproved = (event) => {
+                eventReceived = true;
+                console.log('🎧 Track approved event received:', event.detail);
+                document.getElementById('eventResult').innerHTML = 
+                    `<div class="success">✅ Event received: ${event.detail.trackId}</div>
+                     <pre>${JSON.stringify(event.detail, null, 2)}</pre>`;
+            };
+            
+            window.addEventListener('trackApproved', handleTrackApproved);
+            
+            // Simuliere Event nach 2 Sekunden
+            setTimeout(() => {
+                if (!eventReceived) {
+                    document.getElementById('eventResult').innerHTML = 
+                        '<div class="warning">⏰ Warte auf trackApproved Event...</div>';
+                }
+            }, 2000);
+            
+            document.getElementById('eventResult').innerHTML = 
+                '<div class="info">🎧 Event Listener registriert. Führe einen Approval durch, um das Event zu testen.</div>';
+        }
+
+        // Event Listener für trackApproved
+        window.addEventListener('trackApproved', (event) => {
+            console.log('🎧 Global trackApproved event received:', event.detail);
+        });
+    </script>
+</body>
+</html>

@@ -19,7 +19,28 @@ export const useDatabase = (currentUserId?: string) => {
     setIsLoading(true);
     
     try {
-      const allTracks = DatabaseService.getTracks(currentUserId);
+      // Lade aus zentraler Datenbank
+      const dbTracks = DatabaseService.getTracks(currentUserId);
+      
+      // Lade auch aus localStorage als Backup (zentrale DB verwendet 'aural-central-database')
+      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      
+      // Kombiniere und dedupliziere Tracks
+      const allTracksMap = new Map();
+      
+      // Füge DB-Tracks hinzu
+      dbTracks.forEach(track => {
+        allTracksMap.set(track.id, track);
+      });
+      
+      // Füge localStorage-Tracks hinzu (überschreibt DB-Tracks)
+      localTracks.forEach(track => {
+        allTracksMap.set(track.id, track);
+      });
+      
+      const allTracks = Array.from(allTracksMap.values());
+      
       const allUsers = DatabaseService.getUsers();
       const allComments = DatabaseService.getComments();
       const allActivities = currentUserId ? DatabaseService.getUserActivities(currentUserId) : [];
@@ -33,7 +54,7 @@ export const useDatabase = (currentUserId?: string) => {
       setNotifications(allNotifications);
       setReports(allReports);
       
-      console.log('✅ useDatabase: Daten geladen - Tracks:', allTracks.length, 'Users:', allUsers.length, 'Comments:', allComments.length, 'Activities:', allActivities.length, 'Notifications:', allNotifications.length, 'Reports:', allReports.length);
+      console.log('✅ useDatabase: Daten geladen - Tracks:', allTracks.length, 'DB-Tracks:', dbTracks.length, 'Local-Tracks:', localTracks.length, 'Users:', allUsers.length, 'Comments:', allComments.length, 'Activities:', allActivities.length, 'Notifications:', allNotifications.length, 'Reports:', allReports.length);
     } catch (error) {
       console.error('❌ useDatabase: Fehler beim Laden der Daten:', error);
       setTracks([]);
@@ -58,8 +79,33 @@ export const useDatabase = (currentUserId?: string) => {
       loadData();
     });
 
+    // Zusätzlicher Polling für localStorage-Änderungen
+    const interval = setInterval(() => {
+      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      const dbTracks = DatabaseService.getTracks(currentUserId);
+      
+      // Prüfe auf neue Tracks in localStorage oder DB
+      if (localTracks.length > tracks.length || dbTracks.length > tracks.length) {
+        console.log('🔄 useDatabase: Neue Tracks gefunden (localStorage:', localTracks.length, 'DB:', dbTracks.length, 'Current:', tracks.length, '), lade neu...');
+        loadData();
+      }
+    }, 1000); // Reduziere Intervall auf 1 Sekunde für schnellere Reaktion
+
+    // Event Listener für Track Approval
+    const handleTrackApproved = () => {
+      console.log('🔄 useDatabase: Track approved event received, reloading...');
+      loadData();
+    };
+
+    window.addEventListener('trackApproved', handleTrackApproved);
+
     // Cleanup
-    return removeListener;
+    return () => {
+      removeListener();
+      clearInterval(interval);
+      window.removeEventListener('trackApproved', handleTrackApproved);
+    };
   }, [currentUserId]);
 
   // =============================================================================

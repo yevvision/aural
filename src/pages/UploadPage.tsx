@@ -11,6 +11,17 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+import { capClient } from '../utils/capClient';
+import { uploadSecurityManager } from '../utils/uploadSecurity';
+import { PendingUploadPage } from './PendingUploadPage';
+
+interface PendingUploadData {
+  uploadId: string;
+  title: string;
+  status: 'pending';
+  reason: string;
+  estimatedTime: string;
+}
 import type { AudioTrack } from '../types';
 
 // Predefined tags for audio content
@@ -37,6 +48,8 @@ export const UploadPage = () => {
   const [error, setError] = useState('');
   const [titleError, setTitleError] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showPendingPage, setShowPendingPage] = useState(false);
+  const [pendingUploadData, setPendingUploadData] = useState<PendingUploadData | null>(null);
   
   const { currentUser, addMyTrack } = useUserStore();
   const { addTrack } = useDatabase();
@@ -274,6 +287,7 @@ export const UploadPage = () => {
     setSelectedTags(prev => prev.filter(t => t !== tag));
   };
 
+
   const handleUpload = async () => {
     if (!selectedFile || !currentUser) return;
     
@@ -286,25 +300,111 @@ export const UploadPage = () => {
     setError('');
     
     try {
-      // Create FormData for file upload
+      // 1. Sicherheitscheck durchführen
+      console.log('🔐 Starting security check...');
+      const securityCheck = await uploadSecurityManager.checkUploadSecurity(selectedFile, duration);
+      
+      console.log('🔐 Security Check Result:', {
+        allowed: securityCheck.allowed,
+        requiresReview: securityCheck.requiresReview,
+        reason: securityCheck.reason,
+        deviceStats: {
+          uploads30Min: securityCheck.deviceStats.uploads30Min,
+          uploadsToday: securityCheck.deviceStats.uploadsToday,
+          audioMinutesToday: securityCheck.deviceStats.audioMinutesToday
+        }
+      });
+      
+      // 2. WICHTIG: Device-Stats IMMER aktualisieren (auch bei normalen Uploads)
+      const fileHash = await uploadSecurityManager.calculateFileHash(selectedFile);
+      uploadSecurityManager.updateDeviceStatsAfterUpload(
+        securityCheck.deviceStats, 
+        fileHash, 
+        duration
+      );
+      console.log('📊 Device stats updated for upload attempt');
+      
+      // 3. Cap-Token generieren (unsichtbar für User)
+      console.log('🔐 Generating Cap proof-of-work token...');
+      const capToken = await capClient.generateToken(selectedFile.size);
+      
+      // 3.5. Prüfe Sicherheitsregeln VOR dem Upload
+      if (securityCheck.requiresReview || !securityCheck.allowed) {
+        console.log('📋 Upload requires review BEFORE upload, showing pending modal...');
+        
+        const uploadId = generateId();
+        
+        // Erstelle Blob-URL für lokale Wiedergabe
+        const audioBlobUrl = URL.createObjectURL(selectedFile);
+
+        // Speichere nur Metadaten in localStorage (ohne Audio-Daten)
+        const pendingUpload = {
+          uploadId,
+          filename: selectedFile.name,
+          originalName: selectedFile.name,
+          size: selectedFile.size,
+          mimeType: selectedFile.type,
+          url: audioBlobUrl, // Blob-URL für lokale Wiedergabe
+          title: title.trim(),
+          description: description.trim(),
+          gender: selectedGender || undefined,
+          tags: selectedTags,
+          uploadedAt: new Date().toISOString(),
+          status: 'pending_review',
+          reason: securityCheck.reason || 'Security check triggered',
+          duplicateCount: securityCheck.duplicateCheck.duplicateCount,
+          deviceId: securityCheck.deviceStats.deviceId,
+          userId: currentUser.id,
+          username: currentUser.username,
+          duration: duration // Audio-Dauer hinzufügen
+        };
+        
+        // Speichere nur Metadaten in localStorage
+        const existingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+        existingUploads[uploadId] = pendingUpload;
+        localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
+        
+        // Device-Stats wurden bereits oben aktualisiert
+        
+        const pendingData: PendingUploadData = {
+          uploadId,
+          title: title.trim(),
+          status: 'pending',
+          reason: securityCheck.reason || 'Security check triggered',
+          estimatedTime: '5-10 minutes'
+        };
+        
+        setPendingUploadData(pendingData);
+        setShowPendingPage(true);
+        return;
+      }
+      
+      // Normale Uploads (erlaubt und keine Review erforderlich)
+      console.log('📤 Normal upload - proceeding with backend upload...');
+      
+      // 3. FormData mit Cap-Token erstellen
       const formData = new FormData();
       formData.append('audio', selectedFile);
       formData.append('title', title.trim());
       formData.append('description', description.trim());
+      formData.append('capToken', capToken);
+      formData.append('requiresReview', securityCheck.requiresReview.toString());
       if (selectedGender) {
         formData.append('gender', selectedGender);
       }
       formData.append('tags', JSON.stringify(selectedTags));
       
-      console.log('Uploading to backend...', {
+      console.log('Uploading to backend with security measures...', {
         filename: selectedFile.name,
         size: selectedFile.size,
         type: selectedFile.type,
         title: title.trim(),
-        tags: selectedTags
+        tags: selectedTags,
+        requiresReview: securityCheck.requiresReview,
+        duplicateCount: securityCheck.duplicateCheck.duplicateCount
       });
       
-      // Upload to PHP backend - try different paths
+      // 4. Upload to PHP backend
       let response;
       try {
         response = await fetch('/upload.php', {
@@ -331,7 +431,7 @@ export const UploadPage = () => {
         if (responseText.includes('<?php') || responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
           console.log('PHP server not available, using local storage fallback...');
           
-          // Convert audio file to base64 for persistent storage
+          // Fallback: Store locally and simulate successful upload
           const audioBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
@@ -342,12 +442,11 @@ export const UploadPage = () => {
             reader.readAsDataURL(selectedFile);
           });
           
-          // Fallback: Store locally and simulate successful upload
           const localTrack: AudioTrack = {
             id: generateId(),
             title: title.trim(),
             description: description.trim(),
-            url: audioBase64, // Store as base64 data URL
+            url: audioBase64,
             duration: duration,
             user: currentUser,
             likes: 0,
@@ -361,11 +460,8 @@ export const UploadPage = () => {
             format: selectedFile.type
           };
           
-          // Add to stores
           addMyTrack(localTrack);
           addTrack(localTrack);
-          
-          // Navigate to feed
           navigate('/');
           return;
         }
@@ -390,7 +486,6 @@ export const UploadPage = () => {
         if (responseText.includes('<?php') || responseText.includes('<html')) {
           console.log('Server returned HTML instead of JSON, using local storage fallback...');
           
-          // Convert audio file to base64 for persistent storage
           const audioBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
@@ -405,7 +500,7 @@ export const UploadPage = () => {
             id: generateId(),
             title: title.trim(),
             description: description.trim(),
-            url: audioBase64, // Store as base64 data URL
+            url: audioBase64,
             duration: duration,
             user: currentUser,
             likes: 0,
@@ -431,13 +526,63 @@ export const UploadPage = () => {
       if (!result.success) {
         throw new Error(result.error || 'Upload failed');
       }
+
+      // 5. Device-Stats wurden bereits oben aktualisiert
       
-      // Create new track with server response data
+      // 6. Prüfen ob Review erforderlich ist (IMMER prüfen, auch bei lokaler Speicherung)
+      if (result.requiresReview || securityCheck.requiresReview) {
+        console.log('📋 Upload requires review, showing pending modal...');
+        
+        const uploadId = result.data.uploadId || generateId();
+        
+        // Speichere Upload in pending queue
+        const pendingUpload = {
+          uploadId,
+          filename: result.data.filename || selectedFile.name,
+          originalName: selectedFile.name,
+          size: selectedFile.size,
+          mimeType: selectedFile.type,
+          url: result.data.url || '',
+          title: title.trim(),
+          description: description.trim(),
+          gender: selectedGender || undefined,
+          tags: selectedTags,
+          uploadedAt: new Date().toISOString(),
+          status: 'pending_review',
+          reason: securityCheck.reason || (securityCheck.duplicateCheck.isSuspicious ? 
+            'Duplicate file detected' : 
+            'Rate limit or security check triggered'),
+          duplicateCount: securityCheck.duplicateCheck.duplicateCount,
+          deviceId: securityCheck.deviceStats.deviceId,
+          userId: currentUser.id,
+          username: currentUser.username,
+          duration: duration // Audio-Dauer hinzufügen
+        };
+        
+        // Speichere in localStorage
+        const existingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+        existingUploads[uploadId] = pendingUpload;
+        localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
+        
+        const pendingData: PendingUploadData = {
+          uploadId,
+          title: title.trim(),
+          status: 'pending',
+          reason: securityCheck.reason || 'Security check triggered',
+          estimatedTime: '5-10 minutes'
+        };
+        
+        setPendingUploadData(pendingData);
+        setShowPendingPage(true);
+        return;
+      }
+      
+      // 7. Normale Verarbeitung - Track erstellen
       const newTrack: AudioTrack = {
         id: generateId(),
         title: title.trim(),
         description: description.trim(),
-        url: result.data.url, // Use server URL
+        url: result.data.url,
         duration: duration,
         user: currentUser,
         likes: 0,
@@ -468,8 +613,6 @@ export const UploadPage = () => {
       
       if (success) {
         console.log('✅ UploadPage: Track erfolgreich zur Datenbank hinzugefügt');
-        
-        // Auch zu UserStore hinzufügen (für lokale UI-Features wie "Meine Uploads")
         addMyTrack(newTrack);
       } else {
         console.error('❌ UploadPage: Fehler beim Hinzufügen zur Datenbank');
@@ -731,6 +874,11 @@ export const UploadPage = () => {
           </div>
         )}
       </div>
+
+      {/* Pending Upload Page */}
+      {showPendingPage && pendingUploadData && (
+        <PendingUploadPage uploadData={pendingUploadData} />
+      )}
     </div>
   );
 };

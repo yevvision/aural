@@ -18,6 +18,7 @@ import { DebugPage } from './pages/DebugPage';
 import { DatenschutzPage } from './pages/DatenschutzPage';
 import { AGBPage } from './pages/AGBPage';
 import { ImpressumPage } from './pages/ImpressumPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import './App.css';
 
 // German spec: Enhanced routing structure for Aural mobile web app
@@ -88,9 +89,11 @@ function App() {
         <Route path="/datenschutz" element={<DatenschutzPage />} />
         <Route path="/agb" element={<AGBPage />} />
         <Route path="/impressum" element={<ImpressumPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/aural/datenschutz" element={<DatenschutzPage />} />
         <Route path="/aural/agb" element={<AGBPage />} />
         <Route path="/aural/impressum" element={<ImpressumPage />} />
+        <Route path="/aural/privacy" element={<PrivacyPage />} />
         
         {/* FALLBACK */}
         <Route path="*" element={<FeedPage />} />

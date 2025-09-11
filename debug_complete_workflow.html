@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Workflow Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #e55a2b;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success { background: #4CAF50; }
+        .error { background: #f44336; }
+        .info { background: #2196F3; }
+        .warning { background: #ff9800; }
+        .track-item {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #555;
+        }
+        .track-info {
+            margin-bottom: 10px;
+        }
+        .track-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .play-btn { background: #4CAF50; }
+        .approve-btn { background: #4CAF50; }
+        .reject-btn { background: #f44336; }
+        .test-btn { background: #2196F3; }
+        .debug-btn { background: #9C27B0; }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .debug-info {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .step {
+            background: #444;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #ff6b35;
+        }
+        .step.completed {
+            border-left-color: #4CAF50;
+        }
+        .step.error {
+            border-left-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Complete Workflow Debug</h1>
+    
+    <div class="test-section">
+        <h2>📋 Workflow Steps</h2>
+        <div id="workflow-steps">
+            <div class="step" id="step1">1. Audio-Datei auswählen</div>
+            <div class="step" id="step2">2. Pending Upload erstellen</div>
+            <div class="step" id="step3">3. Upload freigeben</div>
+            <div class="step" id="step4">4. Track in Datenbank speichern</div>
+            <div class="step" id="step5">5. Track auf Hauptseite anzeigen</div>
+            <div class="step" id="step6">6. Audio-Wiedergabe testen</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎵 Audio Upload</h2>
+        <input type="file" id="audioFile" accept="audio/*" />
+        <button onclick="step1_selectAudio()">1. Audio auswählen</button>
+        <div id="step1-status" class="status info">Wählen Sie eine Audio-Datei...</div>
+        <div id="audio-preview"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>⏳ Pending Upload</h2>
+        <button onclick="step2_createPending()">2. Pending Upload erstellen</button>
+        <button onclick="loadPendingUploads()">Pending Uploads laden</button>
+        <div id="step2-status" class="status info">Bereit...</div>
+        <div id="pending-list"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ Upload Freigabe</h2>
+        <button onclick="step3_approveUpload()">3. Upload freigeben</button>
+        <button onclick="step4_checkDatabase()">4. Datenbank prüfen</button>
+        <div id="step3-status" class="status info">Bereit...</div>
+        <div id="approval-details"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎵 Freigegebene Tracks</h2>
+        <button onclick="step5_loadTracks()">5. Tracks laden</button>
+        <button onclick="step6_testAudio()">6. Audio testen</button>
+        <div id="step5-status" class="status info">Bereit...</div>
+        <div id="tracks-list"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Debug Information</h2>
+        <button onclick="showDebugInfo()">Debug Info anzeigen</button>
+        <button onclick="clearAllData()">Alle Daten löschen</button>
+        <div id="debug-info" class="debug-info"></div>
+    </div>
+
+    <script>
+        let currentAudioFile = null;
+        let pendingUpload = null;
+        let approvedTrack = null;
+        let workflowData = {};
+
+        function updateStep(stepId, status) {
+            const step = document.getElementById(stepId);
+            step.className = `step ${status}`;
+        }
+
+        function log(message, type = 'info') {
+            const debugInfo = document.getElementById('debug-info');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#4ecdc4' : '#ffd93d';
+            debugInfo.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            debugInfo.scrollTop = debugInfo.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function step1_selectAudio() {
+            const fileInput = document.getElementById('audioFile');
+            const status = document.getElementById('step1-status');
+            const preview = document.getElementById('audio-preview');
+            
+            if (!fileInput.files[0]) {
+                status.textContent = '❌ Bitte wählen Sie eine Audio-Datei aus';
+                status.className = 'status error';
+                return;
+            }
+
+            try {
+                currentAudioFile = fileInput.files[0];
+                const blobUrl = URL.createObjectURL(currentAudioFile);
+                
+                status.textContent = `✅ Audio geladen: ${currentAudioFile.name} (${(currentAudioFile.size / 1024).toFixed(1)} KB)`;
+                status.className = 'status success';
+                
+                preview.innerHTML = `
+                    <div class="track-item">
+                        <h4>${currentAudioFile.name}</h4>
+                        <p><strong>Typ:</strong> ${currentAudioFile.type}</p>
+                        <p><strong>Größe:</strong> ${(currentAudioFile.size / 1024).toFixed(1)} KB</p>
+                        <audio controls>
+                            <source src="${blobUrl}" type="${currentAudioFile.type}">
+                        </audio>
+                    </div>
+                `;
+
+                updateStep('step1', 'completed');
+                log(`Audio selected: ${currentAudioFile.name}`, 'success');
+            } catch (error) {
+                status.textContent = `❌ Fehler: ${error.message}`;
+                status.className = 'status error';
+                updateStep('step1', 'error');
+                log(`Audio selection error: ${error.message}`, 'error');
+            }
+        }
+
+        function step2_createPending() {
+            const status = document.getElementById('step2-status');
+            
+            if (!currentAudioFile) {
+                status.textContent = '❌ Bitte wählen Sie zuerst eine Audio-Datei aus';
+                status.className = 'status error';
+                updateStep('step2', 'error');
+                return;
+            }
+
+            try {
+                const uploadId = 'debug_' + Date.now();
+                const blobUrl = URL.createObjectURL(currentAudioFile);
+                
+                pendingUpload = {
+                    uploadId,
+                    filename: currentAudioFile.name,
+                    originalName: currentAudioFile.name,
+                    size: currentAudioFile.size,
+                    mimeType: currentAudioFile.type,
+                    url: blobUrl,
+                    title: 'Debug Upload ' + uploadId,
+                    description: 'Debug Description',
+                    uploadedAt: new Date().toISOString(),
+                    status: 'pending_review',
+                    reason: 'Audio zu kurz (< 15s)',
+                    userId: 'debug-user',
+                    username: 'Debug User',
+                    duration: 5
+                };
+
+                // Speichere in localStorage
+                const existingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+                existingUploads[uploadId] = pendingUpload;
+                localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
+
+                status.textContent = `✅ Pending Upload erstellt: ${currentAudioFile.name}`;
+                status.className = 'status success';
+                
+                updateStep('step2', 'completed');
+                log(`Pending upload created: ${uploadId}`, 'success');
+                
+                loadPendingUploads();
+            } catch (error) {
+                status.textContent = `❌ Fehler: ${error.message}`;
+                status.className = 'status error';
+                updateStep('step2', 'error');
+                log(`Pending upload creation error: ${error.message}`, 'error');
+            }
+        }
+
+        function loadPendingUploads() {
+            const list = document.getElementById('pending-list');
+            
+            try {
+                const stored = localStorage.getItem('aural_pending_uploads');
+                const uploads = stored ? Object.values(JSON.parse(stored)) : [];
+                
+                list.innerHTML = uploads.map(upload => `
+                    <div class="track-item">
+                        <div class="track-info">
+                            <h4>${upload.title}</h4>
+                            <p><strong>Datei:</strong> ${upload.filename}</p>
+                            <p><strong>Größe:</strong> ${(upload.size / 1024).toFixed(1)} KB</p>
+                            <p><strong>Grund:</strong> ${upload.reason}</p>
+                        </div>
+                        <div class="track-actions">
+                            <button class="play-btn" onclick="playPendingAudio('${upload.uploadId}')">▶️ Abspielen</button>
+                            <button class="approve-btn" onclick="approveSpecificUpload('${upload.uploadId}')">✅ Freigeben</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                log(`Loaded ${uploads.length} pending uploads`, 'info');
+            } catch (error) {
+                log(`Error loading pending uploads: ${error.message}`, 'error');
+            }
+        }
+
+        function playPendingAudio(uploadId) {
+            const stored = localStorage.getItem('aural_pending_uploads');
+            const uploads = stored ? JSON.parse(stored) : {};
+            const upload = uploads[uploadId];
+            
+            if (upload && upload.url) {
+                const audio = new Audio(upload.url);
+                audio.play().catch(error => {
+                    log(`Audio play failed: ${error.message}`, 'error');
+                });
+            }
+        }
+
+        function approveSpecificUpload(uploadId) {
+            const stored = localStorage.getItem('aural_pending_uploads');
+            const uploads = stored ? JSON.parse(stored) : {};
+            const upload = uploads[uploadId];
+            
+            if (upload) {
+                pendingUpload = upload;
+                step3_approveUpload();
+            }
+        }
+
+        async function step3_approveUpload() {
+            const status = document.getElementById('step3-status');
+            const details = document.getElementById('approval-details');
+            
+            if (!pendingUpload) {
+                status.textContent = '❌ Kein Pending Upload vorhanden';
+                status.className = 'status error';
+                updateStep('step3', 'error');
+                return;
+            }
+
+            try {
+                status.textContent = '🔄 Freigabe läuft...';
+                status.className = 'status info';
+
+                // Konvertiere Blob-URL zu Base64
+                let audioDataUrl = pendingUpload.url;
+                if (pendingUpload.url && pendingUpload.url.startsWith('blob:')) {
+                    log('Converting Blob URL to Base64...', 'info');
+                    const response = await fetch(pendingUpload.url);
+                    const blob = await response.blob();
+                    audioDataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    log(`Base64 conversion completed, length: ${audioDataUrl.length}`, 'success');
+                }
+
+                // Erstelle freigegebenen Track
+                approvedTrack = {
+                    id: pendingUpload.uploadId,
+                    title: pendingUpload.title,
+                    description: pendingUpload.description,
+                    url: audioDataUrl,
+                    duration: pendingUpload.duration || 0,
+                    user: {
+                        id: pendingUpload.userId,
+                        username: pendingUpload.username,
+                        email: '',
+                        avatar: '',
+                        createdAt: new Date(),
+                        isAdmin: false
+                    },
+                    likes: 0,
+                    isLiked: false,
+                    isBookmarked: false,
+                    createdAt: new Date(pendingUpload.uploadedAt),
+                    tags: [],
+                    gender: undefined,
+                    filename: pendingUpload.filename,
+                    fileSize: pendingUpload.size,
+                    format: pendingUpload.mimeType
+                };
+
+                // Speichere in localStorage
+                const existingTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+                existingTracks.push(approvedTrack);
+                localStorage.setItem('aural_tracks', JSON.stringify(existingTracks));
+                log(`Track saved to localStorage, total tracks: ${existingTracks.length}`, 'success');
+
+                // Entferne aus Pending
+                const uploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+                delete uploads[pendingUpload.uploadId];
+                localStorage.setItem('aural_pending_uploads', JSON.stringify(uploads));
+                log(`Removed from pending uploads`, 'success');
+
+                status.textContent = '✅ Upload erfolgreich freigegeben!';
+                status.className = 'status success';
+                
+                details.innerHTML = `
+                    <div class="track-item">
+                        <h4>Freigegebener Track</h4>
+                        <p><strong>Titel:</strong> ${approvedTrack.title}</p>
+                        <p><strong>URL Typ:</strong> ${approvedTrack.url.startsWith('data:') ? 'Base64' : 'Blob'}</p>
+                        <p><strong>URL Länge:</strong> ${approvedTrack.url.length} Zeichen</p>
+                        <p><strong>Erstellt:</strong> ${new Date(approvedTrack.createdAt).toLocaleString()}</p>
+                    </div>
+                `;
+
+                updateStep('step3', 'completed');
+                log(`Upload approved successfully: ${approvedTrack.title}`, 'success');
+                
+                loadPendingUploads();
+            } catch (error) {
+                status.textContent = `❌ Fehler bei der Freigabe: ${error.message}`;
+                status.className = 'status error';
+                updateStep('step3', 'error');
+                log(`Approval error: ${error.message}`, 'error');
+            }
+        }
+
+        function step4_checkDatabase() {
+            const status = document.getElementById('step5-status');
+            
+            try {
+                const stored = localStorage.getItem('aural_tracks');
+                const tracks = stored ? JSON.parse(stored) : [];
+                
+                status.textContent = `✅ Datenbank-Check: ${tracks.length} Tracks gefunden`;
+                status.className = 'status success';
+                
+                updateStep('step4', 'completed');
+                log(`Database check: ${tracks.length} tracks found`, 'success');
+                
+                step5_loadTracks();
+            } catch (error) {
+                status.textContent = `❌ Datenbank-Fehler: ${error.message}`;
+                status.className = 'status error';
+                updateStep('step4', 'error');
+                log(`Database check error: ${error.message}`, 'error');
+            }
+        }
+
+        function step5_loadTracks() {
+            const status = document.getElementById('step5-status');
+            const list = document.getElementById('tracks-list');
+            
+            try {
+                const stored = localStorage.getItem('aural_tracks');
+                const tracks = stored ? JSON.parse(stored) : [];
+                
+                status.textContent = `✅ ${tracks.length} Tracks geladen`;
+                status.className = 'status success';
+                
+                list.innerHTML = tracks.map(track => `
+                    <div class="track-item">
+                        <div class="track-info">
+                            <h4>${track.title}</h4>
+                            <p><strong>Datei:</strong> ${track.filename}</p>
+                            <p><strong>Größe:</strong> ${(track.fileSize / 1024).toFixed(1)} KB</p>
+                            <p><strong>URL Typ:</strong> ${track.url.startsWith('data:') ? 'Base64' : 'Blob'}</p>
+                            <p><strong>Erstellt:</strong> ${new Date(track.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div class="track-actions">
+                            <button class="play-btn" onclick="playTrack('${track.id}')">▶️ Abspielen</button>
+                            <button class="test-btn" onclick="testTrackAudio('${track.id}')">🧪 Testen</button>
+                        </div>
+                        <div class="audio-test">
+                            <audio controls>
+                                <source src="${track.url}" type="${track.format}">
+                            </audio>
+                        </div>
+                    </div>
+                `).join('');
+                
+                updateStep('step5', 'completed');
+                log(`Loaded ${tracks.length} tracks`, 'success');
+            } catch (error) {
+                status.textContent = `❌ Fehler: ${error.message}`;
+                status.className = 'status error';
+                updateStep('step5', 'error');
+                log(`Load tracks error: ${error.message}`, 'error');
+            }
+        }
+
+        function playTrack(trackId) {
+            const stored = localStorage.getItem('aural_tracks');
+            const tracks = stored ? JSON.parse(stored) : [];
+            const track = tracks.find(t => t.id === trackId);
+            
+            if (track && track.url) {
+                const audio = new Audio(track.url);
+                audio.play().catch(error => {
+                    log(`Track play failed: ${error.message}`, 'error');
+                });
+            }
+        }
+
+        function testTrackAudio(trackId) {
+            const stored = localStorage.getItem('aural_tracks');
+            const tracks = stored ? JSON.parse(stored) : [];
+            const track = tracks.find(t => t.id === trackId);
+            
+            if (!track) {
+                log(`Track not found: ${trackId}`, 'error');
+                return;
+            }
+
+            log(`Testing track audio: ${track.title}`, 'info');
+            log(`URL type: ${track.url.startsWith('data:') ? 'Base64' : 'Blob'}`, 'info');
+            log(`URL length: ${track.url.length}`, 'info');
+            log(`Format: ${track.format}`, 'info');
+
+            const audio = new Audio(track.url);
+            
+            audio.addEventListener('loadstart', () => log('Audio load started', 'info'));
+            audio.addEventListener('loadeddata', () => log('Audio data loaded', 'success'));
+            audio.addEventListener('canplay', () => log('Audio can play', 'success'));
+            audio.addEventListener('error', (e) => log(`Audio error: ${e}`, 'error'));
+            audio.addEventListener('play', () => log('Audio started playing', 'success'));
+            audio.addEventListener('pause', () => log('Audio paused', 'info'));
+            audio.addEventListener('ended', () => log('Audio ended', 'info'));
+
+            audio.play().then(() => {
+                log('Audio play successful', 'success');
+                updateStep('step6', 'completed');
+            }).catch(error => {
+                log(`Audio play failed: ${error.message}`, 'error');
+                updateStep('step6', 'error');
+            });
+        }
+
+        function step6_testAudio() {
+            if (approvedTrack) {
+                testTrackAudio(approvedTrack.id);
+            } else {
+                log('No approved track to test', 'error');
+            }
+        }
+
+        function showDebugInfo() {
+            const debugInfo = document.getElementById('debug-info');
+            const pendingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
+            const tracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+            
+            debugInfo.innerHTML = `
+                <div style="color: #4ecdc4">=== DEBUG INFORMATION ===</div>
+                <div>Pending Uploads: ${Object.keys(pendingUploads).length}</div>
+                <div>Approved Tracks: ${tracks.length}</div>
+                <div>Current Audio File: ${currentAudioFile ? currentAudioFile.name : 'None'}</div>
+                <div>Pending Upload: ${pendingUpload ? pendingUpload.title : 'None'}</div>
+                <div>Approved Track: ${approvedTrack ? approvedTrack.title : 'None'}</div>
+                <div style="color: #ffd93d">=== PENDING UPLOADS ===</div>
+                <div>${JSON.stringify(pendingUploads, null, 2)}</div>
+                <div style="color: #ffd93d">=== APPROVED TRACKS ===</div>
+                <div>${JSON.stringify(tracks, null, 2)}</div>
+            `;
+        }
+
+        function clearAllData() {
+            localStorage.removeItem('aural_pending_uploads');
+            localStorage.removeItem('aural_tracks');
+            currentAudioFile = null;
+            pendingUpload = null;
+            approvedTrack = null;
+            
+            // Reset steps
+            for (let i = 1; i <= 6; i++) {
+                updateStep(`step${i}`, '');
+            }
+            
+            document.getElementById('workflow-steps').innerHTML = `
+                <div class="step" id="step1">1. Audio-Datei auswählen</div>
+                <div class="step" id="step2">2. Pending Upload erstellen</div>
+                <div class="step" id="step3">3. Upload freigeben</div>
+                <div class="step" id="step4">4. Track in Datenbank speichern</div>
+                <div class="step" id="step5">5. Track auf Hauptseite anzeigen</div>
+                <div class="step" id="step6">6. Audio-Wiedergabe testen</div>
+            `;
+            
+            log('All data cleared', 'info');
+        }
+
+        // Initial load
+        loadPendingUploads();
+        step5_loadTracks();
+    </script>
+</body>
+</html>

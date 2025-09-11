@@ -1,12 +1,13 @@
 import React from 'react';
 
 interface AdminTabsProps {
-  activeTab: 'uploads' | 'users' | 'comments' | 'reports';
-  setActiveTab: (tab: 'uploads' | 'users' | 'comments' | 'reports') => void;
+  activeTab: 'uploads' | 'users' | 'comments' | 'reports' | 'pending';
+  setActiveTab: (tab: 'uploads' | 'users' | 'comments' | 'reports' | 'pending') => void;
   uploadsCount: number;
   usersCount: number;
   commentsCount: number;
   reportsCount: number;
+  pendingCount: number;
 }
 
 export const AdminTabs: React.FC<AdminTabsProps> = ({
@@ -15,7 +16,8 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
   uploadsCount,
   usersCount,
   commentsCount,
-  reportsCount
+  reportsCount,
+  pendingCount
 }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm mb-6">
@@ -60,6 +62,16 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             }`}
           >
             Reports ({reportsCount})
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'pending'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Warteschlange ({pendingCount})
           </button>
         </nav>
       </div>

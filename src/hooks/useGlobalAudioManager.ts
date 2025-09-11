@@ -111,9 +111,16 @@ export const useGlobalAudioManager = () => {
     if (!audio || !currentTrack) return;
     
     setLoading(true);
-    console.log('Loading track:', currentTrack.title, 'URL type:', typeof currentTrack.url);
-    console.log('URL starts with data:', currentTrack.url?.startsWith('data:'));
-    console.log('URL length:', currentTrack.url?.length);
+    console.log('🎵 Loading track:', currentTrack.title, 'URL type:', typeof currentTrack.url);
+    console.log('🎵 URL starts with data:', currentTrack.url?.startsWith('data:'));
+    console.log('🎵 URL length:', currentTrack.url?.length);
+    console.log('🎵 Full track object:', {
+      id: currentTrack.id,
+      title: currentTrack.title,
+      url: currentTrack.url ? currentTrack.url.substring(0, 100) + '...' : 'NO URL',
+      filename: currentTrack.filename,
+      format: currentTrack.format
+    });
     
     // Ensure we have a valid URL
     if (currentTrack.url) {

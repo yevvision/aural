@@ -31,7 +31,7 @@ const feedCategories = [
 
 export const FeedPage = () => {
   console.log('🎯 FeedPage: Rendering...');
-  const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack } = useDatabase('user-1'); // Verwende aktuellen User
+  const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack, loadData } = useDatabase('user-1'); // Verwende aktuellen User
   const { followedUsers, myTracks } = useUserStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('couples');
@@ -41,13 +41,45 @@ export const FeedPage = () => {
   useEffect(() => {
     console.log('🎯 FeedPage: Component mounted, tracks werden automatisch geladen...');
     setIsInitialized(true);
-  }, []);
+
+    // Höre auf Track-Approval Events
+    const handleTrackApproved = (event: CustomEvent) => {
+      console.log('🎯 FeedPage: Track approved event received:', event.detail);
+      loadData(); // Lade Daten neu
+    };
+
+    window.addEventListener('trackApproved', handleTrackApproved as EventListener);
+    
+    return () => {
+      window.removeEventListener('trackApproved', handleTrackApproved as EventListener);
+    };
+  }, [loadData]);
 
   // Debug: Log tracks to see what's loaded
   useEffect(() => {
     console.log('🎯 FeedPage: Tracks aktualisiert:', {
       count: tracks.length,
-      tracks: tracks.map(t => ({ id: t.id, title: t.title, user: t.user?.username }))
+      tracks: tracks.map(t => ({ 
+        id: t.id, 
+        title: t.title, 
+        user: t.user?.username,
+        hasUrl: !!t.url,
+        urlType: t.url ? (t.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL',
+        createdAt: t.createdAt
+      }))
+    });
+    
+    // Debug: Zeige auch localStorage Tracks
+    const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
+    console.log('🎯 FeedPage: localStorage Tracks:', {
+      count: localTracks.length,
+      tracks: localTracks.map(t => ({ 
+        id: t.id, 
+        title: t.title, 
+        user: t.user?.username,
+        hasUrl: !!t.url,
+        urlType: t.url ? (t.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'
+      }))
     });
   }, [tracks]);
 
@@ -124,12 +156,13 @@ export const FeedPage = () => {
     
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     
     switch (categoryId) {
       case 'new':
-        // Show tracks from the last week, sorted by date (newest first)
+        // Show tracks from the last 2 weeks, sorted by date (newest first)
         categoryTracks = tracks
-          .filter(track => toSafeDate(track.createdAt) > oneWeekAgo)
+          .filter(track => toSafeDate(track.createdAt) > twoWeeksAgo)
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
         break;
       case 'bookmarked':
@@ -169,8 +202,19 @@ export const FeedPage = () => {
       id: t.id,
       title: t.title,
       createdAt: t.createdAt,
-      user: t.user?.username
+      user: t.user?.username,
+      isRecent: categoryId === 'new' ? toSafeDate(t.createdAt) > twoWeeksAgo : 'N/A'
     })));
+    
+    // Spezielle Debug-Info für "New" Kategorie
+    if (categoryId === 'new') {
+      console.log(`🔍 NEW CATEGORY DEBUG:`);
+      console.log(`- Total tracks: ${tracks.length}`);
+      console.log(`- Two weeks ago: ${twoWeeksAgo.toISOString()}`);
+      console.log(`- Filtered tracks: ${categoryTracks.length}`);
+      console.log(`- Showing: ${Math.min(categoryTracks.length, maxItems)}`);
+    }
+    
     console.log('=== END DEBUG ===\n');
     
     return categoryTracks.slice(0, maxItems);
@@ -277,7 +321,35 @@ export const FeedPage = () => {
                 {feedCategories.map((category, categoryIndex) => {
                   const categoryTracks = getCategoryTracks(category.id);
                   
-                  if (categoryTracks.length === 0) return null;
+                  // Debug: Log für jede Kategorie
+                  console.log(`🎯 FeedPage: Kategorie ${category.id} - Tracks: ${categoryTracks.length}`);
+                  
+                  // Zeige Kategorie auch wenn leer (für Debugging)
+                  if (categoryTracks.length === 0) {
+                    console.log(`⚠️ FeedPage: Kategorie ${category.id} ist leer - wird trotzdem gerendert für Debugging`);
+                    return (
+                      <RevealOnScroll 
+                        key={category.id} 
+                        direction="up" 
+                        delay={categoryIndex * 0.1}
+                        className="space-y-3"
+                      >
+                        <motion.div 
+                          className="flex items-center justify-between"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: categoryIndex * 0.1 }}
+                        >
+                          <h2 className="text-lg font-semibold text-text-primary">
+                            {category.name} (0 Tracks)
+                          </h2>
+                        </motion.div>
+                        <div className="text-center py-4 text-gray-500">
+                          Keine Tracks in dieser Kategorie
+                        </div>
+                      </RevealOnScroll>
+                    );
+                  }
                   
                   return (
                     <RevealOnScroll 
@@ -337,11 +409,22 @@ export const FeedPage = () => {
                     <StaggerWrapper className="space-y-3">
                       {tracks
                         .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime())
-                        .map((track, index) => (
-                          <StaggerItem key={track.id}>
-                            <AudioCard track={track} index={index} />
-                          </StaggerItem>
-                        ))}
+                        .map((track, index) => {
+                          // Debug: Log jeden Track in "All Recordings"
+                          console.log(`🎵 All Recordings Track ${index + 1}:`, {
+                            id: track.id,
+                            title: track.title,
+                            createdAt: track.createdAt,
+                            user: track.user?.username,
+                            hasUrl: !!track.url,
+                            urlType: track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'
+                          });
+                          return (
+                            <StaggerItem key={track.id}>
+                              <AudioCard track={track} index={index} />
+                            </StaggerItem>
+                          );
+                        })}
                     </StaggerWrapper>
                   </motion.div>
                 </RevealOnScroll>

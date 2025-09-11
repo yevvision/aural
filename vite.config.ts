@@ -8,6 +8,9 @@ export default defineConfig({
   server: {
     host: 'localhost',
     port: 5173,
+    hmr: {
+      overlay: false // Deaktiviere Error-Overlay um Extension-Fehler zu vermeiden
+    }
   },
   build: {
     outDir: 'dist',
@@ -20,5 +23,8 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js'
       }
     }
+  },
+  optimizeDeps: {
+    exclude: ['cap'] // Cap-Bibliothek von Optimierung ausschließen
   }
 })
