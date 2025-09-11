@@ -44,9 +44,19 @@ html, body {
   background-color: transparent;
   color: var(--text-primary);
   font-family: 'Inter', 'Manrope', system-ui, sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
   position: relative;
   min-height: 100vh;
+}
+
+/* Remove scrollbars globally */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
 }
 
 /* Background styles have been moved to the OrganicOrangeMorphBackground component */
