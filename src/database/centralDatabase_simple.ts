@@ -639,6 +639,44 @@ class CentralDatabaseSimple {
   }
 
   // ADMIN-FUNKTIONEN
+  
+  // DELETE: Alle Benutzerinhalte löschen (außer Holler die Waldfee)
+  deleteAllUserContent(): boolean {
+    console.log('🧹 CentralDB Simple: deleteAllUserContent() - Lösche alle außer Holler die Waldfee');
+    
+    const hollaUserId = '4';
+    const beforeCount = this.data.tracks.length;
+    
+    // Behalte nur die ersten 3 Holler-Tracks
+    const hollaTracks = this.data.tracks
+      .filter(track => track.user.id === hollaUserId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .slice(0, 3);
+    
+    this.data.tracks = hollaTracks;
+    
+    // Behalte nur Holler-Benutzer
+    this.data.users = this.data.users.filter(user => user.id === hollaUserId);
+    
+    // Lösche alle Kommentare
+    this.data.comments = [];
+    
+    // Lösche alle Reports
+    this.data.reports = [];
+    
+    // Lösche alle Likes und Bookmarks
+    this.data.likes.clear();
+    this.data.bookmarks.clear();
+    this.data.commentLikes.clear();
+    
+    this.saveToStorage();
+    
+    const afterCount = this.data.tracks.length;
+    console.log(`✅ CentralDB Simple: Löschung abgeschlossen. Vorher: ${beforeCount}, Nachher: ${afterCount}`);
+    
+    return true;
+  }
+  
   reset(): void {
     console.log('🔄 CentralDB Simple: Komplette Datenbank zurücksetzen');
     this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map() };
