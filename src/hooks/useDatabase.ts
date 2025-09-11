@@ -267,7 +267,15 @@ export const useDatabase = (currentUserId?: string) => {
 
   const deleteAllUserContent = (): boolean => {
     console.log('🧹 useDatabase: deleteAllUserContent()');
-    return DatabaseService.deleteAllUserContent();
+    const success = DatabaseService.deleteAllUserContent();
+    
+    if (success) {
+      // Lade Daten neu nach der Löschung
+      console.log('🧹 useDatabase: Löschung erfolgreich, lade Daten neu...');
+      loadData();
+    }
+    
+    return success;
   };
 
   const getStats = () => {

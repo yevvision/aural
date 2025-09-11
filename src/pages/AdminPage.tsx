@@ -210,7 +210,10 @@ export const AdminPage: React.FC = () => {
         setSortField('date');
         setSortOrder('desc');
         
-        // Statistiken werden automatisch über useEffect aktualisiert
+        // Lade Daten explizit neu
+        console.log('🎯 AdminPage: Lade Daten neu nach Löschung...');
+        loadData();
+        
         console.log('🎯 AdminPage: UI-State zurückgesetzt');
         
         // Zeige Erfolgsmeldung
