@@ -228,11 +228,30 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
               >
                 <Heart 
                   size={12} 
-                  className="text-gray-400 hover:text-gray-300" 
+                  className={`${safeTrack.isLiked ? 'text-red-500' : 'text-gray-400'} hover:text-gray-300`}
+                  fill={safeTrack.isLiked ? 'currentColor' : 'none'}
                 />
                 <span className="text-gray-400">
                   {safeTrack.likes}
                 </span>
+              </button>
+              
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔖 AudioCard: Bookmark button clicked for track:', safeTrack.id);
+                  const success = toggleBookmark(safeTrack.id, 'user-1');
+                  console.log('🔖 AudioCard: Bookmark result:', success);
+                }}
+                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+                title={safeTrack.isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              >
+                <Bookmark 
+                  size={12} 
+                  className={`${safeTrack.isBookmarked ? 'text-yellow-500' : 'text-gray-400'} hover:text-gray-300`}
+                  fill={safeTrack.isBookmarked ? 'currentColor' : 'none'}
+                />
               </button>
               
               <button 

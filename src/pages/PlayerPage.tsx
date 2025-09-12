@@ -13,7 +13,7 @@ export const PlayerPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentTrack, isPlaying, currentTime, duration, expand, collapse, setCurrentTrack } = usePlayerStore();
-  const { tracks, toggleLike, toggleBookmark, addCommentToTrack, addReport, toggleCommentLike, isCommentLikedByUser, getCommentLikeCount } = useDatabase('user-1');
+  const { tracks, toggleLike, toggleBookmark, addCommentToTrack, addReport, toggleCommentLike, isCommentLikedByUser, getCommentLikeCount, comments } = useDatabase('user-1');
   const { toggle, seek } = useAudioPlayer();
   
   // Get the global audio element for visualization
@@ -178,7 +178,8 @@ export const PlayerPage = () => {
   };
 
   // Get track comments - only show real comments, no sample comments
-  const comments = track.comments || [];
+  // Get comments for this track from the database
+  const trackComments = comments.filter(comment => comment.trackId === track.id);
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
@@ -195,7 +196,7 @@ export const PlayerPage = () => {
           </div>
           <div className="flex items-center space-x-1">
             <MessageCircle size={14} strokeWidth={1.5} className="text-gray-400" />
-            <span className="text-gray-400 text-xs">{track.commentsCount || comments.length}</span>
+            <span className="text-gray-400 text-xs">{track.commentsCount || trackComments.length}</span>
           </div>
         </div>
 
@@ -335,9 +336,9 @@ export const PlayerPage = () => {
         
         {/* Comments section - visible when scrolling */}
         <div className="mt-4">
-          {comments.length > 0 ? (
+          {trackComments.length > 0 ? (
             <div className="space-y-4">
-              {comments.map((comment) => {
+              {trackComments.map((comment) => {
                 const isLiked = isCommentLikedByUser(comment.id, 'user-1');
                 const likeCount = getCommentLikeCount(comment.id);
                 
