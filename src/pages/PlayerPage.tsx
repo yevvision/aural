@@ -190,10 +190,31 @@ export const PlayerPage = () => {
         {/* Username and statistics line */}
         <div className="flex items-center space-x-2 mb-4">
           <span className="text-gray-400 text-xs">{track.user?.username || 'Unknown'}</span>
-          <div className="flex items-center space-x-1">
-            <Heart size={14} strokeWidth={1.5} className="text-gray-400" />
+          <button 
+            onClick={handleLike}
+            className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+            title={track.isLiked ? 'Unlike' : 'Like'}
+          >
+            <Heart 
+              size={14} 
+              strokeWidth={1.5} 
+              className={`${track.isLiked ? 'text-red-500' : 'text-gray-400'} hover:text-gray-300`}
+              fill={track.isLiked ? 'currentColor' : 'none'}
+            />
             <span className="text-gray-400 text-xs">{track.likes}</span>
-          </div>
+          </button>
+          <button 
+            onClick={handleBookmark}
+            className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+            title={track.isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+          >
+            <Bookmark 
+              size={14} 
+              strokeWidth={1.5} 
+              className={`${track.isBookmarked ? 'text-yellow-500' : 'text-gray-400'} hover:text-gray-300`}
+              fill={track.isBookmarked ? 'currentColor' : 'none'}
+            />
+          </button>
           <div className="flex items-center space-x-1">
             <MessageCircle size={14} strokeWidth={1.5} className="text-gray-400" />
             <span className="text-gray-400 text-xs">{track.commentsCount || trackComments.length}</span>
