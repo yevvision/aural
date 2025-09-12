@@ -1,0 +1,28 @@
+open wp13874980.server-he.de
+user ftp13874980-aural aural33!
+binary
+cd /www/aural
+mkdir assets
+mkdir uploads
+lcd dist
+put index.html
+put vite.svg
+lcd assets
+cd assets
+put index-Cg5zhJfg.css
+put index-BY7-5q0t.js
+put worker-BAOIWoxA.js
+put ffmpegWorker-G7I8upzo.js
+cd ..
+lcd ..
+put upload.php
+put setup.php
+put .htaccess
+put robots.txt
+put sitemap.xml
+lcd uploads
+cd uploads
+put index.php
+cd ..
+lcd ..
+quit

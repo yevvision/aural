@@ -570,6 +570,7 @@ class CentralDatabase {
             id: 'comment-1',
             content: 'Wunderschöne Stimme! 😍',
             user: currentUser,
+            trackId: 'holla-1',
             createdAt: new Date(Date.now() - 3600000),
             likes: 2,
             isLiked: false
@@ -578,6 +579,7 @@ class CentralDatabase {
             id: 'comment-2', 
             content: 'Sehr entspannend, danke! 🙏',
             user: currentUser,
+            trackId: 'holla-1',
             createdAt: new Date(Date.now() - 7200000),
             likes: 1,
             isLiked: false
@@ -605,6 +607,7 @@ class CentralDatabase {
             id: 'comment-3',
             content: 'Perfekt zum Einschlafen! 😴',
             user: currentUser,
+            trackId: 'holla-2',
             createdAt: new Date(Date.now() - 86400000),
             likes: 3,
             isLiked: false
@@ -632,6 +635,7 @@ class CentralDatabase {
             id: 'comment-4',
             content: 'So beruhigend! 🧘‍♀️',
             user: currentUser,
+            trackId: 'holla-3',
             createdAt: new Date(Date.now() - 172800000),
             likes: 5,
             isLiked: false
@@ -640,6 +644,7 @@ class CentralDatabase {
             id: 'comment-5',
             content: 'Hilft mir beim Meditieren',
             user: currentUser,
+            trackId: 'holla-3',
             createdAt: new Date(Date.now() - 259200000),
             likes: 2,
             isLiked: false

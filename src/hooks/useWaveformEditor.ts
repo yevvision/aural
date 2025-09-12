@@ -39,7 +39,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         autoScroll: true,
         autoCenter: true,
         // Mobile-specific optimizations
-        responsive: true,
+        // responsive: true, // Not supported in current version
         fillParent: true,
         // Better touch handling
         backend: 'MediaElement',
@@ -48,38 +48,11 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         cursorWidth: 2,
         hideScrollbar: true,
         // Better touch responsiveness
-        pixelRatio: window.devicePixelRatio || 1,
+        // pixelRatio: window.devicePixelRatio || 1, // Not supported in current version
       });
 
       // Regions plugin with mobile optimizations
-      const regions = ws.registerPlugin(RegionsPlugin.create({
-        // Mobile-optimized region settings
-        drag: true,
-        resize: true,
-        // Larger touch targets for mobile
-        minLength: 0.1, // minimum 100ms region
-        // Better visual feedback
-        color: 'rgba(245, 158, 11, 0.25)',
-        borderColor: 'rgba(245, 158, 11, 0.8)',
-        borderWidth: 2,
-        // Mobile-friendly handles
-        handleStyle: {
-          left: {
-            backgroundColor: 'rgba(245, 158, 11, 0.8)',
-            border: '2px solid white',
-            borderRadius: '50%',
-            width: '16px',
-            height: '16px',
-          },
-          right: {
-            backgroundColor: 'rgba(245, 158, 11, 0.8)',
-            border: '2px solid white',
-            borderRadius: '50%',
-            width: '16px',
-            height: '16px',
-          },
-        },
-      }));
+      const regions = ws.registerPlugin(RegionsPlugin.create());
       
       // Touch: regions are draggable/resizable by default
       regions.on('region-created', (r: any) => {

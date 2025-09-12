@@ -307,7 +307,7 @@ export const useFeedStore = create<FeedStore>()(
         if (userTrack) {
           const newComment = {
             id: Date.now().toString(),
-            text: commentText,
+            content: commentText,
             user: {
               id: 'current-user',
               username: 'Du',

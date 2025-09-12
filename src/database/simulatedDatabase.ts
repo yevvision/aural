@@ -427,7 +427,7 @@ class SimulatedDatabase {
   }
 
   // Sortierung und Filterung
-  getTracksSorted(sortBy: string, order: 'asc' | 'desc' = 'desc'): AudioTrack[] {
+  getTracksSorted(sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' | 'fileSize', order: 'asc' | 'desc' = 'desc'): AudioTrack[] {
     const tracks = this.getAllTracks();
     
     return tracks.sort((a, b) => {
@@ -454,10 +454,10 @@ class SimulatedDatabase {
           aValue = a.likes;
           bValue = b.likes;
           break;
-        case 'comments':
-          aValue = a.commentsCount || 0;
-          bValue = b.commentsCount || 0;
-          break;
+        // case 'comments':
+        //   aValue = a.commentsCount || 0;
+        //   bValue = b.commentsCount || 0;
+        //   break;
         case 'date':
         default:
           aValue = new Date(a.createdAt).getTime();

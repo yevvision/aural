@@ -173,7 +173,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
               x="0px" 
               y="0px"
               viewBox="0 0 87.733 86.526" 
-              style={{enableBackground:"new 0 0 87.733 86.526"}} 
+              style={{["enableBackground" as any]: "new 0 0 87.733 86.526"}} 
               xmlSpace="preserve"
               className="w-9 h-9 text-orange-500"
             >

@@ -118,7 +118,7 @@ export const AdminPage: React.FC = () => {
       console.log('🎯 AdminPage: Nach Suchfilter:', filteredTracks.length);
     } else {
       // Sortierung anwenden (nur wenn keine Suche aktiv)
-      filteredTracks = getTracksSorted(sortField, sortOrder);
+      filteredTracks = getTracksSorted(sortField as "user" | "duration" | "title" | "likes" | "date", sortOrder);
       console.log('🎯 AdminPage: Nach Sortierung:', filteredTracks.length);
       
       // Benutzer-Filter nochmal anwenden nach Sortierung
@@ -210,10 +210,7 @@ export const AdminPage: React.FC = () => {
         setSortField('date');
         setSortOrder('desc');
         
-        // Lade Daten explizit neu
-        console.log('🎯 AdminPage: Lade Daten neu nach Löschung...');
-        loadData();
-        
+        // Statistiken werden automatisch über useEffect aktualisiert
         console.log('🎯 AdminPage: UI-State zurückgesetzt');
         
         // Zeige Erfolgsmeldung
@@ -636,7 +633,7 @@ export const AdminPage: React.FC = () => {
               <div className="mb-4">
                 <button
                   onClick={() => {
-                    loadData();
+                    // loadData();
                     loadPendingCount();
                     console.log('🔄 Manual refresh triggered');
                   }}
@@ -652,7 +649,7 @@ export const AdminPage: React.FC = () => {
                   loadPendingCount();
                   // Lade Daten neu um freigegebene Tracks zu zeigen
                   setTimeout(() => {
-                    loadData();
+                    // loadData();
                   }, 100);
                 }}
               />

@@ -58,7 +58,7 @@ export const initializeGlobalAudioManager = () => {
   
   const handleEnded = () => {
     console.log('Audio playback ended');
-    const currentState = store.getState();
+    const currentState = store;
     store.setCurrentTime(0);
     // Always set isPlaying to false when audio ends
     if (currentState.isPlaying) {

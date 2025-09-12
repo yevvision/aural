@@ -1,9 +1,9 @@
 export async function concatenateSegments(blob: Blob, segments: { start: number; end: number }[]): Promise<Blob> {
   // Reuse existing AudioContext or create new one
-  let ac = window.audioContext;
+  let ac = (window as any).audioContext;
   if (!ac) {
     ac = new (window.AudioContext || (window as any).webkitAudioContext)();
-    window.audioContext = ac;
+    (window as any).audioContext = ac;
   }
   
   const arr = await blob.arrayBuffer();
@@ -112,10 +112,10 @@ export async function concatenateSegments(blob: Blob, segments: { start: number;
 
 export async function trimToWav(blob: Blob, startSec: number, endSec: number): Promise<Blob> {
   // Reuse existing AudioContext or create new one
-  let ac = window.audioContext;
+  let ac = (window as any).audioContext;
   if (!ac) {
     ac = new (window.AudioContext || (window as any).webkitAudioContext)();
-    window.audioContext = ac;
+    (window as any).audioContext = ac;
   }
   
   const arr = await blob.arrayBuffer();

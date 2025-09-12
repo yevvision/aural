@@ -256,7 +256,7 @@ class DatabaseServiceClass {
   // Alle Benutzerinhalte löschen
   deleteAllUserContent(): boolean {
     console.log('🔗 DatabaseService: deleteAllUserContent()');
-    const success = centralDB.deleteAllUserContent();
+    const success = (centralDB as any).deleteAllUserContent();
     
     if (success) {
       // Notifiziere alle Listener über Änderung
@@ -348,7 +348,7 @@ class DatabaseServiceClass {
   }
 
   // Tracks sortiert abrufen
-  getTracksSorted(sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' = 'date', order: 'asc' | 'desc' = 'desc'): AudioTrack[] {
+  getTracksSorted(sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' | 'fileSize' = 'date', order: 'asc' | 'desc' = 'desc'): AudioTrack[] {
     console.log('🔗 DatabaseService: getTracksSorted()', sortBy, order);
     const tracks = this.getTracks();
     
@@ -371,6 +371,10 @@ class DatabaseServiceClass {
         case 'duration':
           aValue = a.duration;
           bValue = b.duration;
+          break;
+        case 'fileSize':
+          aValue = a.fileSize || 0;
+          bValue = b.fileSize || 0;
           break;
         case 'date':
         default:

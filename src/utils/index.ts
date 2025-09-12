@@ -376,21 +376,21 @@ export const createDummyTracks = (): AudioTrack[] => {
   const sampleComments = [
     {
       id: 'comment-1',
-      text: 'Das ist wirklich entspannend! Perfekt zum Einschlafen.',
+      content: 'Das ist wirklich entspannend! Perfekt zum Einschlafen.',
       user: users[1],
       trackId: '1',
       createdAt: new Date('2024-02-15T20:30:00')
     },
     {
       id: 'comment-2', 
-      text: 'Wunderschöne Stimme! Mehr davon bitte.',
+      content: 'Wunderschöne Stimme! Mehr davon bitte.',
       user: users[2],
       trackId: '1',
       createdAt: new Date('2024-02-15T21:15:00')
     },
     {
       id: 'comment-3',
-      text: 'Sehr beruhigend, danke für das Teilen!',
+      content: 'Sehr beruhigend, danke für das Teilen!',
       user: users[0],
       trackId: '2',
       createdAt: new Date('2024-02-14T19:45:00')

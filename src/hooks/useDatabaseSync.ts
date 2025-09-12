@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useFeedStore } from '../stores/feedStore';
 import { useUserStore } from '../stores/userStore';
 import { database } from '../database/simulatedDatabase';
+import type { AudioTrack } from '../types';
 
 export const useDatabaseSync = () => {
   const { setTracks, deleteTracksByUser, tracks: feedTracks } = useFeedStore();
@@ -80,7 +81,7 @@ export const useDatabaseSync = () => {
     return database.getAllTracks();
   };
 
-  const getTracksSorted = (sortBy: string, order: 'asc' | 'desc' = 'desc') => {
+  const getTracksSorted = (sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' | 'fileSize', order: 'asc' | 'desc' = 'desc') => {
     return database.getTracksSorted(sortBy, order);
   };
 

@@ -370,7 +370,7 @@ export default function AudioEditor({
                       transition={{ duration: 0.2 }}
                     >
                       <motion.button
-                        onClick={handlePlaySelection}
+                        onClick={() => handlePlaySelection()}
                         className="flex-1 py-1.5 px-2 rounded-lg border border-green-500 bg-green-500/20 flex items-center justify-center space-x-1 hover:bg-green-500/30 transition-all duration-200"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -380,7 +380,7 @@ export default function AudioEditor({
                       </motion.button>
                       
                       <motion.button
-                        onClick={handleDeleteSelection}
+                        onClick={() => handleDeleteSelection()}
                         className="flex-1 py-1.5 px-2 rounded-lg border border-red-500 bg-red-500/20 flex items-center justify-center space-x-1 hover:bg-red-500/30 transition-all duration-200"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}

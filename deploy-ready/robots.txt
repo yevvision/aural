@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Audio-App - erlaube alle Crawler
+Sitemap: https://yev.vision/sitemap.xml
+
+# Blockiere Upload-Ordner
+Disallow: /uploads/
+Disallow: /api/
+Disallow: /admin/
+
+# Erlaube wichtige Seiten
+Allow: /
+Allow: /feed
+Allow: /search
+Allow: /upload
+Allow: /record

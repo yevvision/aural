@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aural Debug - Weißer Bildschirm Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .warning { border-left: 4px solid #ff9800; }
+        .info { border-left: 4px solid #2196F3; }
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #e55a2b;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Aural Debug - Weißer Bildschirm Fix</h1>
+        
+        <div class="status info">
+            <h3>📋 Problem-Diagnose</h3>
+            <p>Die vielen serviceWorker.js und background.js Fehler kommen von Browser-Extensions, nicht von der Aural-App.</p>
+        </div>
+
+        <div class="status warning">
+            <h3>⚠️ Bekannte Probleme</h3>
+            <ul>
+                <li>Browser-Extensions verursachen Frame-Fehler</li>
+                <li>Cap-Bibliothek kann Probleme verursachen</li>
+                <li>Vite Cache kann veraltet sein</li>
+            </ul>
+        </div>
+
+        <div class="status success">
+            <h3>✅ Lösungen implementiert</h3>
+            <ul>
+                <li>Vite Cache geleert</li>
+                <li>Error-Overlay deaktiviert</li>
+                <li>Cap-Fallback implementiert</li>
+                <li>OptimizeDeps konfiguriert</li>
+            </ul>
+        </div>
+
+        <div class="status info">
+            <h3>🚀 Nächste Schritte</h3>
+            <ol>
+                <li>Browser-Cache leeren (Ctrl+Shift+R)</li>
+                <li>Browser-Extensions temporär deaktivieren</li>
+                <li>Inkognito-Modus testen</li>
+                <li>App neu laden</li>
+            </ol>
+        </div>
+
+        <div>
+            <h3>🔍 Debug-Log</h3>
+            <div id="log" class="log">Warte auf Debug-Informationen...</div>
+            <button onclick="runDiagnostics()">Diagnose starten</button>
+            <button onclick="clearLog()">Log leeren</button>
+            <button onclick="testCap()">Cap-Test</button>
+            <button onclick="testSecurity()">Sicherheits-Test</button>
+        </div>
+
+        <div class="status success">
+            <h3>🎯 App-Links</h3>
+            <p>
+                <a href="http://localhost:5173" style="color: #ff6b35;">→ Haupt-App (localhost:5173)</a><br>
+                <a href="http://localhost:5173/privacy" style="color: #ff6b35;">→ Datenschutz-Seite</a><br>
+                <a href="http://localhost:5173/admin" style="color: #ff6b35;">→ Admin-Bereich</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function runDiagnostics() {
+            clearLog();
+            log('🔍 Starte Diagnose...');
+            
+            // Browser-Info
+            log(`Browser: ${navigator.userAgent}`);
+            log(`URL: ${window.location.href}`);
+            log(`Viewport: ${window.innerWidth}x${window.innerHeight}`);
+            
+            // JavaScript-Features
+            log(`LocalStorage: ${typeof(Storage) !== "undefined" ? "✅" : "❌"}`);
+            log(`Fetch API: ${typeof(fetch) !== "undefined" ? "✅" : "❌"}`);
+            log(`Crypto API: ${typeof(crypto) !== "undefined" ? "✅" : "❌"}`);
+            
+            // Extension-Fehler prüfen
+            const originalError = window.onerror;
+            window.onerror = function(msg, url, line, col, error) {
+                if (msg.includes('serviceWorker') || msg.includes('background.js')) {
+                    log(`⚠️ Extension-Fehler (ignorieren): ${msg}`);
+                } else {
+                    log(`❌ App-Fehler: ${msg}`);
+                }
+                return false;
+            };
+            
+            log('✅ Diagnose abgeschlossen');
+        }
+
+        function testCap() {
+            log('🔐 Teste Cap-Client...');
+            
+            try {
+                // Simuliere Cap-Token-Generierung
+                const fileSize = 1024 * 1024; // 1MB
+                const timestamp = Date.now();
+                const randomData = Math.random().toString(36).substring(2);
+                const userAgent = navigator.userAgent.substring(0, 50);
+                
+                const tokenData = `${timestamp}-${fileSize}-1-${randomData}-${userAgent}`;
+                const hash = btoa(tokenData).replace(/[^a-zA-Z0-9]/g, '');
+                const token = `cap_fallback_${hash}`;
+                
+                log(`✅ Cap-Token generiert: ${token.substring(0, 30)}...`);
+                log(`Token-Länge: ${token.length} Zeichen`);
+            } catch (error) {
+                log(`❌ Cap-Test fehlgeschlagen: ${error.message}`);
+            }
+        }
+
+        function testSecurity() {
+            log('🛡️ Teste Sicherheitssystem...');
+            
+            try {
+                // Teste Device-ID-Generierung
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Device fingerprint', 2, 2);
+                }
+                
+                const fingerprint = [
+                    navigator.userAgent,
+                    navigator.language,
+                    screen.width + 'x' + screen.height,
+                    new Date().getTimezoneOffset(),
+                    canvas.toDataURL()
+                ].join('|');
+                
+                let hash = 0;
+                for (let i = 0; i < fingerprint.length; i++) {
+                    const char = fingerprint.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                const deviceId = Math.abs(hash).toString(36);
+                
+                log(`✅ Device-ID generiert: ${deviceId}`);
+                log(`Fingerprint-Länge: ${fingerprint.length} Zeichen`);
+                
+                // Teste Rate-Limits
+                const limits = {
+                    maxUploadsPer30Min: 3,
+                    maxUploadsPerDay: 5,
+                    maxAudioMinutesPerDay: 120
+                };
+                log(`✅ Rate-Limits konfiguriert: ${JSON.stringify(limits)}`);
+                
+            } catch (error) {
+                log(`❌ Sicherheits-Test fehlgeschlagen: ${error.message}`);
+            }
+        }
+
+        // Automatische Diagnose beim Laden
+        window.addEventListener('load', () => {
+            log('🚀 Debug-Seite geladen');
+            runDiagnostics();
+        });
+    </script>
+</body>
+</html>

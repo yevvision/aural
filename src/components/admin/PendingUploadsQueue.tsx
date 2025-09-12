@@ -174,6 +174,8 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
           username: uploadToApprove.username,
           email: '', // Fallback
           avatar: '', // Fallback
+          totalLikes: 0,
+          totalUploads: 0,
           createdAt: new Date(),
           isAdmin: false
         },
@@ -182,7 +184,7 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
         isBookmarked: false,
         createdAt: new Date(), // Verwende aktuelles Datum für freigegebene Tracks
         tags: uploadToApprove.tags,
-        gender: uploadToApprove.gender,
+        gender: uploadToApprove.gender as 'Female' | 'Male' | 'Mixed' | 'Couple' | 'Diverse',
         filename: uploadToApprove.filename,
         fileSize: uploadToApprove.size,
         format: uploadToApprove.mimeType

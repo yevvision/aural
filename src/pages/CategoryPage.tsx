@@ -39,7 +39,7 @@ export const CategoryPage = () => {
     setIsLoading(true);
     
     // WICHTIG: Verwende nur Datenbank-Tracks für Konsistenz mit Admin-Seite
-    const allTracks = getTracksSorted('createdAt', 'desc');
+    const allTracks = getTracksSorted('date', 'desc');
     
     console.log('CategoryPage: Lade Tracks aus Datenbank:', allTracks.length);
     console.log('CategoryPage: Tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
