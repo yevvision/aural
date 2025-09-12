@@ -30,7 +30,7 @@ jobs:
           password: aural33!
           port: 21
           protocol: ftps
-          local-dir: dist
+          local-dir: ./dist/
           server-dir: /www/aural
           dangerous-clean-slate: false
           log-level: standard
