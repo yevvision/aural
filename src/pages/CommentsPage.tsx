@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Heart, User, Play, Clock, Send, ArrowLeft, Upload, Bookmark, UserPlus } from 'lucide-react';
+import { MessageCircle, Heart, User, Play, Clock, Send, ArrowLeft, Upload, Bookmark, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
 import { useFeedStore } from '../stores/feedStore';
 import { usePlayerStore } from '../stores/playerStore';
 import { useActivityStore } from '../stores/activityStore';
 import { timeAgo, sanitizeAudioTrack } from '../utils';
+import { groupActivitiesByTime, getRecentUnreadCount, type TimePeriod, type GroupedActivities } from '../utils/notificationUtils';
 import { Button } from '../components/ui/Button';
 import { PageTransition, RevealOnScroll } from '../components/ui';
 import type { AudioTrack, NotificationActivity } from '../types';
@@ -19,12 +20,13 @@ export const CommentsPage = () => {
   const { currentUser } = useUserStore();
   const { tracks, addComment } = useFeedStore();
   const { setCurrentTrack } = usePlayerStore();
-  const { activities, markAllAsRead, userActivities, markAllUserActivitiesAsRead, removeUserActivitiesFromNotifications } = useActivityStore();
+  const { activities, markAllAsRead, userActivities, markAllUserActivitiesAsRead, removeUserActivitiesFromNotifications, cleanupOldActivities } = useActivityStore();
   
   const [selectedTrack, setSelectedTrack] = useState<AudioTrack | null>(null);
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'notifications' | 'my_activity'>('notifications'); // Default to notifications
+  const [collapsedPeriods, setCollapsedPeriods] = useState<Set<TimePeriod>>(new Set(['older'])); // Collapse older by default
   
   // Load specific track if trackId is provided
   useEffect(() => {
@@ -36,10 +38,11 @@ export const CommentsPage = () => {
     }
   }, [trackId, tracks]);
   
-  // Remove user's own activities from notifications on component mount
+  // Remove user's own activities from notifications and cleanup old activities on component mount
   useEffect(() => {
     removeUserActivitiesFromNotifications();
-  }, [removeUserActivitiesFromNotifications]);
+    cleanupOldActivities();
+  }, [removeUserActivitiesFromNotifications, cleanupOldActivities]);
   
   // Mark activities as read when leaving the page (cleanup function)
   useEffect(() => {
@@ -83,10 +86,26 @@ export const CommentsPage = () => {
     navigate(-1);
   };
 
-  // Nur externe Benachrichtigungen zählen für die Badge-Anzeige
-  const unreadCount = activities.filter(a => !a.isRead).length;
+  // Nur externe Benachrichtigungen zählen für die Badge-Anzeige (nur letzte Woche)
+  const unreadCount = getRecentUnreadCount(activities);
   
   const displayActivities = viewMode === 'notifications' ? activities : userActivities;
+  
+  // Group activities by time period
+  const groupedActivities = groupActivitiesByTime(displayActivities, collapsedPeriods);
+  
+  // Toggle collapse state for a time period
+  const toggleCollapse = (period: TimePeriod) => {
+    setCollapsedPeriods(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(period)) {
+        newSet.delete(period);
+      } else {
+        newSet.add(period);
+      }
+      return newSet;
+    });
+  };
 
   // Helper function to get activity icon
   const getActivityIcon = (type: string, size: number = 16) => {
@@ -152,14 +171,14 @@ export const CommentsPage = () => {
             </div>
           </RevealOnScroll>
 
-          {/* Activities List - Table Format */}
+          {/* Activities List - Grouped by Time Period */}
           <div className="space-y-1">
-            {displayActivities.length === 0 ? (
+            {groupedActivities.length === 0 ? (
               <RevealOnScroll direction="up" delay={0.1}>
                 <div className="text-center py-12">
                   <MessageCircle size={48} className="text-text-secondary mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-text-primary mb-2">
-                    {viewMode === 'my_activity' ? 'No own activities yet' : 'No notifications yet'}
+                    {viewMode === 'my_activity' ? 'No recent activities' : 'No recent notifications'}
                   </h3>
                   <p className="text-text-secondary">
                     {viewMode === 'my_activity' 
@@ -167,11 +186,53 @@ export const CommentsPage = () => {
                       : 'When others interact with your recordings, you\'ll see it here'
                     }
                   </p>
+                  <p className="text-text-secondary text-sm mt-2">
+                    Only activities from the last 7 days are shown
+                  </p>
                 </div>
               </RevealOnScroll>
             ) : (
-              <div>
-                {displayActivities.map((activity, index) => (
+              <div className="space-y-4">
+                {groupedActivities.map((group, groupIndex) => (
+                  <div key={group.period} className="space-y-2">
+                    {/* Time Period Header */}
+                    <motion.button
+                      onClick={() => toggleCollapse(group.period)}
+                      className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: groupIndex * 0.1 }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-lg font-semibold text-text-primary">
+                          {group.label}
+                        </h3>
+                        <span className="px-2 py-1 bg-gradient-primary/20 text-gradient-strong text-xs font-medium rounded-full">
+                          {group.activities.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {group.activities.some(a => !a.isRead) && (
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                        )}
+                        {group.isCollapsed ? (
+                          <ChevronDown size={16} className="text-text-secondary" />
+                        ) : (
+                          <ChevronUp size={16} className="text-text-secondary" />
+                        )}
+                      </div>
+                    </motion.button>
+
+                    {/* Activities in this period */}
+                    {!group.isCollapsed && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-1"
+                      >
+                        {group.activities.map((activity, index) => (
                   <div
                     key={activity.id}
                     className={`flex items-start space-x-3 py-3 px-2 border-b border-white/10 last:border-b-0 transition-all duration-200 ${
@@ -337,6 +398,10 @@ export const CommentsPage = () => {
                         </div>
                       </div>
                     </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

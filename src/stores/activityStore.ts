@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { NotificationActivity, UserActivity } from '../types';
+import { isWithinOneWeek } from '../utils/notificationUtils';
 
 interface ActivityStore {
   activities: NotificationActivity[];
@@ -17,6 +18,7 @@ interface ActivityStore {
   clearActivities: () => void;
   removeUserActivitiesFromNotifications: () => void;
   getActivitiesByType: (type: 'like' | 'comment' | 'follow' | 'bookmark' | 'followed_user_upload' | 'upload') => NotificationActivity[];
+  cleanupOldActivities: () => void;
   
   // Actions for user's own activities
   addUserActivity: (activity: Omit<UserActivity, 'id' | 'createdAt' | 'isRead'>) => void;
@@ -87,6 +89,24 @@ export const useActivityStore = create<ActivityStore>()(
       
       getActivitiesByType: (type) => {
         return get().activities.filter(activity => activity.type === type);
+      },
+      
+      cleanupOldActivities: () => {
+        set((state) => {
+          const recentActivities = state.activities.filter(activity => 
+            isWithinOneWeek(activity.createdAt)
+          );
+          const recentUserActivities = state.userActivities.filter(activity => 
+            isWithinOneWeek(activity.createdAt)
+          );
+          
+          return {
+            activities: recentActivities,
+            userActivities: recentUserActivities,
+            unreadCount: recentActivities.filter(a => !a.isRead).length,
+            userUnreadCount: recentUserActivities.filter(a => !a.isRead).length
+          };
+        });
       },
       
       // User's own activities
