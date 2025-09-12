@@ -208,7 +208,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
             <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400">
               <Link 
                 to={`/profile/${safeUser.id}`}
-                className="text-orange-500 hover:text-orange-400 transition-colors flex items-center space-x-1"
+                className="text-gray-400 hover:text-gray-300 transition-colors flex items-center space-x-1"
                 onClick={(e) => e.stopPropagation()}
               >
                 <User size={12} />
