@@ -1,19 +1,18 @@
-# Minimal .htaccess for SPA (Single Page Application)
-# For aural.yev.vision - HostEurope compatible version
-
-# Set default index file
+# Default-Datei
 DirectoryIndex index.html
 
-# Enable rewrite engine
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  
-  # Don't rewrite if file exists
+
+  # Existierende Dateien/Ordner ausnehmen
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
-  
-  # Rewrite everything else to index.html for SPA routing
+
+  # Alles andere auf index.html
   RewriteRule . /index.html [L]
 </IfModule>
+
+# Directory Listing verbieten
+Options -Indexes
