@@ -2,7 +2,7 @@ name: Build & Deploy to yev.vision/aural
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}   # <--- NEU
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -31,6 +31,6 @@ jobs:
           port: 21
           protocol: ftps
           local-dir: ./dist/
-          server-dir: /www/aural
+          server-dir: /www/aural/
           dangerous-clean-slate: false
           log-level: standard
