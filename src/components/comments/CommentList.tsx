@@ -27,7 +27,7 @@ export const CommentList = ({ comments }: CommentListProps) => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <Body weight="semibold" className="text-text-primary text-sm">
+              <Body weight="semibold" className="text-orange-500 text-sm">
                 {comment.user.username}
               </Body>
               <Caption color="secondary" className="text-xs">

@@ -344,7 +344,7 @@ export const PlayerPage = () => {
                 return (
                   <div key={comment.id} className="border-b border-gray-800 pb-4">
                     <div className="flex items-center mb-2">
-                      <span className="text-white text-sm font-medium">{comment.user.username}</span>
+                      <span className="text-orange-500 text-sm font-medium">{comment.user.username}</span>
                       <span className="text-gray-500 text-xs ml-2">
                         {new Date(comment.createdAt).toLocaleDateString('de-DE')}
                       </span>

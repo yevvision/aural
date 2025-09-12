@@ -65,7 +65,7 @@ export const PendingUploadPage: React.FC<PendingUploadPageProps> = ({ uploadData
               <Clock className="w-6 h-6 text-orange-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-white">{uploadData.title}</h3>
+              <h3 className="text-xl font-semibold text-orange-500">{uploadData.title}</h3>
               <p className="text-gray-400">Upload ID: {uploadData.uploadId}</p>
             </div>
           </div>

@@ -414,7 +414,7 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
                 <div className="flex-1">
                   {/* Titel und Grund */}
                   <div className="flex items-center space-x-3 mb-3">
-                    <h3 className="text-lg font-medium text-white">
+                    <h3 className="text-lg font-medium text-orange-500">
                       {upload.title}
                     </h3>
                     <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${getReasonColor(upload.reason)}`}>
@@ -564,12 +564,12 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
             <div className="space-y-4">
               <div>
                 <span className="text-gray-500">Titel:</span>
-                <p className="text-white font-medium">{selectedUpload.title}</p>
+                <p className="text-orange-500 font-medium">{selectedUpload.title}</p>
               </div>
               
               <div>
                 <span className="text-gray-500">Uploader:</span>
-                <p className="text-white">{selectedUpload.username} (ID: {selectedUpload.userId})</p>
+                <p className="text-orange-500">{selectedUpload.username} (ID: {selectedUpload.userId})</p>
               </div>
               
               <div>

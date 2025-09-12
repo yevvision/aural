@@ -201,7 +201,7 @@ export const CommentsPage = () => {
                                   {' '}liked{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -210,7 +210,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -223,7 +223,7 @@ export const CommentsPage = () => {
                                   {' '}commented on{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -232,7 +232,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -245,7 +245,7 @@ export const CommentsPage = () => {
                                   {' '}bookmarked{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -254,7 +254,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -267,7 +267,7 @@ export const CommentsPage = () => {
                                   {' '}uploaded{' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -278,7 +278,7 @@ export const CommentsPage = () => {
                                   {' '}started following{' '}
                                   <span
                                     onClick={() => handleUserClick(activity.followedUser?.id || '')}
-                                    className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     {activity.followedUser?.username}
                                   </span>
@@ -290,7 +290,7 @@ export const CommentsPage = () => {
                             <>
                               <span
                                 onClick={() => handleUserClick((activity as NotificationActivity).user.id)}
-                                className="font-medium hover:text-gradient-strong transition-colors duration-200 cursor-pointer"
+                                className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                               >
                                 {(activity as NotificationActivity).user.id === 'self' 
                                   ? 'You have' 
@@ -306,7 +306,7 @@ export const CommentsPage = () => {
                                   {' '}
                                   <span
                                     onClick={() => handleTrackClick(activity.trackId || '')}
-                                    className="font-medium text-gradient-strong hover:text-gradient-deep transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
                                   >
                                     {activity.type === 'followed_user_upload' ? '' : '„'}{activity.trackTitle}{activity.type === 'followed_user_upload' ? '' : '"'}
                                   </span>
