@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { NotificationActivity, UserActivity } from '../types';
-import { isWithinOneWeek } from '../utils/notificationUtils';
+import { isWithinSixMonths } from '../utils/notificationUtils';
 
 interface ActivityStore {
   activities: NotificationActivity[];
@@ -94,10 +94,10 @@ export const useActivityStore = create<ActivityStore>()(
       cleanupOldActivities: () => {
         set((state) => {
           const recentActivities = state.activities.filter(activity => 
-            isWithinOneWeek(activity.createdAt)
+            isWithinSixMonths(activity.createdAt)
           );
           const recentUserActivities = state.userActivities.filter(activity => 
-            isWithinOneWeek(activity.createdAt)
+            isWithinSixMonths(activity.createdAt)
           );
           
           return {

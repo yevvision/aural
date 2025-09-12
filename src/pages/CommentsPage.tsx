@@ -26,7 +26,7 @@ export const CommentsPage = () => {
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'notifications' | 'my_activity'>('notifications'); // Default to notifications
-  const [collapsedPeriods, setCollapsedPeriods] = useState<Set<TimePeriod>>(new Set(['older'])); // Collapse older by default
+  const [collapsedPeriods, setCollapsedPeriods] = useState<Set<TimePeriod>>(new Set()); // Only this_week is expanded by default
   
   // Load specific track if trackId is provided
   useEffect(() => {
@@ -93,6 +93,17 @@ export const CommentsPage = () => {
   
   // Group activities by time period
   const groupedActivities = groupActivitiesByTime(displayActivities, collapsedPeriods);
+  
+  // Initialize collapsed periods based on default expanded state
+  useEffect(() => {
+    const defaultCollapsed = new Set<TimePeriod>();
+    groupedActivities.forEach(group => {
+      if (!group.isDefaultExpanded) {
+        defaultCollapsed.add(group.period);
+      }
+    });
+    setCollapsedPeriods(defaultCollapsed);
+  }, [groupedActivities.length]); // Only run when groups change
   
   // Toggle collapse state for a time period
   const toggleCollapse = (period: TimePeriod) => {
@@ -187,7 +198,7 @@ export const CommentsPage = () => {
                     }
                   </p>
                   <p className="text-text-secondary text-sm mt-2">
-                    Only activities from the last 7 days are shown
+                    Only activities from the last 6 months are shown
                   </p>
                 </div>
               </RevealOnScroll>
