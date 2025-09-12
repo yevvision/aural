@@ -1,4 +1,4 @@
-import { Play, Pause, ChevronUp, Heart, Clock, Bookmark } from 'lucide-react';
+import { Play, Pause, Heart, Clock, Bookmark, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -14,7 +14,7 @@ interface MiniPlayerProps {
 // Mini-Player with glassmorphism design and enhanced animations
 export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   const navigate = useNavigate();
-  const { currentTrack, isPlaying, currentTime, duration, isExpanded } = usePlayerStore();
+  const { currentTrack, isPlaying, currentTime, duration, isExpanded, setCurrentTrack, reset } = usePlayerStore();
   const { tracks, toggleLike, toggleBookmark } = useDatabase('user-1');
   const { toggle, seek } = useAudioPlayer();
   
@@ -140,6 +140,11 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     
     // Keep the animation state for a short duration
     setTimeout(() => setBookmarkClicked(false), 300);
+  };
+
+  const handleClose = () => {
+    console.log('❌ MiniPlayer: Close button clicked');
+    reset(); // This will stop audio and clear the current track
   };
 
   // Calculate thumb position based on progress width
@@ -279,7 +284,31 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             whileTap={{ scale: 0.95 }}
             aria-label="Expand player"
           >
-            <ChevronUp size={14} className="text-white" strokeWidth={1.5} />
+            <svg 
+              width="14" 
+              height="14" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="text-white"
+            >
+              <path d="M7 17L17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
+          </motion.button>
+
+          {/* Close button */}
+          <motion.button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="Close player"
+          >
+            <X size={14} className="text-white" strokeWidth={1.5} />
           </motion.button>
         </div>
       </div>

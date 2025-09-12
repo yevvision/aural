@@ -14,6 +14,7 @@ import {
 
 // Gender filters for audio content
 const genderFilters = [
+  { type: 'all', label: 'All' },
   { type: 'couples', label: 'Couples' },
   { type: 'females', label: 'Females' },
   { type: 'males', label: 'Males' },
@@ -34,7 +35,7 @@ export const FeedPage = () => {
   const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack, loadData } = useDatabase('user-1'); // Verwende aktuellen User
   const { followedUsers, myTracks } = useUserStore();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('couples');
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('all');
   const navigate = useNavigate();
 
   // Simplified initialization
@@ -141,17 +142,48 @@ export const FeedPage = () => {
     return new Date();
   };
 
+  // Filter tracks by gender
+  const getFilteredTracks = () => {
+    if (selectedGenderFilter === 'all') {
+      return tracks; // Show all tracks
+    } else if (selectedGenderFilter === 'couples') {
+      return tracks.filter(track => 
+        track.gender === 'Couple' || 
+        (track.tags && track.tags.includes('Couple'))
+      );
+    } else if (selectedGenderFilter === 'females') {
+      return tracks.filter(track => 
+        track.gender === 'Female' || 
+        (track.tags && track.tags.includes('Female'))
+      );
+    } else if (selectedGenderFilter === 'males') {
+      return tracks.filter(track => 
+        track.gender === 'Male' || 
+        (track.tags && track.tags.includes('Male'))
+      );
+    } else if (selectedGenderFilter === 'diverse') {
+      return tracks.filter(track => 
+        track.gender === 'Diverse' || 
+        (track.tags && track.tags.includes('Diverse'))
+      );
+    }
+    return tracks; // Show all if no filter
+  };
+
   // German spec: Get tracks for each category (preview) - using current tracks to preserve bookmarks
   const getCategoryTracks = (categoryId: string, maxItems = 3) => {
-    let categoryTracks = [...tracks]; // Use current tracks with preserved state
+    const filteredTracks = getFilteredTracks();
+    let categoryTracks = [...filteredTracks]; // Use filtered tracks with preserved state
     
     // Debug: Log all tracks with their dates
     console.log(`=== ${categoryId.toUpperCase()} CATEGORY DEBUG ===`);
-    console.log('All tracks before sorting:', tracks.map(t => ({
+    console.log('All tracks before sorting:', filteredTracks.map(t => ({
       id: t.id,
       title: t.title,
       createdAt: t.createdAt,
-      user: t.user?.username
+      user: t.user?.username,
+      gender: t.gender,
+      tags: t.tags
     })));
     
     const now = new Date();
@@ -161,25 +193,25 @@ export const FeedPage = () => {
     switch (categoryId) {
       case 'new':
         // Show tracks from the last 2 weeks, sorted by date (newest first)
-        categoryTracks = tracks
+        categoryTracks = filteredTracks
           .filter(track => toSafeDate(track.createdAt) > twoWeeksAgo)
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
         break;
       case 'bookmarked':
         // Show bookmarked tracks, sorted by bookmark date (newest first)
-        categoryTracks = [...tracks]
+        categoryTracks = [...filteredTracks]
           .filter(track => track.isBookmarked)
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
         break;
       case 'subscribs':
         // Show tracks from followed users, sorted by date (newest first)
-        categoryTracks = [...tracks]
+        categoryTracks = [...filteredTracks]
           .filter(track => track.user && followedUsers.includes(track.user.id))
           .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
         break;
       case 'top_rated':
         // Sort by date first (newest first), then by likes for ties
-        categoryTracks = [...tracks].sort((a, b) => {
+        categoryTracks = [...filteredTracks].sort((a, b) => {
           const dateDiff = toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime();
           if (dateDiff !== 0) return dateDiff;
           return b.likes - a.likes;
@@ -187,7 +219,7 @@ export const FeedPage = () => {
         break;
       case 'most_commented':
         // Sort by date first (newest first), then by comments for ties
-        categoryTracks = [...tracks].sort((a, b) => {
+        categoryTracks = [...filteredTracks].sort((a, b) => {
           const dateDiff = toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime();
           if (dateDiff !== 0) return dateDiff;
           const aComments = a.commentsCount || 0;
@@ -210,8 +242,9 @@ export const FeedPage = () => {
     if (categoryId === 'new') {
       console.log(`🔍 NEW CATEGORY DEBUG:`);
       console.log(`- Total tracks: ${tracks.length}`);
+      console.log(`- Gender filtered tracks: ${filteredTracks.length}`);
       console.log(`- Two weeks ago: ${twoWeeksAgo.toISOString()}`);
-      console.log(`- Filtered tracks: ${categoryTracks.length}`);
+      console.log(`- Final filtered tracks: ${categoryTracks.length}`);
       console.log(`- Showing: ${Math.min(categoryTracks.length, maxItems)}`);
     }
     
@@ -243,14 +276,14 @@ export const FeedPage = () => {
           </motion.div>
         </RevealOnScroll>
 
-        {/* Enhanced "Show me" Filter tabs with animations - with transparent background */}
+        {/* Enhanced "Show me" Filter tabs with animations - full width */}
         <RevealOnScroll direction="up" className="mb-6">
-          <StaggerWrapper className="flex flex-wrap gap-2 overflow-visible">
+          <StaggerWrapper className="grid grid-cols-5 gap-2">
             {genderFilters.map((filterOption) => (
-              <StaggerItem key={filterOption.type} className="flex-none">
+              <StaggerItem key={filterOption.type} className="w-full">
                 <motion.button
                   onClick={() => handleGenderFilterChange(filterOption.type)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
+                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
                     selectedGenderFilter === filterOption.type
                       ? 'bg-gradient-primary text-white'
                       : 'glass-surface text-text-secondary hover:text-text-primary hover:bg-white/15'
@@ -379,12 +412,12 @@ export const FeedPage = () => {
                         All Recordings
                       </h2>
                       <span className="text-sm text-text-secondary">
-                        {tracks.length} recordings
+                        {getFilteredTracks().length} recordings
                       </span>
                     </div>
                     
                     <StaggerWrapper className="space-y-3">
-                      {tracks
+                      {getFilteredTracks()
                         .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime())
                         .map((track, index) => {
                           // Debug: Log jeden Track in "All Recordings"

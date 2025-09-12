@@ -12,6 +12,7 @@ import {
 
 // Gender filters for audio content
 const genderFilters = [
+  { type: 'all', label: 'All' },
   { type: 'couples', label: 'Couples' },
   { type: 'females', label: 'Females' },
   { type: 'males', label: 'Males' },
@@ -35,7 +36,7 @@ export const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('couples');
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('all');
   const [allTags, setAllTags] = useState<string[]>([]);
   const [visibleTags, setVisibleTags] = useState<string[]>([]);
   const [showMoreTags, setShowMoreTags] = useState(false);
@@ -58,6 +59,34 @@ export const SearchPage = () => {
     setVisibleTags(sortedTags.slice(0, 20));
   }, [tracks]);
 
+  // Filter tracks by gender
+  const getFilteredTracks = () => {
+    if (selectedGenderFilter === 'all') {
+      return tracks; // Show all tracks
+    } else if (selectedGenderFilter === 'couples') {
+      return tracks.filter(track => 
+        track.gender === 'Couple' || 
+        (track.tags && track.tags.includes('Couple'))
+      );
+    } else if (selectedGenderFilter === 'females') {
+      return tracks.filter(track => 
+        track.gender === 'Female' || 
+        (track.tags && track.tags.includes('Female'))
+      );
+    } else if (selectedGenderFilter === 'males') {
+      return tracks.filter(track => 
+        track.gender === 'Male' || 
+        (track.tags && track.tags.includes('Male'))
+      );
+    } else if (selectedGenderFilter === 'diverse') {
+      return tracks.filter(track => 
+        track.gender === 'Diverse' || 
+        (track.tags && track.tags.includes('Diverse'))
+      );
+    }
+    return tracks; // Show all if no filter
+  };
+
   const debouncedSearch = debounce((searchQuery: string) => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -68,7 +97,8 @@ export const SearchPage = () => {
     setIsSearching(true);
     
     setTimeout(() => {
-      let results = tracks.filter(track => {
+      const filteredTracks = getFilteredTracks();
+      let results = filteredTracks.filter(track => {
         const matchesQuery = 
           track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           track.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -154,12 +184,12 @@ export const SearchPage = () => {
 
           {/* Gender Filter Toggles */}
           <RevealOnScroll direction="up" delay={0.2}>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {genderFilters.map((filterOption) => (
                 <motion.button
                   key={filterOption.type}
                   onClick={() => handleGenderFilterChange(filterOption.type)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
+                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
                     selectedGenderFilter === filterOption.type
                       ? 'bg-gradient-primary text-white'
                       : 'glass-surface text-text-secondary hover:text-text-primary hover:bg-white/15'

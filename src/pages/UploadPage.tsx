@@ -296,6 +296,12 @@ export const UploadPage = () => {
       return;
     }
     
+    // Gender validation - required field
+    if (!selectedGender) {
+      setError('Please select who is on the recording');
+      return;
+    }
+    
     setIsUploading(true);
     setError('');
     
@@ -348,7 +354,7 @@ export const UploadPage = () => {
           title: title.trim(),
           description: description.trim(),
           gender: selectedGender || undefined,
-          tags: selectedTags,
+          tags: [...selectedTags, selectedGender],
           uploadedAt: new Date().toISOString(),
           status: 'pending_review',
           reason: securityCheck.reason || 'Security check triggered',
@@ -392,14 +398,16 @@ export const UploadPage = () => {
       if (selectedGender) {
         formData.append('gender', selectedGender);
       }
-      formData.append('tags', JSON.stringify(selectedTags));
+      // Add gender as a tag for filtering
+      const tagsWithGender = [...selectedTags, selectedGender];
+      formData.append('tags', JSON.stringify(tagsWithGender));
       
       console.log('Uploading to backend with security measures...', {
         filename: selectedFile.name,
         size: selectedFile.size,
         type: selectedFile.type,
         title: title.trim(),
-        tags: selectedTags,
+        tags: [...selectedTags, selectedGender],
         requiresReview: securityCheck.requiresReview,
         duplicateCount: securityCheck.duplicateCheck.duplicateCount
       });
@@ -453,7 +461,7 @@ export const UploadPage = () => {
             isLiked: false,
             isBookmarked: false,
             createdAt: new Date(),
-            tags: selectedTags,
+            tags: [...selectedTags, selectedGender],
             gender: selectedGender || undefined,
             filename: selectedFile.name,
             fileSize: selectedFile.size,
@@ -507,7 +515,7 @@ export const UploadPage = () => {
             isLiked: false,
             isBookmarked: false,
             createdAt: new Date(),
-            tags: selectedTags,
+            tags: [...selectedTags, selectedGender],
             gender: selectedGender || undefined,
             filename: selectedFile.name,
             fileSize: selectedFile.size,
@@ -546,7 +554,7 @@ export const UploadPage = () => {
           title: title.trim(),
           description: description.trim(),
           gender: selectedGender || undefined,
-          tags: selectedTags,
+          tags: [...selectedTags, selectedGender],
           uploadedAt: new Date().toISOString(),
           status: 'pending_review',
           reason: securityCheck.reason || (securityCheck.duplicateCheck.isSuspicious ? 
@@ -589,7 +597,7 @@ export const UploadPage = () => {
         isLiked: false,
         isBookmarked: false,
         createdAt: new Date(result.data.uploadedAt),
-        tags: selectedTags,
+        tags: [...selectedTags, selectedGender],
         gender: selectedGender || undefined,
         filename: result.data.originalName,
         fileSize: result.data.size,

@@ -211,14 +211,26 @@ export const PlayerPage = () => {
 
         {/* Tags - flexible height */}
         <div className="flex flex-wrap gap-2 mb-10">
-          {(track.tags || ['Soft', 'Female', 'Toy', 'Whisper', 'Intimate']).map((tag, index) => (
-            <span
-              key={index}
-              className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full"
-            >
-              {tag}
-            </span>
-          ))}
+          {(() => {
+            const tags = track.tags || ['Soft', 'Female', 'Toy', 'Whisper', 'Intimate'];
+            const genderTags = ['Female', 'Male', 'Couple', 'Diverse'];
+            
+            // Find gender tag and move it to the front
+            const genderTag = tags.find(tag => genderTags.includes(tag));
+            const otherTags = tags.filter(tag => !genderTags.includes(tag));
+            
+            // Sort tags: gender first, then others
+            const sortedTags = genderTag ? [genderTag, ...otherTags] : otherTags;
+            
+            return sortedTags.map((tag, index) => (
+              <span
+                key={index}
+                className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full"
+              >
+                {tag}
+              </span>
+            ));
+          })()}
         </div>
 
         {/* Play button with time displays centered vertically in page */}
