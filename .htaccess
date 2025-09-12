@@ -1,5 +1,5 @@
 # Minimal .htaccess for SPA (Single Page Application)
-# For aural.yev.vision
+# For aural.yev.vision - HostEurope compatible version
 
 # Set default index file
 DirectoryIndex index.html
@@ -16,31 +16,4 @@ DirectoryIndex index.html
   
   # Rewrite everything else to index.html for SPA routing
   RewriteRule . /index.html [L]
-</IfModule>
-
-# Security headers (optional, only if allowed by hosting)
-<IfModule mod_headers.c>
-  # Prevent MIME type sniffing
-  Header always set X-Content-Type-Options nosniff
-  
-  # Prevent clickjacking
-  Header always set X-Frame-Options DENY
-  
-  # XSS protection
-  Header always set X-XSS-Protection "1; mode=block"
-</IfModule>
-
-# Cache static assets (optional, only if allowed by hosting)
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresByType text/css "access plus 1 year"
-  ExpiresByType application/javascript "access plus 1 year"
-  ExpiresByType image/png "access plus 1 year"
-  ExpiresByType image/jpg "access plus 1 year"
-  ExpiresByType image/jpeg "access plus 1 year"
-  ExpiresByType image/gif "access plus 1 year"
-  ExpiresByType image/svg+xml "access plus 1 year"
-  ExpiresByType image/webp "access plus 1 year"
-  ExpiresByType font/woff "access plus 1 year"
-  ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>
