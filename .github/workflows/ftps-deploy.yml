@@ -1,9 +1,9 @@
-name: Build & Deploy to yev.vision/aural
+name: Build & Deploy to aural.yev.vision
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: {}   # Manuelles Starten erlaubt
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -17,12 +17,47 @@ jobs:
         with:
           node-version: 20
 
+      # Falls dein Repo KEIN package-lock.json hat, ist npm ci zu streng -> benutze npm install
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Build project
         run: npm run build
 
+      # Sicherstellen, dass dist/ existiert und index.html drin liegt
+      - name: Verify build output
+        run: |
+          ls -la
+          ls -la dist || (echo "dist/ fehlt - prüfe Vite build outDir" && exit 1)
+          test -f dist/index.html || (echo "dist/index.html fehlt -> Build prüfe Vite base/outDir" && exit 1)
+
+      # HostEurope-kompatible .htaccess schreiben (überschreibt ggf. alte)
+      - name: Write HostEurope-safe .htaccess
+        run: |
+          cat > dist/.htaccess << 'EOF'
+          <IfModule mod_rewrite.c>
+            RewriteEngine On
+            RewriteBase /
+            RewriteCond %{REQUEST_FILENAME} -f [OR]
+            RewriteCond %{REQUEST_FILENAME} -d
+            RewriteRule ^ - [L]
+            RewriteRule ^.*$ /index.html [L]
+          </IfModule>
+          EOF
+
+      # Hilfsdateien, um live zu prüfen, ob dein Deploy angekommen ist
+      - name: Add version & probe
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > dist/version.txt
+          echo ok > dist/probe.txt
+          touch dist/favicon.ico
+
+      # FTPS Upload
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -34,6 +69,7 @@ jobs:
           passive: true
           local-dir: ./dist/
           server-dir: /www/aural/
-          dangerous-clean-slate: true
+          # einmalig true wenn du komplett aufräumen willst; danach besser false lassen
+          dangerous-clean-slate: false
           log-level: verbose
-          timeout: 60000
+          timeout: 120000
