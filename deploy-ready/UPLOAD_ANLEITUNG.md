@@ -31,14 +31,14 @@ Alle Dateien sind im Ordner `deploy-ready/` vorbereitet.
 - `uploads/index.php`
 
 ### 4. Verifikationsdatei hochladen:
-- `deployed-2025-09-12T19-59-38-344Z.txt`
+- `deployed-2025-09-13T02-07-11-609Z.txt`
 
 ## ✅ Nach dem Upload:
 
 ### Teste die App:
 - **Hauptseite:** https://yev.vision/aural/
 - **Setup:** https://yev.vision/aural/setup.php
-- **Verifikation:** https://yev.vision/aural/deployed-2025-09-12T19-59-38-344Z.txt
+- **Verifikation:** https://yev.vision/aural/deployed-2025-09-13T02-07-11-609Z.txt
 
 ### Prüfe Assets:
 - **CSS:** https://yev.vision/aural/assets/index-Cg5zhJfg.css
@@ -62,4 +62,4 @@ Wenn alles funktioniert, ist deine Aural-App live unter:
 **https://yev.vision/aural/**
 
 ---
-*Erstellt am: 2025-09-12T19:59:38.346Z*
+*Erstellt am: 2025-09-13T02:07:11.613Z*
