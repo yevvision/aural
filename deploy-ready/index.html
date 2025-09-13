@@ -1,12 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="..../vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Aural - Voice Social Network" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:*; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';">
     <title>Aural - Voice Social Network</title>
-    <script type="module" crossorigin src="..../assets/index-DPxtH6Lm.js"></script>
-    <link rel="stylesheet" crossorigin href="..../assets/index-Bqm2jVNZ.css">
+    <style>
+      /* Verhindere FOUC (Flash of Unstyled Content) */
+      #root {
+        background-color: #000000;
+        min-height: 100vh;
+      }
+      /* Verstecke Loading-Spinner falls vorhanden */
+      .loading {
+        display: none;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-Yh1taOFc.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-dD1it48p.css">
   </head>
   <body style="background-color: #000000; margin: 0; padding: 0;">
     <div id="root"></div>

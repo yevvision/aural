@@ -159,7 +159,7 @@ export const ProfilePage = () => {
         type: 'my_follow',
         trackId: '', // Not applicable for follow activities
         trackTitle: '', // Not applicable for follow activities
-        followedUser: user
+        followedUser: users.find(u => u.id === 'user-1')
       });
     }
   };

@@ -27,7 +27,7 @@ export interface AudioTrack {
   isBookmarked?: boolean; // New bookmark functionality
   comments?: Comment[];
   commentsCount?: number;
-  plays: number; // New: Play count tracking
+  plays?: number; // New: Play count tracking
   createdAt: Date;
   waveformData?: number[]; // For visualizer
   tags?: string[];

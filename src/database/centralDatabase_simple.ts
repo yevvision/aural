@@ -581,7 +581,7 @@ class CentralDatabaseSimple {
       console.log('📥 CentralDB Simple: - Comment Likes:', this.data.commentLikes.size);
     } catch (error) {
       console.error('❌ CentralDB Simple: Fehler beim Laden:', error);
-      this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map() };
+      this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map(), plays: new Map() };
     }
   }
 
