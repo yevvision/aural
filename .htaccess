@@ -1,18 +1,12 @@
-# Default-Datei
-DirectoryIndex index.html
-
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # Existierende Dateien/Ordner ausnehmen
+  # Bestehende Dateien/Ordner direkt ausliefern
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Alles andere auf index.html
+  # Alles andere an SPA Entry
   RewriteRule . /index.html [L]
 </IfModule>
-
-# Directory Listing verbieten
-Options -Indexes
