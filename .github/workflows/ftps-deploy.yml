@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -17,8 +17,8 @@ jobs:
         with:
           node-version: 20
 
-      # Falls dein Repo KEIN package-lock.json hat, ist npm ci zu streng -> benutze npm install
-      - name: Install dependencies
+      # Falls kein package-lock.json vorhanden ist, ist npm ci zu streng
+      - name: Install deps
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -26,17 +26,17 @@ jobs:
             npm install
           fi
 
-      - name: Build project
+      - name: Build
         run: npm run build
 
-      # Sicherstellen, dass dist/ existiert und index.html drin liegt
+      # Sicherstellen, dass dist/ wirklich existiert
       - name: Verify build output
         run: |
           ls -la
-          ls -la dist || (echo "dist/ fehlt - prüfe Vite build outDir" && exit 1)
-          test -f dist/index.html || (echo "dist/index.html fehlt -> Build prüfe Vite base/outDir" && exit 1)
+          ls -la dist || (echo "dist/ fehlt – prüfe Vite outDir" && exit 1)
+          test -f dist/index.html || (echo "dist/index.html fehlt – Build prüfen" && exit 1)
 
-      # HostEurope-kompatible .htaccess schreiben (überschreibt ggf. alte)
+      # HostEurope-sichere .htaccess erzeugen (verhindert 500er)
       - name: Write HostEurope-safe .htaccess
         run: |
           cat > dist/.htaccess << 'EOF'
@@ -50,26 +50,42 @@ jobs:
           </IfModule>
           EOF
 
-      # Hilfsdateien, um live zu prüfen, ob dein Deploy angekommen ist
+      # Probe-Dateien zum schnellen Prüfen im Browser
       - name: Add version & probe
         run: |
           date -u +"%Y-%m-%dT%H:%M:%SZ" > dist/version.txt
           echo ok > dist/probe.txt
           touch dist/favicon.ico
 
-      # FTPS Upload
-      - name: Deploy via FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: wp13874980.server-he.de
-          username: ftp13874980-aural
-          password: aural33!
-          port: 21
-          protocol: ftps
-          passive: true
-          local-dir: ./dist/
-          server-dir: /www/aural/
-          # einmalig true wenn du komplett aufräumen willst; danach besser false lassen
-          dangerous-clean-slate: false
-          log-level: verbose
-          timeout: 120000
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Deploy via FTPS (lftp mirror)
+        env:
+          FTP_HOST: wp13874980.server-he.de
+          FTP_USER: ftp13874980-aural
+          FTP_PASS: aural33!
+          REMOTE_DIR: /www/aural
+        run: |
+          lftp -u "$FTP_USER","$FTP_PASS" "ftps://$FTP_HOST:21" << 'EOF'
+          set cmd:fail-exit true
+          set xfer:log true
+          set ssl:verify-certificate no
+          set ftp:ssl-allow yes
+          set ftp:ssl-force yes
+          set ftp:ssl-protect-data yes
+          set ftp:passive-mode true
+          set ftp:prefer-epsv false
+          set net:connection-limit 1
+          set net:timeout 30
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 30
+
+          lcd dist
+          mkdir -p /www/aural
+          cd /www/aural
+
+          # -R = Upload (reverse), -n = nur neuere, -e = keine Löschungen, -v = verbose
+          mirror -Rnev . .
+          bye
+          EOF
