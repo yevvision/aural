@@ -1,1 +1,4 @@
-ok
+OK - Server funktioniert
+Timestamp: 2024-01-15 12:00:00
+Domain: aural.yev.vision
+Status: Server antwortet

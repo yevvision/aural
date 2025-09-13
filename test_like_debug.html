@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Like Debug Test - Aural</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { background: #065f46; border-color: #10b981; }
+        .error { background: #7f1d1d; border-color: #f87171; }
+        .info { background: #1e3a8a; border-color: #60a5fa; }
+        .warning { background: #92400e; border-color: #f59e0b; }
+        
+        .track-card {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .track-info {
+            flex: 1;
+        }
+        
+        .track-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .btn-like { 
+            background: #dc2626; 
+            color: white; 
+        }
+        .btn-like.liked { 
+            background: #ef4444; 
+        }
+        
+        .btn-bookmark { 
+            background: #d97706; 
+            color: white; 
+        }
+        .btn-bookmark.bookmarked { 
+            background: #f59e0b; 
+        }
+        
+        .btn-secondary { 
+            background: #374151; 
+            color: white; 
+        }
+        
+        .log {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        
+        .log-success { color: #10b981; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
+        .log-warning { color: #f59e0b; }
+        
+        .debug-section {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Like Debug Test</h1>
+        
+        <div class="status info">
+            <strong>ℹ️ Debug-Modus für Like-Button-Funktionalität</strong><br>
+            Diese Seite testet die komplette Like-Button-Pipeline.
+        </div>
+
+        <div class="debug-section">
+            <h3>🎵 Test Tracks</h3>
+            <button class="btn btn-secondary" onclick="loadTracks()">Tracks laden</button>
+            <button class="btn btn-secondary" onclick="clearLog()">Log leeren</button>
+            <div id="tracks-container">
+                <div class="status info">Klicke auf "Tracks laden" um zu beginnen</div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>📊 Debug Informationen</h3>
+            <div id="debug-info">
+                <div class="status info">Warte auf Debug-Informationen...</div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>📋 Debug Log</h3>
+            <div id="debug-log" class="log">
+                <div class="log-entry log-info">Debug-Log bereit...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tracks = [];
+        let currentUserId = 'user-1';
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '<div class="log-entry log-info">Debug-Log geleert...</div>';
+        }
+
+        function updateDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            const stored = localStorage.getItem('aural-central-database');
+            const data = stored ? JSON.parse(stored) : {};
+            
+            debugDiv.innerHTML = `
+                <div class="status info">
+                    <strong>📊 Aktuelle Datenbank-Informationen:</strong><br>
+                    Tracks: ${data.tracks?.length || 0}<br>
+                    Likes: ${data.likes?.length || 0} Einträge<br>
+                    Bookmarks: ${data.bookmarks?.length || 0} Einträge<br>
+                    Current User ID: ${currentUserId}
+                </div>
+            `;
+        }
+
+        function loadTracks() {
+            log('Lade Tracks aus localStorage...', 'info');
+            
+            try {
+                const stored = localStorage.getItem('aural-central-database');
+                if (!stored) {
+                    log('Keine Daten in localStorage gefunden', 'warning');
+                    return;
+                }
+
+                const data = JSON.parse(stored);
+                tracks = data.tracks || [];
+                
+                log(`✅ ${tracks.length} Tracks geladen`, 'success');
+                displayTracks();
+                updateDebugInfo();
+            } catch (error) {
+                log(`❌ Fehler beim Laden: ${error.message}`, 'error');
+            }
+        }
+
+        function displayTracks() {
+            const container = document.getElementById('tracks-container');
+            
+            if (tracks.length === 0) {
+                container.innerHTML = '<div class="status warning">Keine Tracks gefunden</div>';
+                return;
+            }
+
+            container.innerHTML = tracks.map(track => {
+                const isLiked = isTrackLiked(track.id);
+                const isBookmarked = isTrackBookmarked(track.id);
+                const likesCount = getLikesCount(track.id);
+                
+                return `
+                    <div class="track-card">
+                        <div class="track-info">
+                            <h3>${track.title}</h3>
+                            <p><strong>User:</strong> ${track.user.username} | <strong>Likes:</strong> ${likesCount}</p>
+                            <p><strong>Status:</strong> ${isLiked ? '❤️ Geliked' : '🤍 Nicht geliked'} | ${isBookmarked ? '🔖 Bookmarkiert' : '📖 Nicht bookmarkiert'}</p>
+                        </div>
+                        <div class="track-controls">
+                            <button class="btn btn-like ${isLiked ? 'liked' : ''}" 
+                                    onclick="toggleLike('${track.id}')">
+                                ${isLiked ? '❤️ Unlike' : '🤍 Like'} (${likesCount})
+                            </button>
+                            <button class="btn btn-bookmark ${isBookmarked ? 'bookmarked' : ''}" 
+                                    onclick="toggleBookmark('${track.id}')">
+                                ${isBookmarked ? '🔖 Unbookmark' : '📖 Bookmark'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function isTrackLiked(trackId) {
+            const stored = localStorage.getItem('aural-central-database');
+            if (!stored) return false;
+            
+            const data = JSON.parse(stored);
+            const likes = data.likes || [];
+            const trackLikes = likes.find(l => l.trackId === trackId);
+            
+            return trackLikes ? trackLikes.userIds.includes(currentUserId) : false;
+        }
+
+        function isTrackBookmarked(trackId) {
+            const stored = localStorage.getItem('aural-central-database');
+            if (!stored) return false;
+            
+            const data = JSON.parse(stored);
+            const bookmarks = data.bookmarks || [];
+            const trackBookmarks = bookmarks.find(b => b.trackId === trackId);
+            
+            return trackBookmarks ? trackBookmarks.userIds.includes(currentUserId) : false;
+        }
+
+        function getLikesCount(trackId) {
+            const stored = localStorage.getItem('aural-central-database');
+            if (!stored) return 0;
+            
+            const data = JSON.parse(stored);
+            const likes = data.likes || [];
+            const trackLikes = likes.find(l => l.trackId === trackId);
+            
+            return trackLikes ? trackLikes.userIds.length : 0;
+        }
+
+        function toggleLike(trackId) {
+            log(`🔄 Togglen Like für Track: ${trackId}`, 'info');
+            
+            try {
+                const stored = localStorage.getItem('aural-central-database');
+                const data = JSON.parse(stored);
+                
+                let likes = data.likes || [];
+                let trackLikes = likes.find(l => l.trackId === trackId);
+                
+                if (!trackLikes) {
+                    trackLikes = { trackId, userIds: [] };
+                    likes.push(trackLikes);
+                }
+                
+                const userIndex = trackLikes.userIds.indexOf(currentUserId);
+                if (userIndex > -1) {
+                    trackLikes.userIds.splice(userIndex, 1);
+                    log(`✅ Like entfernt für Track: ${trackId}`, 'success');
+                } else {
+                    trackLikes.userIds.push(currentUserId);
+                    log(`✅ Like hinzugefügt für Track: ${trackId}`, 'success');
+                }
+                
+                data.likes = likes;
+                localStorage.setItem('aural-central-database', JSON.stringify(data));
+                
+                log(`💾 Datenbank aktualisiert - Likes für ${trackId}: ${trackLikes.userIds.length}`, 'info');
+                
+                displayTracks();
+                updateDebugInfo();
+            } catch (error) {
+                log(`❌ Fehler beim Togglen des Likes: ${error.message}`, 'error');
+            }
+        }
+
+        function toggleBookmark(trackId) {
+            log(`🔄 Togglen Bookmark für Track: ${trackId}`, 'info');
+            
+            try {
+                const stored = localStorage.getItem('aural-central-database');
+                const data = JSON.parse(stored);
+                
+                let bookmarks = data.bookmarks || [];
+                let trackBookmarks = bookmarks.find(b => b.trackId === trackId);
+                
+                if (!trackBookmarks) {
+                    trackBookmarks = { trackId, userIds: [] };
+                    bookmarks.push(trackBookmarks);
+                }
+                
+                const userIndex = trackBookmarks.userIds.indexOf(currentUserId);
+                if (userIndex > -1) {
+                    trackBookmarks.userIds.splice(userIndex, 1);
+                    log(`✅ Bookmark entfernt für Track: ${trackId}`, 'success');
+                } else {
+                    trackBookmarks.userIds.push(currentUserId);
+                    log(`✅ Bookmark hinzugefügt für Track: ${trackId}`, 'success');
+                }
+                
+                data.bookmarks = bookmarks;
+                localStorage.setItem('aural-central-database', JSON.stringify(data));
+                
+                log(`💾 Datenbank aktualisiert - Bookmarks für ${trackId}: ${trackBookmarks.userIds.length}`, 'info');
+                
+                displayTracks();
+                updateDebugInfo();
+            } catch (error) {
+                log(`❌ Fehler beim Togglen des Bookmarks: ${error.message}`, 'error');
+            }
+        }
+
+        // Initial laden
+        log('Like Debug Test Seite geladen', 'info');
+        loadTracks();
+    </script>
+</body>
+</html>

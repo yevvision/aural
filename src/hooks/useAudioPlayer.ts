@@ -2,6 +2,7 @@ import { usePlayerStore } from '../stores/playerStore';
 import { useCallback } from 'react';
 import type { AudioTrack } from '../types';
 import { getGlobalAudio, initializeGlobalAudio } from './useGlobalAudioManager';
+import { useDatabase } from './useDatabase';
 
 export const useAudioPlayer = () => {
   const {
@@ -13,15 +14,19 @@ export const useAudioPlayer = () => {
     setCurrentTrack,
     togglePlay
   } = usePlayerStore();
+  
+  const { incrementPlay } = useDatabase('user-1');
 
   const play = useCallback((track?: AudioTrack) => {
     if (track && track.id !== currentTrack?.id) {
       setCurrentTrack(track);
+      // Erhöhe Play-Anzahl für neuen Track
+      incrementPlay(track.id);
     }
     if (!isPlaying) {
       togglePlay();
     }
-  }, [currentTrack, isPlaying, setCurrentTrack, togglePlay]);
+  }, [currentTrack, isPlaying, setCurrentTrack, togglePlay, incrementPlay]);
 
   const pause = useCallback(() => {
     if (isPlaying) {

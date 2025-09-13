@@ -1,4 +1,4 @@
-import { Clock, Heart, MessageCircle, Trash2, User, Bookmark } from 'lucide-react';
+import { Clock, Heart, Trash2, User, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
@@ -24,7 +24,10 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   const { currentTrack, isPlaying, play, pause } = useAudioPlayer();
   const { reset } = usePlayerStore(); // Add reset function from player store
   const { myTracks } = useUserStore();
-  const { toggleLike, toggleBookmark } = useDatabase('user-1'); // Verwende aktuellen User
+  const { tracks, toggleLike } = useDatabase('user-1'); // Verwende aktuellen User
+  
+  // Hole den aktuellen Track aus der Datenbank, um sicherzustellen, dass Like/Bookmark-Status aktuell ist
+  const currentTrackData = tracks.find(t => t.id === track.id) || track;
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const audioCardRef = useRef<HTMLDivElement>(null);
@@ -40,8 +43,8 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   setVisibleAudioCardIdsRef.current = setVisibleAudioCardIds;
 
   // Sanitize track and user data
-  const safeTrack = sanitizeAudioTrack(track);
-  const safeUser = sanitizeUser(track.user);
+  const safeTrack = sanitizeAudioTrack(currentTrackData);
+  const safeUser = sanitizeUser(currentTrackData.user);
 
   // Debug: Log track data
   console.log('🎵 AudioCard: Track data:', {
@@ -49,7 +52,9 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
     title: safeTrack.title,
     isLiked: safeTrack.isLiked,
     isBookmarked: safeTrack.isBookmarked,
-    likes: safeTrack.likes
+    likes: safeTrack.likes,
+    commentsCount: safeTrack.commentsCount,
+    comments: safeTrack.comments?.length || 0
   });
 
   const isCurrentTrack = currentTrack?.id === safeTrack.id;
@@ -215,6 +220,15 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <span>{safeUser.username}</span>
               </Link>
               
+              <div className="flex items-center space-x-1">
+                <Play 
+                  size={13} 
+                  className="text-gray-400"
+                  fill="none"
+                />
+                <span className="text-gray-400">{safeTrack.plays || 0}</span>
+              </div>
+              
               <button 
                 onClick={(e) => {
                   e.preventDefault();
@@ -228,49 +242,14 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
               >
                 <Heart 
                   size={12} 
-                  className={`${safeTrack.isLiked ? 'text-red-500' : 'text-gray-400'} hover:text-gray-300`}
-                  fill={safeTrack.isLiked ? 'currentColor' : 'none'}
+                  className="text-gray-400 hover:text-gray-300"
+                  fill="none"
                 />
                 <span className="text-gray-400">
                   {safeTrack.likes}
                 </span>
               </button>
               
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('🔖 AudioCard: Bookmark button clicked for track:', safeTrack.id);
-                  const success = toggleBookmark(safeTrack.id, 'user-1');
-                  console.log('🔖 AudioCard: Bookmark result:', success);
-                }}
-                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
-                title={safeTrack.isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
-              >
-                <Bookmark 
-                  size={12} 
-                  className={`${safeTrack.isBookmarked ? 'text-yellow-500' : 'text-gray-400'} hover:text-gray-300`}
-                  fill={safeTrack.isBookmarked ? 'currentColor' : 'none'}
-                />
-              </button>
-              
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('💬 AudioCard: Comment button clicked for track:', safeTrack.id);
-                  // Navigate to player page with this track to add comments
-                  navigate(`/player/${safeTrack.id}`);
-                }}
-                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
-                title="Add comment"
-              >
-                <MessageCircle 
-                  size={12} 
-                  className="text-gray-400 hover:text-blue-400" 
-                />
-                <span className="text-gray-400">{safeTrack.commentsCount || 0}</span>
-              </button>
               
               <div className="flex items-center space-x-1">
                 <Clock size={12} />

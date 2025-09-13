@@ -83,9 +83,12 @@ export const AppLayout = () => {
     setVisibleAudioCardIdsState(new Set());
   }, [location.pathname]);
 
+  // Check if we're on the record page for mobile layout
+  const isRecordPage = location.pathname === '/record' || location.pathname === '/aural/record';
+  
   return (
     <BackNavigationContext.Provider value={{ showBackButton, setShowBackButton }}>
-      <div className="min-h-screen">
+      <div className={`min-h-screen ${isRecordPage ? 'mobile-record-layout' : ''}`}>
         {/* Organic Orange Morph Background - Changes with route navigation */}
         <OrganicOrangeMorphBackground />
         
@@ -96,7 +99,7 @@ export const AppLayout = () => {
             <TopNavigation />
             
             {/* Main Content with reduced top padding for category/subpages */}
-            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') ? 'content-blur-bottom' : ''}`}>
+            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
               <div style={{ minHeight: '100%' }}>
                 <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
               </div>

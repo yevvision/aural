@@ -3,217 +3,422 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test: Like/Bookmark/Kommentar Fix</title>
+    <title>Like/Bookmark Fix Test</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
-        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
-        .button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .button:hover { background: #0056b3; }
-        .success { color: #28a745; }
-        .error { color: #dc3545; }
-        .warning { color: #ffc107; }
-        .info { color: #17a2b8; }
-        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
-        .test-case { background: #333; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .test-case h4 { color: #17a2b8; margin-bottom: 10px; }
-        .track-card { background: #2d2d2d; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #444; }
-        .track-card h5 { color: #fff; margin-bottom: 10px; }
-        .track-card .buttons { display: flex; gap: 10px; margin-top: 10px; }
-        .track-card .button { padding: 5px 10px; font-size: 12px; }
-        .like-button { background: #dc3545; }
-        .like-button.liked { background: #28a745; }
-        .bookmark-button { background: #ffc107; color: #000; }
-        .bookmark-button.bookmarked { background: #28a745; color: #fff; }
-        .comment-button { background: #17a2b8; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+        }
+        .test-section {
+            background: #111;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .test-button {
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #ea580c;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #065f46;
+            color: #10b981;
+        }
+        .error {
+            background: #7f1d1d;
+            color: #f87171;
+        }
+        .info {
+            background: #1e3a8a;
+            color: #60a5fa;
+        }
+        .track-info {
+            background: #1f2937;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #f97316;
+        }
+        .like-bookmark-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .like-btn, .bookmark-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .like-btn {
+            background: #dc2626;
+            color: white;
+        }
+        .like-btn.liked {
+            background: #ef4444;
+        }
+        .bookmark-btn {
+            background: #d97706;
+            color: white;
+        }
+        .bookmark-btn.bookmarked {
+            background: #f59e0b;
+        }
     </style>
 </head>
 <body>
-    <h1>🔧 Test: Like/Bookmark/Kommentar Fix</h1>
+    <h1>🔧 Like/Bookmark Fix Test</h1>
     
-    <div class="section">
-        <h2>📊 Problem gelöst</h2>
-        <div class="success">
-            <h3>✅ Jetzt (korrekt):</h3>
-            <p><strong>Like-System:</strong> <code>toggleLike()</code> ruft <code>loadData()</code> auf</p>
-            <p><strong>Bookmark-System:</strong> <code>toggleBookmark()</code> ruft <code>loadData()</code> auf</p>
-            <p><strong>Kommentar-System:</strong> <code>addCommentToTrack()</code> und <code>deleteCommentFromTrack()</code> rufen <code>loadData()</code> auf</p>
-            <p><strong>Ergebnis:</strong> UI wird automatisch aktualisiert nach Aktionen</p>
+    <div class="test-section">
+        <h2>📊 Aktueller Datenbank-Status</h2>
+        <button class="test-button" onclick="loadDatabaseStatus()">Datenbank-Status laden</button>
+        <div id="db-status" class="status info">Klicke auf "Datenbank-Status laden"</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎵 Test-Tracks</h2>
+        <div id="tracks-container">
+            <div class="status info">Lade Tracks...</div>
         </div>
     </div>
-    
-    <div class="section">
-        <h2>🎵 Test-Tracks</h2>
-        <div id="testTracks"></div>
+
+    <div class="test-section">
+        <h2>🧪 Like/Bookmark Tests</h2>
+        <button class="test-button" onclick="testLikeFunctionality()">Like-Funktionalität testen</button>
+        <button class="test-button" onclick="testBookmarkFunctionality()">Bookmark-Funktionalität testen</button>
+        <button class="test-button" onclick="testAllInteractions()">Alle Interaktionen testen</button>
+        <div id="test-results" class="status info">Warte auf Tests...</div>
     </div>
-    
-    <div class="section">
-        <h2>🔄 Reset</h2>
-        <button class="button" onclick="resetAll()">🔄 Alles zurücksetzen</button>
-        <div id="resetResult"></div>
+
+    <div class="test-section">
+        <h2>🔄 Reset & Cleanup</h2>
+        <button class="test-button" onclick="resetDatabase()">Datenbank zurücksetzen</button>
+        <button class="test-button" onclick="clearLocalStorage()">LocalStorage leeren</button>
+        <div id="reset-status" class="status info">Bereit für Reset</div>
     </div>
 
     <script>
-        // Simuliere die Datenbank
-        class MockDatabase {
+        // Simuliere die zentrale Datenbank
+        class TestDatabase {
             constructor() {
-                this.tracks = [
-                    {
-                        id: 'track1',
-                        title: 'Test Track 1',
-                        likes: 0,
-                        isLiked: false,
-                        isBookmarked: false,
-                        comments: []
-                    },
-                    {
-                        id: 'track2',
-                        title: 'Test Track 2',
-                        likes: 5,
-                        isLiked: true,
-                        isBookmarked: true,
-                        comments: [
-                            { id: 'comment1', text: 'Tolles Lied!', userId: 'user1' }
-                        ]
+                this.data = {
+                    tracks: [],
+                    users: [],
+                    likes: new Map(),
+                    bookmarks: new Map()
+                };
+                this.loadFromStorage();
+            }
+
+            loadFromStorage() {
+                try {
+                    const stored = localStorage.getItem('aural-central-database');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        this.data.tracks = parsed.tracks || [];
+                        this.data.users = parsed.users || [];
+                        
+                        // Konvertiere Likes zurück zu Map
+                        if (parsed.likes && Array.isArray(parsed.likes)) {
+                            this.data.likes = new Map();
+                            parsed.likes.forEach(item => {
+                                if (item && item.trackId && Array.isArray(item.userIds)) {
+                                    this.data.likes.set(item.trackId, new Set(item.userIds));
+                                }
+                            });
+                        }
+                        
+                        // Konvertiere Bookmarks zurück zu Map
+                        if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
+                            this.data.bookmarks = new Map();
+                            parsed.bookmarks.forEach(item => {
+                                if (item && item.trackId && Array.isArray(item.userIds)) {
+                                    this.data.bookmarks.set(item.trackId, new Set(item.userIds));
+                                }
+                            });
+                        }
                     }
-                ];
+                } catch (error) {
+                    console.error('Fehler beim Laden:', error);
+                }
             }
-            
+
+            getAllTracks(userId = 'user-1') {
+                return this.data.tracks.map(track => this.enrichTrackWithUserData(track, userId));
+            }
+
+            enrichTrackWithUserData(track, userId) {
+                const trackLikes = this.data.likes.get(track.id) || new Set();
+                const trackBookmarks = this.data.bookmarks.get(track.id) || new Set();
+                
+                return {
+                    ...track,
+                    isLiked: trackLikes.has(userId),
+                    isBookmarked: trackBookmarks.has(userId),
+                    likes: trackLikes.size
+                };
+            }
+
             toggleLike(trackId, userId) {
-                const track = this.tracks.find(t => t.id === trackId);
-                if (!track) return false;
+                console.log('❤️ TestDB: toggleLike()', trackId, userId);
                 
-                track.isLiked = !track.isLiked;
-                track.likes += track.isLiked ? 1 : -1;
-                console.log('❤️ Like toggled:', trackId, 'isLiked:', track.isLiked, 'likes:', track.likes);
+                const track = this.data.tracks.find(t => t.id === trackId);
+                if (!track) {
+                    console.log('⚠️ TestDB: Track nicht gefunden:', trackId);
+                    return false;
+                }
+
+                if (!this.data.likes.has(trackId)) {
+                    this.data.likes.set(trackId, new Set());
+                }
+                
+                const trackLikes = this.data.likes.get(trackId);
+                const wasLiked = trackLikes.has(userId);
+                
+                if (wasLiked) {
+                    trackLikes.delete(userId);
+                    console.log('💔 TestDB: Like entfernt. Neue Anzahl:', trackLikes.size);
+                } else {
+                    trackLikes.add(userId);
+                    console.log('❤️ TestDB: Like hinzugefügt. Neue Anzahl:', trackLikes.size);
+                }
+                
+                this.saveToStorage();
                 return true;
             }
-            
+
             toggleBookmark(trackId, userId) {
-                const track = this.tracks.find(t => t.id === trackId);
-                if (!track) return false;
+                console.log('🔖 TestDB: toggleBookmark()', trackId, userId);
                 
-                track.isBookmarked = !track.isBookmarked;
-                console.log('🔖 Bookmark toggled:', trackId, 'isBookmarked:', track.isBookmarked);
+                const track = this.data.tracks.find(t => t.id === trackId);
+                if (!track) {
+                    console.log('⚠️ TestDB: Track nicht gefunden:', trackId);
+                    return false;
+                }
+
+                if (!this.data.bookmarks.has(trackId)) {
+                    this.data.bookmarks.set(trackId, new Set());
+                }
+                
+                const trackBookmarks = this.data.bookmarks.get(trackId);
+                const wasBookmarked = trackBookmarks.has(userId);
+                
+                if (wasBookmarked) {
+                    trackBookmarks.delete(userId);
+                    console.log('🔓 TestDB: Bookmark entfernt');
+                } else {
+                    trackBookmarks.add(userId);
+                    console.log('🔖 TestDB: Bookmark hinzugefügt');
+                }
+                
+                this.saveToStorage();
                 return true;
             }
-            
-            addComment(trackId, comment) {
-                const track = this.tracks.find(t => t.id === trackId);
-                if (!track) return false;
-                
-                track.comments.push(comment);
-                console.log('💬 Comment added:', trackId, 'comments:', track.comments.length);
-                return true;
+
+            saveToStorage() {
+                try {
+                    const likesArray = Array.from(this.data.likes.entries()).map(([trackId, userIds]) => ({
+                        trackId,
+                        userIds: Array.from(userIds)
+                    }));
+                    
+                    const bookmarksArray = Array.from(this.data.bookmarks.entries()).map(([trackId, userIds]) => ({
+                        trackId,
+                        userIds: Array.from(userIds)
+                    }));
+
+                    const dataToSave = {
+                        tracks: this.data.tracks,
+                        users: this.data.users,
+                        likes: likesArray,
+                        bookmarks: bookmarksArray,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('aural-central-database', JSON.stringify(dataToSave));
+                    console.log('💾 TestDB: Daten gespeichert');
+                } catch (error) {
+                    console.error('❌ TestDB: Fehler beim Speichern:', error);
+                }
             }
-            
-            deleteComment(trackId, commentId) {
-                const track = this.tracks.find(t => t.id === trackId);
-                if (!track) return false;
-                
-                track.comments = track.comments.filter(c => c.id !== commentId);
-                console.log('🗑️ Comment deleted:', trackId, 'comments:', track.comments.length);
-                return true;
+
+            reset() {
+                this.data = {
+                    tracks: [],
+                    users: [],
+                    likes: new Map(),
+                    bookmarks: new Map()
+                };
+                localStorage.removeItem('aural-central-database');
             }
         }
 
-        const mockDB = new MockDatabase();
+        const testDB = new TestDatabase();
 
-        function renderTracks() {
-            const container = document.getElementById('testTracks');
-            container.innerHTML = '';
+        function loadDatabaseStatus() {
+            const tracks = testDB.getAllTracks();
+            const statusDiv = document.getElementById('db-status');
             
-            mockDB.tracks.forEach(track => {
-                const trackCard = document.createElement('div');
-                trackCard.className = 'track-card';
-                trackCard.innerHTML = `
-                    <h5>${track.title}</h5>
-                    <p>Likes: ${track.likes} | Bookmarked: ${track.isBookmarked ? 'Yes' : 'No'} | Comments: ${track.comments.length}</p>
-                    <div class="buttons">
-                        <button class="button like-button ${track.isLiked ? 'liked' : ''}" onclick="toggleLike('${track.id}')">
+            statusDiv.innerHTML = `
+                <div class="success">
+                    <strong>✅ Datenbank geladen</strong><br>
+                    Tracks: ${tracks.length}<br>
+                    Likes Map: ${testDB.data.likes.size} Einträge<br>
+                    Bookmarks Map: ${testDB.data.bookmarks.size} Einträge
+                </div>
+            `;
+            
+            displayTracks();
+        }
+
+        function displayTracks() {
+            const tracks = testDB.getAllTracks();
+            const container = document.getElementById('tracks-container');
+            
+            if (tracks.length === 0) {
+                container.innerHTML = '<div class="status error">Keine Tracks gefunden</div>';
+                return;
+            }
+
+            container.innerHTML = tracks.map(track => `
+                <div class="track-info">
+                    <h3>${track.title}</h3>
+                    <p>von ${track.user.username} • ${track.likes} Likes</p>
+                    <div class="like-bookmark-controls">
+                        <button class="like-btn ${track.isLiked ? 'liked' : ''}" 
+                                onclick="toggleLike('${track.id}')">
                             ${track.isLiked ? '❤️ Unlike' : '🤍 Like'} (${track.likes})
                         </button>
-                        <button class="button bookmark-button ${track.isBookmarked ? 'bookmarked' : ''}" onclick="toggleBookmark('${track.id}')">
-                            ${track.isBookmarked ? '🔖 Unbookmark' : '🔖 Bookmark'}
+                        <button class="bookmark-btn ${track.isBookmarked ? 'bookmarked' : ''}" 
+                                onclick="toggleBookmark('${track.id}')">
+                            ${track.isBookmarked ? '🔖 Bookmarked' : '📖 Bookmark'}
                         </button>
-                        <button class="button comment-button" onclick="addComment('${track.id}')">
-                            💬 Add Comment
-                        </button>
-                        ${track.comments.length > 0 ? `<button class="button" onclick="deleteComment('${track.id}', '${track.comments[0].id}')">🗑️ Delete Comment</button>` : ''}
                     </div>
-                `;
-                container.appendChild(trackCard);
-            });
+                </div>
+            `).join('');
         }
 
         function toggleLike(trackId) {
-            console.log('🔄 Toggle Like:', trackId);
-            const success = mockDB.toggleLike(trackId, 'user1');
+            const success = testDB.toggleLike(trackId, 'user-1');
             if (success) {
-                renderTracks(); // Simuliere loadData()
-                console.log('✅ Like toggled successfully');
+                displayTracks();
+                updateTestResults('✅ Like erfolgreich getoggelt für Track: ' + trackId);
+            } else {
+                updateTestResults('❌ Fehler beim Togglen des Likes für Track: ' + trackId);
             }
         }
 
         function toggleBookmark(trackId) {
-            console.log('🔄 Toggle Bookmark:', trackId);
-            const success = mockDB.toggleBookmark(trackId, 'user1');
+            const success = testDB.toggleBookmark(trackId, 'user-1');
             if (success) {
-                renderTracks(); // Simuliere loadData()
-                console.log('✅ Bookmark toggled successfully');
+                displayTracks();
+                updateTestResults('✅ Bookmark erfolgreich getoggelt für Track: ' + trackId);
+            } else {
+                updateTestResults('❌ Fehler beim Togglen des Bookmarks für Track: ' + trackId);
             }
         }
 
-        function addComment(trackId) {
-            console.log('🔄 Add Comment:', trackId);
-            const comment = {
-                id: 'comment' + Date.now(),
-                text: 'Neuer Kommentar!',
-                userId: 'user1'
-            };
-            const success = mockDB.addComment(trackId, comment);
-            if (success) {
-                renderTracks(); // Simuliere loadData()
-                console.log('✅ Comment added successfully');
+        function updateTestResults(message) {
+            const resultsDiv = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsDiv.innerHTML += `<div>${timestamp}: ${message}</div>`;
+        }
+
+        function testLikeFunctionality() {
+            updateTestResults('🧪 Starte Like-Funktionalitätstest...');
+            const tracks = testDB.getAllTracks();
+            
+            if (tracks.length === 0) {
+                updateTestResults('❌ Keine Tracks zum Testen verfügbar');
+                return;
             }
+
+            const track = tracks[0];
+            const initialLikes = track.likes;
+            const initialLiked = track.isLiked;
+            
+            updateTestResults(`📊 Initial: ${initialLikes} Likes, isLiked: ${initialLiked}`);
+            
+            // Test Like
+            testDB.toggleLike(track.id, 'user-1');
+            const afterLike = testDB.getAllTracks()[0];
+            updateTestResults(`📊 Nach Like: ${afterLike.likes} Likes, isLiked: ${afterLike.isLiked}`);
+            
+            // Test Unlike
+            testDB.toggleLike(track.id, 'user-1');
+            const afterUnlike = testDB.getAllTracks()[0];
+            updateTestResults(`📊 Nach Unlike: ${afterUnlike.likes} Likes, isLiked: ${afterUnlike.isLiked}`);
+            
+            updateTestResults('✅ Like-Funktionalitätstest abgeschlossen');
         }
 
-        function deleteComment(trackId, commentId) {
-            console.log('🔄 Delete Comment:', trackId, commentId);
-            const success = mockDB.deleteComment(trackId, commentId);
-            if (success) {
-                renderTracks(); // Simuliere loadData()
-                console.log('✅ Comment deleted successfully');
+        function testBookmarkFunctionality() {
+            updateTestResults('🧪 Starte Bookmark-Funktionalitätstest...');
+            const tracks = testDB.getAllTracks();
+            
+            if (tracks.length === 0) {
+                updateTestResults('❌ Keine Tracks zum Testen verfügbar');
+                return;
             }
+
+            const track = tracks[0];
+            const initialBookmarked = track.isBookmarked;
+            
+            updateTestResults(`📊 Initial: isBookmarked: ${initialBookmarked}`);
+            
+            // Test Bookmark
+            testDB.toggleBookmark(track.id, 'user-1');
+            const afterBookmark = testDB.getAllTracks()[0];
+            updateTestResults(`📊 Nach Bookmark: isBookmarked: ${afterBookmark.isBookmarked}`);
+            
+            // Test Unbookmark
+            testDB.toggleBookmark(track.id, 'user-1');
+            const afterUnbookmark = testDB.getAllTracks()[0];
+            updateTestResults(`📊 Nach Unbookmark: isBookmarked: ${afterUnbookmark.isBookmarked}`);
+            
+            updateTestResults('✅ Bookmark-Funktionalitätstest abgeschlossen');
         }
 
-        function resetAll() {
-            mockDB.tracks = [
-                {
-                    id: 'track1',
-                    title: 'Test Track 1',
-                    likes: 0,
-                    isLiked: false,
-                    isBookmarked: false,
-                    comments: []
-                },
-                {
-                    id: 'track2',
-                    title: 'Test Track 2',
-                    likes: 5,
-                    isLiked: true,
-                    isBookmarked: true,
-                    comments: [
-                        { id: 'comment1', text: 'Tolles Lied!', userId: 'user1' }
-                    ]
-                }
-            ];
-            renderTracks();
-            document.getElementById('resetResult').innerHTML = '<div class="success">✅ Alle Daten zurückgesetzt</div>';
+        function testAllInteractions() {
+            updateTestResults('🧪 Starte umfassenden Test...');
+            testLikeFunctionality();
+            testBookmarkFunctionality();
+            updateTestResults('✅ Alle Tests abgeschlossen');
         }
 
-        // Initialisierung
-        console.log('🚀 Like/Bookmark/Kommentar Fix Test System initialisiert');
-        renderTracks();
+        function resetDatabase() {
+            testDB.reset();
+            document.getElementById('reset-status').innerHTML = '<div class="success">✅ Datenbank zurückgesetzt</div>';
+            displayTracks();
+        }
+
+        function clearLocalStorage() {
+            localStorage.clear();
+            document.getElementById('reset-status').innerHTML = '<div class="success">✅ LocalStorage geleert</div>';
+            testDB.loadFromStorage();
+            displayTracks();
+        }
+
+        // Initial laden
+        loadDatabaseStatus();
     </script>
 </body>
 </html>

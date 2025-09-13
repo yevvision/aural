@@ -884,6 +884,7 @@ export const sanitizeAudioTrack = (track: any): AudioTrack => {
     isBookmarked: Boolean(track.isBookmarked),
     comments: Array.isArray(track.comments) ? track.comments : undefined,
     commentsCount: typeof track.commentsCount === 'number' ? track.commentsCount : 0,
+    plays: typeof track.plays === 'number' ? track.plays : 0,
     createdAt: track.createdAt || new Date(),
     waveformData: Array.isArray(track.waveformData) ? track.waveformData : undefined,
     tags: Array.isArray(track.tags) ? track.tags : undefined,

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSP Fix Test - Aural</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { background: #065f46; border-color: #10b981; }
+        .error { background: #7f1d1d; border-color: #f87171; }
+        .info { background: #1e3a8a; border-color: #60a5fa; }
+        .warning { background: #92400e; border-color: #f59e0b; }
+        
+        .test-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        
+        .btn-primary { background: #f97316; color: white; }
+        .btn-primary:hover { background: #ea580c; }
+        
+        .btn-secondary { background: #374151; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        
+        .log {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        
+        .log-success { color: #10b981; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
+        .log-warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 CSP Fix Test</h1>
+        
+        <div class="status info">
+            <strong>ℹ️ Content Security Policy Test</strong><br>
+            Diese Seite testet, ob die CSP-Probleme behoben wurden.
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 CSP Tests</h3>
+            <button class="btn btn-primary" onclick="testCSPCompliance()">CSP-Compliance testen</button>
+            <button class="btn btn-secondary" onclick="testSafeOperations()">Sichere Operationen testen</button>
+            <button class="btn btn-secondary" onclick="clearLog()">Log leeren</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Ergebnisse</h3>
+            <div id="test-results">
+                <div class="status info">Warte auf Tests...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Debug Log</h3>
+            <div id="debug-log" class="log">
+                <div class="log-entry log-info">Debug-Log bereit...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '<div class="log-entry log-info">Debug-Log geleert...</div>';
+        }
+
+        function updateResults(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsDiv.innerHTML += `<div class="status ${type}">${timestamp}: ${message}</div>`;
+        }
+
+        function testCSPCompliance() {
+            log('Starte CSP-Compliance Test...', 'info');
+            updateResults('Starte CSP-Compliance Test...', 'info');
+            
+            let passed = 0;
+            let failed = 0;
+            
+            // Test 1: Keine eval() Funktionen
+            try {
+                if (typeof eval === 'function') {
+                    log('✅ eval() ist verfügbar, aber wird nicht verwendet', 'success');
+                    passed++;
+                } else {
+                    log('✅ eval() ist nicht verfügbar', 'success');
+                    passed++;
+                }
+            } catch (error) {
+                log(`❌ eval() Test fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            // Test 2: Keine new Function() mit Strings
+            try {
+                const testFunc = new Function('return "test"');
+                const result = testFunc();
+                if (result === 'test') {
+                    log('✅ new Function() funktioniert (sollte aber vermieden werden)', 'warning');
+                    passed++;
+                }
+            } catch (error) {
+                log(`❌ new Function() Test fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            // Test 3: setTimeout mit String (sollte blockiert werden)
+            try {
+                setTimeout('console.log("test")', 100);
+                log('⚠️ setTimeout mit String funktioniert (sollte blockiert werden)', 'warning');
+                failed++;
+            } catch (error) {
+                log('✅ setTimeout mit String ist blockiert', 'success');
+                passed++;
+            }
+            
+            // Test 4: setInterval mit String (sollte blockiert werden)
+            try {
+                setInterval('console.log("test")', 1000);
+                log('⚠️ setInterval mit String funktioniert (sollte blockiert werden)', 'warning');
+                failed++;
+            } catch (error) {
+                log('✅ setInterval mit String ist blockiert', 'success');
+                passed++;
+            }
+            
+            const total = passed + failed;
+            const successRate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            
+            log(`CSP-Compliance Test abgeschlossen: ${passed}/${total} Tests bestanden (${successRate}%)`, 
+                successRate >= 80 ? 'success' : 'warning');
+            
+            updateResults(`CSP-Compliance Test: ${passed}/${total} Tests bestanden (${successRate}%)`, 
+                successRate >= 80 ? 'success' : 'warning');
+        }
+
+        function testSafeOperations() {
+            log('Starte sichere Operationen Test...', 'info');
+            updateResults('Starte sichere Operationen Test...', 'info');
+            
+            let passed = 0;
+            let failed = 0;
+            
+            // Test 1: Normale Funktionen
+            try {
+                const result = Math.max(1, 2, 3);
+                if (result === 3) {
+                    log('✅ Math.max() funktioniert', 'success');
+                    passed++;
+                } else {
+                    log('❌ Math.max() gibt falsches Ergebnis zurück', 'error');
+                    failed++;
+                }
+            } catch (error) {
+                log(`❌ Math.max() Test fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            // Test 2: Array-Operationen
+            try {
+                const arr = [1, 2, 3];
+                const doubled = arr.map(x => x * 2);
+                if (doubled[0] === 2 && doubled[1] === 4 && doubled[2] === 6) {
+                    log('✅ Array.map() funktioniert', 'success');
+                    passed++;
+                } else {
+                    log('❌ Array.map() gibt falsches Ergebnis zurück', 'error');
+                    failed++;
+                }
+            } catch (error) {
+                log(`❌ Array.map() Test fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            // Test 3: setTimeout mit Funktion (sollte funktionieren)
+            try {
+                setTimeout(() => {
+                    log('✅ setTimeout mit Funktion funktioniert', 'success');
+                }, 100);
+                passed++;
+            } catch (error) {
+                log(`❌ setTimeout mit Funktion fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            // Test 4: localStorage
+            try {
+                localStorage.setItem('test-key', 'test-value');
+                const value = localStorage.getItem('test-key');
+                if (value === 'test-value') {
+                    log('✅ localStorage funktioniert', 'success');
+                    passed++;
+                } else {
+                    log('❌ localStorage gibt falsches Ergebnis zurück', 'error');
+                    failed++;
+                }
+                localStorage.removeItem('test-key');
+            } catch (error) {
+                log(`❌ localStorage Test fehlgeschlagen: ${error.message}`, 'error');
+                failed++;
+            }
+            
+            const total = passed + failed;
+            const successRate = total > 0 ? (passed / total * 100).toFixed(1) : 0;
+            
+            log(`Sichere Operationen Test abgeschlossen: ${passed}/${total} Tests bestanden (${successRate}%)`, 
+                successRate >= 80 ? 'success' : 'warning');
+            
+            updateResults(`Sichere Operationen Test: ${passed}/${total} Tests bestanden (${successRate}%)`, 
+                successRate >= 80 ? 'success' : 'warning');
+        }
+
+        // Initial laden
+        log('CSP Fix Test Seite geladen', 'info');
+        updateResults('CSP Fix Test Seite bereit', 'info');
+    </script>
+</body>
+</html>

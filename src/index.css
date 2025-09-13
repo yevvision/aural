@@ -39,7 +39,13 @@
   --hover-glow: 0 0 15px rgba(255, 106, 58, 0.3);
 }
 
-html, body {
+html {
+  background-color: #000000;
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
   margin: 0;
   background-color: #000000;
   color: var(--text-primary);
@@ -47,12 +53,28 @@ html, body {
   overflow-x: hidden;
   position: relative;
   min-height: 100vh;
+  overscroll-behavior-y: none; /* Verhindert Overscroll-Effekte */
 }
 
 /* Remove scrollbars globally */
 * {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+/* Verhindert Overscroll-Spalt komplett */
+html, body, #root {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Footer-Abstand optimieren */
+footer {
+  margin-bottom: 0;
+}
+
+main > :last-child {
+  margin-bottom: 0;
 }
 
 *::-webkit-scrollbar {
@@ -521,6 +543,143 @@ html, body {
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 16px;
+  }
+  
+  /* Mobile-specific: Footer bei Record-Seite im ersten Viewport verstecken */
+  .mobile-record-layout footer {
+    position: absolute;
+    bottom: -100vh; /* Footer außerhalb des Viewports */
+    left: 0;
+    right: 0;
+    z-index: 10;
+  }
+  
+  /* Mobile-specific: Record-Seite Layout */
+  .mobile-record-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .mobile-record-layout main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Zentriert den Inhalt vertikal */
+    padding-bottom: 0 !important; /* Entfernt Standard-Padding */
+  }
+  
+  /* Mobile-specific: Record-Button zentrieren */
+  .mobile-record-layout .record-button-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    min-height: 50vh; /* Reduzierte Höhe für Upload-Div Platz */
+  }
+  
+  /* Mobile-specific: Upload Div - absolute position, transparent, unten positioniert */
+  .mobile-record-layout .upload-hint-container {
+    position: absolute;
+    bottom: 55px; /* Nochmal 20px höher (35px + 20px = 55px) */
+    left: 1rem;
+    right: 1rem;
+    background: transparent; /* Transparenter Hintergrund */
+    text-align: center;
+    padding: 1rem;
+    /* Kein Border, kein Backdrop-Filter */
+    z-index: 10; /* Über anderen Inhalten */
+  }
+  
+  /* Mobile-specific: Upload Button Abstand */
+  .mobile-record-layout .upload-hint-container button {
+    margin-bottom: 15px; /* 15px Abstand zum unteren Rand */
+  }
+  
+  /* Mobile-specific: Recording Controls - 15px über unteren Viewport-Rand */
+  .mobile-record-layout .recording-controls-container {
+    position: fixed;
+    bottom: 15px; /* 15px über unteren Viewport-Rand */
+    left: 1rem;
+    right: 1rem;
+    background: transparent;
+    text-align: center;
+    padding: 1rem;
+    z-index: 10;
+  }
+  
+  /* Mobile-specific: Footer Position anpassen */
+  .mobile-record-layout footer {
+    position: relative;
+    bottom: auto;
+    margin-top: 15px; /* 15px Abstand nach oben zum ersten Viewport */
+    z-index: 10; /* Unter der Upload-Div */
+  }
+  
+  /* Mobile-specific: Main Content für Record-Seite anpassen */
+  .mobile-record-layout main {
+    padding-bottom: 0 !important; /* Entfernt Standard-Padding für Record-Seite */
+  }
+}
+
+/* Desktop-Styles für Record-Seite */
+@media (min-width: 769px) {
+  /* Desktop: Normale Darstellung - Footer direkt sichtbar */
+  .mobile-record-layout footer {
+    position: relative;
+    bottom: auto;
+    margin-top: 0; /* Kein zusätzlicher Abstand */
+  }
+  
+  /* Desktop: Upload-Div normal zentriert */
+  .mobile-record-layout .upload-hint-container {
+    position: static; /* Normale Position, nicht absolute */
+    bottom: auto;
+    left: auto;
+    right: auto;
+    margin: 0 auto; /* Zentriert */
+    max-width: 400px; /* Begrenzte Breite */
+    text-align: center; /* Text zentriert */
+  }
+  
+  /* Desktop: Upload-Button zentriert */
+  .mobile-record-layout .upload-hint-container button {
+    display: block;
+    margin: 0.5rem auto 0 auto; /* Button zentriert */
+  }
+  
+  /* Desktop: Record-Button Container mit Abständen */
+  .mobile-record-layout .record-button-container {
+    min-height: auto; /* Keine Mindesthöhe */
+    margin-bottom: 200px; /* 200px Abstand zum Upload-Text */
+  }
+  
+  /* Desktop: Upload-Div Abstand zum Footer */
+  .mobile-record-layout .upload-hint-container {
+    margin-bottom: 2rem; /* Normaler Abstand zum Footer */
+  }
+  
+  /* Desktop: Recording Controls - gleiche Position wie Upload-Text */
+  .mobile-record-layout .recording-controls-container {
+    position: static; /* Normale Position, nicht absolute */
+    bottom: auto;
+    left: auto;
+    right: auto;
+    margin: 0 auto; /* Zentriert */
+    max-width: 400px; /* Begrenzte Breite */
+    text-align: center; /* Text zentriert */
+    margin-bottom: 2rem; /* Normaler Abstand zum Footer */
+  }
+  
+  /* Desktop: Title-Abstand zum Button */
+  .mobile-record-layout .desktop-title-spacing {
+    margin-bottom: 100px; /* 100px Abstand zwischen "Ready" und Button */
+  }
+  
+  /* Desktop: Main Content normal */
+  .mobile-record-layout main {
+    padding-bottom: 0 !important;
   }
 }
 

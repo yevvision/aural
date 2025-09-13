@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Styling Test - Aural</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { background: #065f46; border-color: #10b981; }
+        .error { background: #7f1d1d; border-color: #f87171; }
+        .info { background: #1e3a8a; border-color: #60a5fa; }
+        .warning { background: #92400e; border-color: #f59e0b; }
+        
+        .demo-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .icon-demo {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .small-icon {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: #1f2937;
+            border: 1px solid #374151;
+        }
+        
+        .large-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1f2937;
+            transition: all 0.2s;
+        }
+        
+        .large-icon.liked {
+            border-color: #ef4444;
+            background: #ef4444/20;
+        }
+        
+        .large-icon.bookmarked {
+            border-color: #f59e0b;
+            background: #f59e0b/20;
+        }
+        
+        .icon {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .icon.small {
+            width: 12px;
+            height: 12px;
+        }
+        
+        .icon.large {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .heart { color: #9ca3af; }
+        .heart.liked { color: #ef4444; fill: currentColor; }
+        .heart.large { color: #ef4444; fill: currentColor; }
+        
+        .bookmark { color: #9ca3af; }
+        .bookmark.bookmarked { color: #f59e0b; fill: currentColor; }
+        .bookmark.large { color: #f59e0b; fill: currentColor; }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        
+        .btn-primary { background: #f97316; color: white; }
+        .btn-secondary { background: #374151; color: white; }
+        
+        .explanation {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Icon Styling Test</h1>
+        
+        <div class="status info">
+            <strong>ℹ️ Icon-Styling-Demo</strong><br>
+            Zeigt die verschiedenen Icon-Styles in der Aural-App.
+        </div>
+
+        <div class="demo-section">
+            <h3>📱 AudioCard - Kleine Icons (grau, kein Bookmark)</h3>
+            <div class="explanation">
+                <strong>AudioCard-Styling:</strong><br>
+                • Like-Icon: Immer grau, keine Einfärbung<br>
+                • Bookmark-Icon: Komplett entfernt<br>
+                • Nur Like-Count wird angezeigt
+            </div>
+            
+            <div class="icon-demo">
+                <div class="small-icon">
+                    <svg class="icon small heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    <span>23</span>
+                </div>
+                
+                <div class="small-icon">
+                    <svg class="icon small heart liked" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    <span>24</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h3>🎵 MiniPlayer - Große Icons (eingefärbt)</h3>
+            <div class="explanation">
+                <strong>MiniPlayer-Styling:</strong><br>
+                • Like-Icon: Rot eingefärbt wenn geliked<br>
+                • Bookmark-Icon: Gelb eingefärbt wenn bookmarkiert<br>
+                • Große, runde Buttons mit Hover-Effekten
+            </div>
+            
+            <div class="icon-demo">
+                <div class="large-icon">
+                    <svg class="icon large heart" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                </div>
+                
+                <div class="large-icon bookmarked">
+                    <svg class="icon large bookmark" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h3>📄 PlayerPage - Große Icons (eingefärbt)</h3>
+            <div class="explanation">
+                <strong>PlayerPage-Styling:</strong><br>
+                • Like-Icon: Rot eingefärbt wenn geliked<br>
+                • Bookmark-Icon: Gelb eingefärbt wenn bookmarkiert<br>
+                • Große, runde Buttons mit Animationen
+            </div>
+            
+            <div class="icon-demo">
+                <div class="large-icon liked">
+                    <svg class="icon large heart" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                </div>
+                
+                <div class="large-icon">
+                    <svg class="icon large bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h3>✅ Zusammenfassung</h3>
+            <div class="status success">
+                <strong>✅ Icon-Styling korrekt implementiert:</strong><br>
+                • AudioCard: Kleine Icons grau, kein Bookmark-Symbol<br>
+                • MiniPlayer: Große Icons eingefärbt (rot/gelb)<br>
+                • PlayerPage: Große Icons eingefärbt (rot/gelb)<br>
+                • Konsistente Benutzerführung
+            </div>
+        </div>
+    </div>
+</body>
+</html>

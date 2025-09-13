@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Reset - Aural</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success { background: #065f46; border-color: #10b981; }
+        .error { background: #7f1d1d; border-color: #f87171; }
+        .info { background: #1e3a8a; border-color: #60a5fa; }
+        .warning { background: #92400e; border-color: #f59e0b; }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        
+        .btn-primary { background: #f97316; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-secondary { background: #374151; color: white; }
+        
+        .log {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        
+        .log-success { color: #10b981; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
+        .log-warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Database Reset</h1>
+        
+        <div class="status warning">
+            <strong>⚠️ Achtung!</strong><br>
+            Diese Seite resettet die Datenbank und lädt die Demo-Daten neu. Alle aktuellen Daten gehen verloren!
+        </div>
+
+        <div>
+            <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Datenbank zurücksetzen</button>
+            <button class="btn btn-primary" onclick="loadCurrentData()">📊 Aktuelle Daten anzeigen</button>
+            <button class="btn btn-secondary" onclick="clearLog()">🧹 Log leeren</button>
+        </div>
+
+        <div id="current-data">
+            <div class="status info">Klicke auf "Aktuelle Daten anzeigen" um zu beginnen</div>
+        </div>
+
+        <div class="log" id="debug-log">
+            <div class="log-entry log-info">Database Reset Tool bereit...</div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '<div class="log-entry log-info">Log geleert...</div>';
+        }
+
+        function loadCurrentData() {
+            log('Lade aktuelle Datenbank...', 'info');
+            
+            try {
+                const stored = localStorage.getItem('aural-central-database');
+                if (!stored) {
+                    log('Keine Daten in localStorage gefunden', 'warning');
+                    document.getElementById('current-data').innerHTML = '<div class="status warning">Keine Daten gefunden</div>';
+                    return;
+                }
+
+                const data = JSON.parse(stored);
+                const tracks = data.tracks || [];
+                
+                log(`✅ ${tracks.length} Tracks gefunden`, 'success');
+                
+                let html = '<div class="status success"><strong>📊 Aktuelle Datenbank:</strong><br>';
+                html += `Tracks: ${tracks.length}<br>`;
+                html += `Likes: ${data.likes?.length || 0} Einträge<br>`;
+                html += `Bookmarks: ${data.bookmarks?.length || 0} Einträge<br><br>`;
+                
+                html += '<strong>🎵 Tracks mit Kommentaren:</strong><br>';
+                tracks.forEach(track => {
+                    const commentsCount = track.comments ? track.comments.length : 0;
+                    const likesCount = track.likes || 0;
+                    html += `• ${track.title}: ${likesCount} Likes, ${commentsCount} Kommentare<br>`;
+                    log(`Track: ${track.title} - Likes: ${likesCount}, Comments: ${commentsCount}`, 'info');
+                });
+                
+                html += '</div>';
+                document.getElementById('current-data').innerHTML = html;
+                
+            } catch (error) {
+                log(`❌ Fehler beim Laden: ${error.message}`, 'error');
+                document.getElementById('current-data').innerHTML = '<div class="status error">Fehler beim Laden der Daten</div>';
+            }
+        }
+
+        function resetDatabase() {
+            log('🗑️ Starte Datenbank-Reset...', 'warning');
+            
+            try {
+                // Lösche aktuelle Datenbank
+                localStorage.removeItem('aural-central-database');
+                log('✅ Alte Datenbank gelöscht', 'success');
+                
+                // Lade Seite neu, um neue Demo-Daten zu generieren
+                log('🔄 Lade Seite neu für neue Demo-Daten...', 'info');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Fehler beim Reset: ${error.message}`, 'error');
+            }
+        }
+
+        // Initial laden
+        log('Database Reset Tool geladen', 'info');
+    </script>
+</body>
+</html>

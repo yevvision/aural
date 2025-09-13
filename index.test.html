@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aural Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .status {
+            background: #10b981;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .info {
+            background: #1f2937;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Aural Test</h1>
+        
+        <div class="status">
+            <h2>✅ Server funktioniert!</h2>
+            <p>Die Website lädt erfolgreich.</p>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Server-Informationen:</h3>
+            <ul>
+                <li><strong>Domain:</strong> aural.yev.vision</li>
+                <li><strong>Status:</strong> 200 OK</li>
+                <li><strong>Zeitstempel:</strong> <span id="timestamp"></span></li>
+                <li><strong>User Agent:</strong> <span id="userAgent"></span></li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h3>🔧 Nächste Schritte:</h3>
+            <ol>
+                <li>Wenn diese Seite lädt, ist der Server grundsätzlich OK</li>
+                <li>Prüfe, ob <code>index.html</code> existiert</li>
+                <li>Prüfe die <code>.htaccess</code> Datei</li>
+                <li>Prüfe die Dateiberechtigungen</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString('de-DE');
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+    </script>
+</body>
+</html>

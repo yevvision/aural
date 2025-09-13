@@ -11,6 +11,7 @@ class CentralDatabaseSimple {
     likes: Map<string, Set<string>>; // trackId -> Set of userIds who liked
     bookmarks: Map<string, Set<string>>; // trackId -> Set of userIds who bookmarked
     commentLikes: Map<string, Set<string>>; // commentId -> Set of userIds who liked
+    plays: Map<string, number>; // trackId -> play count
   } = {
     tracks: [],
     users: [],
@@ -18,7 +19,8 @@ class CentralDatabaseSimple {
     reports: [],
     likes: new Map(),
     bookmarks: new Map(),
-    commentLikes: new Map()
+    commentLikes: new Map(),
+    plays: new Map()
   };
 
   private constructor() {
@@ -62,13 +64,24 @@ class CentralDatabaseSimple {
 
   // Hilfsmethode: Track mit User-spezifischen Daten bereichern
   private enrichTrackWithUserData(track: AudioTrack, userId: string): AudioTrack {
-    const isLiked = this.data.likes.get(track.id)?.has(userId) || false;
-    const isBookmarked = this.data.bookmarks.get(track.id)?.has(userId) || false;
+    const trackLikes = this.data.likes.get(track.id) || new Set();
+    const trackBookmarks = this.data.bookmarks.get(track.id) || new Set();
+    const playCount = this.data.plays.get(track.id) || 0;
+    
+    const isLiked = trackLikes.has(userId);
+    const isBookmarked = trackBookmarks.has(userId);
+    const likesCount = trackLikes.size;
+    
+    // Berechne commentsCount aus den Kommentaren im Track
+    const commentsCount = track.comments ? track.comments.length : 0;
     
     return {
       ...track,
       isLiked,
-      isBookmarked
+      isBookmarked,
+      likes: likesCount,
+      commentsCount,
+      plays: playCount
     };
   }
 
@@ -229,13 +242,11 @@ class CentralDatabaseSimple {
     if (wasLiked) {
       // Unlike
       trackLikes.delete(userId);
-      track.likes = Math.max(0, track.likes - 1);
-      console.log('💔 CentralDB Simple: Like entfernt. Neue Anzahl:', track.likes);
+      console.log('💔 CentralDB Simple: Like entfernt. Neue Anzahl:', trackLikes.size);
     } else {
       // Like
       trackLikes.add(userId);
-      track.likes += 1;
-      console.log('❤️ CentralDB Simple: Like hinzugefügt. Neue Anzahl:', track.likes);
+      console.log('❤️ CentralDB Simple: Like hinzugefügt. Neue Anzahl:', trackLikes.size);
     }
     
     this.saveToStorage();
@@ -274,6 +285,26 @@ class CentralDatabaseSimple {
     return true;
   }
 
+  // PLAY: Play-Anzahl erhöhen
+  incrementPlay(trackId: string): boolean {
+    console.log('▶️ CentralDB Simple: incrementPlay()', trackId);
+    
+    const track = this.data.tracks.find(t => t.id === trackId);
+    if (!track) {
+      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Play:', trackId);
+      return false;
+    }
+
+    // Erhöhe Play-Anzahl
+    const currentPlays = this.data.plays.get(trackId) || 0;
+    this.data.plays.set(trackId, currentPlays + 1);
+    
+    console.log('▶️ CentralDB Simple: Play erhöht. Neue Anzahl:', currentPlays + 1);
+    
+    this.saveToStorage();
+    return true;
+  }
+
   // GET: User's liked tracks
   getUserLikedTracks(userId: string): AudioTrack[] {
     console.log('❤️ CentralDB Simple: getUserLikedTracks()', userId);
@@ -287,6 +318,7 @@ class CentralDatabaseSimple {
     
     return this.data.tracks
       .filter(track => likedTrackIds.includes(track.id))
+      .map(track => this.enrichTrackWithUserData(track, userId))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
@@ -303,6 +335,7 @@ class CentralDatabaseSimple {
     
     return this.data.tracks
       .filter(track => bookmarkedTrackIds.includes(track.id))
+      .map(track => this.enrichTrackWithUserData(track, userId))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
@@ -456,6 +489,11 @@ class CentralDatabaseSimple {
         userIds: Array.from(userIds)
       }));
 
+      const playsArray = Array.from(this.data.plays.entries()).map(([trackId, count]) => ({
+        trackId,
+        count
+      }));
+
       const dataToSave = {
         tracks: this.data.tracks,
         users: this.data.users,
@@ -464,6 +502,7 @@ class CentralDatabaseSimple {
         likes: likesArray,
         bookmarks: bookmarksArray,
         commentLikes: commentLikesArray,
+        plays: playsArray,
         timestamp: new Date().toISOString()
       };
       
@@ -512,6 +551,15 @@ class CentralDatabaseSimple {
         });
       }
 
+      const playsMap = new Map<string, number>();
+      if (parsed.plays && Array.isArray(parsed.plays)) {
+        parsed.plays.forEach((item: { trackId: string; count: number }) => {
+          if (item && item.trackId && typeof item.count === 'number') {
+            playsMap.set(item.trackId, item.count);
+          }
+        });
+      }
+
       this.data = {
         tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
         users: Array.isArray(parsed.users) ? parsed.users : [],
@@ -519,7 +567,8 @@ class CentralDatabaseSimple {
         reports: Array.isArray(parsed.reports) ? parsed.reports : [],
         likes: likesMap,
         bookmarks: bookmarksMap,
-        commentLikes: commentLikesMap
+        commentLikes: commentLikesMap,
+        plays: playsMap
       };
       
       console.log('📥 CentralDB Simple: Daten aus localStorage geladen:');
@@ -580,13 +629,33 @@ class CentralDatabaseSimple {
         likes: 23,
         isLiked: false,
         isBookmarked: false,
-        commentsCount: 0,
+        commentsCount: 2,
+        plays: 0,
         createdAt: new Date(Date.now() - 86400000), // 1 Tag alt
         fileSize: 2560000,
         filename: 'intime_fluesterstimme.wav',
         tags: ['Soft', 'Female', 'ASMR'],
         gender: 'Female',
-        comments: []
+        comments: [
+          {
+            id: 'comment-1',
+            content: 'Wunderschöne Stimme! 😍',
+            user: currentUser,
+            trackId: 'holla-1',
+            createdAt: new Date(Date.now() - 3600000),
+            likes: 2,
+            isLiked: false
+          },
+          {
+            id: 'comment-2', 
+            content: 'Sehr entspannend, danke! 🙏',
+            user: currentUser,
+            trackId: 'holla-1',
+            createdAt: new Date(Date.now() - 7200000),
+            likes: 1,
+            isLiked: false
+          }
+        ]
       },
       {
         id: 'holla-2',
@@ -598,13 +667,24 @@ class CentralDatabaseSimple {
         likes: 18,
         isLiked: false,
         isBookmarked: false,
-        commentsCount: 0,
+        commentsCount: 1,
+        plays: 0,
         createdAt: new Date(Date.now() - 172800000), // 2 Tage alt
         fileSize: 5120000,
         filename: 'asmr_entspannung.wav',
         tags: ['ASMR', 'Relaxing', 'Female'],
         gender: 'Female',
-        comments: []
+        comments: [
+          {
+            id: 'comment-3',
+            content: 'Perfekt zum Einschlafen! 😴',
+            user: currentUser,
+            trackId: 'holla-2',
+            createdAt: new Date(Date.now() - 86400000),
+            likes: 3,
+            isLiked: false
+          }
+        ]
       },
       {
         id: 'holla-3',
@@ -616,13 +696,33 @@ class CentralDatabaseSimple {
         likes: 31,
         isLiked: false,
         isBookmarked: false,
-        commentsCount: 0,
+        commentsCount: 2,
+        plays: 0,
         createdAt: new Date(Date.now() - 259200000), // 3 Tage alt
         fileSize: 3840000,
         filename: 'stille_momente.wav',
         tags: ['Meditation', 'Calm', 'Female'],
         gender: 'Female',
-        comments: []
+        comments: [
+          {
+            id: 'comment-4',
+            content: 'So beruhigend! 🧘‍♀️',
+            user: currentUser,
+            trackId: 'holla-3',
+            createdAt: new Date(Date.now() - 172800000),
+            likes: 5,
+            isLiked: false
+          },
+          {
+            id: 'comment-5',
+            content: 'Hilft mir beim Meditieren',
+            user: currentUser,
+            trackId: 'holla-3',
+            createdAt: new Date(Date.now() - 259200000),
+            likes: 2,
+            isLiked: false
+          }
+        ]
       }
     ];
 
@@ -641,7 +741,7 @@ class CentralDatabaseSimple {
   // ADMIN-FUNKTIONEN
   reset(): void {
     console.log('🔄 CentralDB Simple: Komplette Datenbank zurücksetzen');
-    this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map() };
+    this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map(), plays: new Map() };
     localStorage.removeItem('aural-central-database');
     this.initializeDefaultData();
   }

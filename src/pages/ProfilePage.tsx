@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Upload, Calendar, ArrowLeft, Flame, Edit3, UserPlus, UserCheck } from 'lucide-react';
+import { Calendar, ArrowLeft, Settings, UserPlus, UserCheck, User } from 'lucide-react';
 import { useUserStore } from '../stores/userStore';
-import { useFeedStore } from '../stores/feedStore';
 import { usePlayerStore } from '../stores/playerStore';
 import { useActivityStore } from '../stores/activityStore';
+import { useFeedStore } from '../stores/feedStore';
+import { useDatabase } from '../hooks/useDatabase';
 import { AudioCard } from '../components/feed/AudioCard';
-import { createDummyUsers, formatSafeDate, sanitizeAudioTrack } from '../utils';
+import { formatSafeDate, sanitizeAudioTrack } from '../utils';
 import { 
   PageTransition, 
   StaggerWrapper, 
@@ -21,16 +22,16 @@ export const ProfilePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, myTracks, updateProfile, followUser, unfollowUser, isUserFollowed } = useUserStore();
-  const { tracks } = useFeedStore();
+  const { tracks, users, getUserLikedTracks, getUserBookmarkedTracks } = useDatabase('user-1');
   const { setCurrentTrack } = usePlayerStore();
   const { addUserActivity } = useActivityStore();
-  const [showBackButton, setShowBackButton] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [bioText, setBioText] = useState('');
   const [usernameText, setUsernameText] = useState('');
+  const [activeTab, setActiveTab] = useState<'uploads' | 'liked' | 'bookmarked'>('uploads');
   
   // Check if we should show back button based on navigation history
-  useEffect(() => {
+  const showBackButton = useMemo(() => {
     // Don't show back button if:
     // 1. User accessed profile directly via URL or bottom navigation
     // 2. User is on their own profile (/profile without ID)
@@ -43,22 +44,57 @@ export const ProfilePage = () => {
     // Show back button only when:
     // - Viewing someone else's profile AND
     // - There's either navigation state or a referrer (indicating navigation from within app)
-    setShowBackButton(!isOwnProfile && (Boolean(hasNavigationState || hasReferrer)));
+    return !isOwnProfile && (Boolean(hasNavigationState || hasReferrer));
   }, [location, id, currentUser]);
   
-  // Find user - either current user or from dummy data
-  const user = id ? 
-    (id === currentUser?.id ? currentUser : createDummyUsers().find(u => u.id === id)) :
-    currentUser; // If no ID parameter, show current user's profile
+  // Find user - either current user or from central database
+  // Support both ID and username lookup
+  const finalUser = useMemo(() => {
+    const user = id ? 
+      (id === currentUser?.id ? currentUser : 
+       users.find(u => u.id === id) || 
+       users.find(u => u.username === id)) :
+      currentUser; // If no ID parameter, show current user's profile
+    
+    // If user not found in users, try to find from tracks
+    const userFromTracks = !user && id ? tracks.find(t => t.user.id === id || t.user.username === id)?.user : null;
+    return user || userFromTracks;
+  }, [id, currentUser, users, tracks]);
   
-  // If user not found in dummy users, try to find from tracks
-  const userFromTracks = !user && id ? tracks.find(t => t.user.id === id)?.user : null;
-  const finalUser = user || userFromTracks;
+  const isOwnProfile = useMemo(() => !id || id === currentUser?.id, [id, currentUser?.id]);
+  const userTracks = useMemo(() => {
+    return isOwnProfile ? myTracks : tracks.filter(t => t.user.id === id || t.user.username === id);
+  }, [isOwnProfile, myTracks, tracks, id]);
   
-  const userTracks = (!id || id === currentUser?.id) ? myTracks : tracks.filter(t => t.user.id === id);
+  // Get liked and bookmarked tracks directly from database (already enriched)
+  const likedTracks = useMemo(() => getUserLikedTracks('user-1'), [tracks, users]);
+  const bookmarkedTracks = useMemo(() => getUserBookmarkedTracks('user-1'), [tracks, users]);
+  
+  // Get tracks based on active tab using useMemo to prevent unnecessary recalculations
+  const displayTracks = useMemo(() => {
+    if (!isOwnProfile) return userTracks; // For other profiles, always show uploads
+    
+    switch (activeTab) {
+      case 'uploads':
+        return userTracks;
+      case 'liked':
+        return likedTracks;
+      case 'bookmarked':
+        return bookmarkedTracks;
+      default:
+        return userTracks;
+    }
+  }, [isOwnProfile, activeTab, userTracks, likedTracks, bookmarkedTracks]);
   
   // Calculate total likes for all tracks uploaded by this user
-  const totalLikes = userTracks.reduce((sum, track) => sum + track.likes, 0);
+  const totalLikes = useMemo(() => {
+    return userTracks.reduce((sum, track) => sum + track.likes, 0);
+  }, [userTracks]);
+  
+  // Calculate total plays for all tracks uploaded by this user
+  const totalPlays = useMemo(() => {
+    return userTracks.reduce((sum, track) => sum + (track.plays || 0), 0);
+  }, [userTracks]);
   
   // Initialize bio and username text when user changes
   useEffect(() => {
@@ -86,8 +122,7 @@ export const ProfilePage = () => {
     );
   }
   
-  const isOwnProfile = !id || user?.id === currentUser?.id;
-  const displayTracks = userTracks; // Always show uploads, no more tabs
+  // displayTracks is now defined above based on activeTab
   
   const handleBack = () => {
     navigate(-1);
@@ -157,28 +192,15 @@ export const ProfilePage = () => {
               {isOwnProfile && (
                 <button
                   onClick={() => setIsEditingProfile(true)}
-                  className="absolute top-4 right-4 p-1 rounded-full bg-white/10 hover:bg-white/20 
+                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/10 
                              transition-colors"
-                  aria-label="Profil bearbeiten"
+                  aria-label="Settings"
                 >
-                  <Edit3 size={16} className="text-text-secondary" />
+                  <Settings size={16} className="text-gray-400 hover:text-gray-300" />
                 </button>
               )}
               
-              {/* Avatar */}
-              <div className="w-20 h-20 rounded-full bg-gradient-primary flex items-center justify-center mx-auto mb-4">
-                {finalUser.avatar ? (
-                  <img 
-                    src={finalUser.avatar} 
-                    alt={finalUser.username} 
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <User size={28} className="text-white" />
-                )}
-              </div>
-              
-              {/* Username - Added editing functionality */}
+              {/* Username - Left aligned, 20% larger */}
               <div className="mb-2">
                 {isOwnProfile && isEditingProfile ? (
                   <div className="space-y-3">
@@ -186,13 +208,13 @@ export const ProfilePage = () => {
                       value={usernameText}
                       onChange={(e) => setUsernameText(e.target.value)}
                       className="w-full bg-white/10 border border-white/20 rounded-lg p-2 text-text-primary 
-                               focus:outline-none focus:ring-2 focus:ring-gradient-strong text-center"
+                               focus:outline-none focus:ring-2 focus:ring-gradient-strong"
                       placeholder="Benutzername"
                       maxLength={30}
                     />
                   </div>
                 ) : (
-                  <h2 className="text-xl font-bold text-text-primary">
+                  <h2 className="text-2xl font-bold text-text-primary text-center">
                     {finalUser.username}
                   </h2>
                 )}
@@ -219,7 +241,7 @@ export const ProfilePage = () => {
                   </div>
                 ) : (
                   <div className="relative">
-                    <p className="text-text-secondary leading-relaxed">
+                    <p className="text-sm text-text-secondary leading-relaxed text-center">
                       {finalUser.bio || (
                         isOwnProfile 
                           ? 'Füge eine Bio hinzu, um anderen von dir zu erzählen' 
@@ -248,38 +270,72 @@ export const ProfilePage = () => {
                 </div>
               )}
               
-              {/* Stats Row - Updated to use calculated total likes */}
+              {/* Divider */}
+              <div className="border-t border-gray-700 my-4"></div>
+              
+              {/* Stats Row - Recordings, Plays, Likes */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <Flame size={16} className="text-accent-red" />
-                    <span className="text-lg font-bold text-text-primary">
-                      {totalLikes}
-                    </span>
-                  </div>
-                  <div className="text-xs text-text-secondary">Total Likes</div>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <Upload size={16} className="text-gradient-strong" />
-                    <span className="text-lg font-bold text-text-primary">
-                      {finalUser.totalUploads}
-                    </span>
+                  <div className="text-lg font-bold text-text-primary mb-1">
+                    {userTracks.length}
                   </div>
                   <div className="text-xs text-text-secondary">Recordings</div>
                 </div>
                 <div className="text-center">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <Calendar size={16} className="text-accent-turquoise" />
-                    <span className="text-sm font-bold text-text-primary">
-                      {formatSafeDate(finalUser.createdAt, { month: 'short', year: '2-digit' })}
-                    </span>
+                  <div className="text-lg font-bold text-text-primary mb-1">
+                    {totalPlays}
                   </div>
-                  <div className="text-xs text-text-secondary">Joined</div>
+                  <div className="text-xs text-text-secondary">Plays</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-text-primary mb-1">
+                    {totalLikes}
+                  </div>
+                  <div className="text-xs text-text-secondary">Likes</div>
                 </div>
               </div>
             </div>
           </RevealOnScroll>
+
+          {/* Toggle for own profile */}
+          {isOwnProfile && (
+            <RevealOnScroll direction="up" delay={0.1}>
+              <div className="glass-surface rounded-full p-1">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setActiveTab('uploads')}
+                    className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all duration-200 ${
+                      activeTab === 'uploads'
+                        ? 'bg-gradient-primary text-white shadow-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    }`}
+                  >
+                    Uploads
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('liked')}
+                    className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all duration-200 ${
+                      activeTab === 'liked'
+                        ? 'bg-gradient-primary text-white shadow-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    }`}
+                  >
+                    Liked
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('bookmarked')}
+                    className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all duration-200 ${
+                      activeTab === 'bookmarked'
+                        ? 'bg-gradient-primary text-white shadow-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    }`}
+                  >
+                    Bookmarked
+                  </button>
+                </div>
+              </div>
+            </RevealOnScroll>
+          )}
 
           {/* Follow Button - Only show for other users' profiles */}
           {!isOwnProfile && finalUser && currentUser && (
@@ -316,20 +372,44 @@ export const ProfilePage = () => {
                 <div className="true-black-card text-center py-12">
                   {isOwnProfile ? (
                     <>
-                      <div className="text-4xl mb-4">🎙️</div>
-                      <h3 className="text-lg font-medium text-text-primary mb-2">
-                        No recordings yet
-                      </h3>
-                      <p className="text-text-secondary mb-4">
-                        Teile deine erste Sprachaufnahme!
-                      </p>
-                      <button
-                        onClick={() => navigate('/record')}
-                        className="px-6 py-2 bg-gradient-primary rounded-lg text-white font-medium 
-                                 hover:scale-105 active:scale-95 transition-transform duration-200"
-                      >
-                        Aufnahme starten
-                      </button>
+                      {activeTab === 'uploads' ? (
+                        <>
+                          <div className="text-4xl mb-4">🎙️</div>
+                          <h3 className="text-lg font-medium text-text-primary mb-2">
+                            No recordings yet
+                          </h3>
+                          <p className="text-text-secondary mb-4">
+                            Teile deine erste Sprachaufnahme!
+                          </p>
+                          <button
+                            onClick={() => navigate('/record')}
+                            className="px-6 py-2 bg-gradient-primary rounded-lg text-white font-medium 
+                                     hover:scale-105 active:scale-95 transition-transform duration-200"
+                          >
+                            Aufnahme starten
+                          </button>
+                        </>
+                      ) : activeTab === 'liked' ? (
+                        <>
+                          <div className="text-4xl mb-4">❤️</div>
+                          <h3 className="text-lg font-medium text-text-primary mb-2">
+                            No liked recordings
+                          </h3>
+                          <p className="text-text-secondary">
+                            Du hast noch keine Aufnahmen geliked.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-4xl mb-4">🔖</div>
+                          <h3 className="text-lg font-medium text-text-primary mb-2">
+                            No bookmarked recordings
+                          </h3>
+                          <p className="text-text-secondary">
+                            Du hast noch keine Aufnahmen bookmarkt.
+                          </p>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>

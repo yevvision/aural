@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag } from 'lucide-react';
+import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag, User } from 'lucide-react';
 import { usePlayerStore } from '../stores/playerStore';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -189,32 +189,31 @@ export const PlayerPage = () => {
       <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col"> {/* Adjusted padding and height */}
         {/* Username and statistics line */}
         <div className="flex items-center space-x-2 mb-4">
-          <span className="text-gray-400 text-xs">{track.user?.username || 'Unknown'}</span>
           <button 
-            onClick={handleLike}
-            className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
-            title={track.isLiked ? 'Unlike' : 'Like'}
+            onClick={() => navigate(`/profile/${track.user?.username || 'unknown'}`)}
+            className="flex items-center space-x-1 text-gray-400 text-xs hover:text-white transition-colors cursor-pointer"
           >
+            <User size={12} />
+            <span>{track.user?.username || 'Unknown'}</span>
+          </button>
+          <div className="flex items-center space-x-1">
+            <Play 
+              size={14} 
+              strokeWidth={1.5} 
+              className="text-gray-400"
+              fill="none"
+            />
+            <span className="text-gray-400 text-xs">{track.plays || 0}</span>
+          </div>
+          <div className="flex items-center space-x-1">
             <Heart 
               size={14} 
               strokeWidth={1.5} 
-              className={`${track.isLiked ? 'text-red-500' : 'text-gray-400'} hover:text-gray-300`}
-              fill={track.isLiked ? 'currentColor' : 'none'}
+              className="text-gray-400"
+              fill="none"
             />
             <span className="text-gray-400 text-xs">{track.likes}</span>
-          </button>
-          <button 
-            onClick={handleBookmark}
-            className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
-            title={track.isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
-          >
-            <Bookmark 
-              size={14} 
-              strokeWidth={1.5} 
-              className={`${track.isBookmarked ? 'text-yellow-500' : 'text-gray-400'} hover:text-gray-300`}
-              fill={track.isBookmarked ? 'currentColor' : 'none'}
-            />
-          </button>
+          </div>
           <div className="flex items-center space-x-1">
             <MessageCircle size={14} strokeWidth={1.5} className="text-gray-400" />
             <span className="text-gray-400 text-xs">{track.commentsCount || trackComments.length}</span>

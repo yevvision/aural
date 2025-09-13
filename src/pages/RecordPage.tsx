@@ -207,24 +207,24 @@ export const RecordPage = () => {
 
   return (
     <PageTransition>
-      <div className="max-w-md mx-auto px-4 py-6 pb-24">
+      <div className="max-w-md mx-auto px-4 py-6 pb-24 relative min-h-screen">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="space-y-8"
+          className="h-full relative"
         >
-          {/* Audio Visualizer Section */}
-          <div className="flex flex-col items-center space-y-8">
-            {/* Title */}
-            <div className="text-center">
-              <Heading level={1} className="text-3xl font-bold text-white mb-2">
-                {isRecording ? 'Have fun!' : 'Ready?'}
-              </Heading>
-            </div>
+          {/* Title - oben positioniert */}
+          <div className="text-center pt-8 pb-4 desktop-title-spacing">
+            <Heading level={1} className="text-3xl font-bold text-white mb-2">
+              {isRecording ? 'Have fun!' : 'Ready?'}
+            </Heading>
+          </div>
 
+          {/* Mobile-optimized Record Button Container */}
+          <div className="record-button-container">
             {/* Audio Visualizer with Record Button positioned over it */}
-            <div className="flex justify-center items-center my-8 relative">
+            <div className="flex justify-center items-center relative">
               <div className="relative w-[100px] h-[100px]">
                 {/* Enhanced Audio Visualizer positioned exactly behind the button */}
                 <div className="absolute inset-0 z-0">
@@ -252,53 +252,6 @@ export const RecordPage = () => {
 
           </div>
 
-          {/* Upload Text - only show when not recording */}
-          {!isRecording && (
-            <div className="text-center">
-              <Body color="secondary" className="text-sm text-white/60">
-                Alternatively to recording, you can also upload an audio file from your device.
-              </Body>
-              <button
-                onClick={handleUploadClick}
-                className="mt-2 text-orange-500 hover:text-orange-400 text-sm underline transition-colors duration-200"
-              >
-                Upload file
-              </button>
-            </div>
-          )}
-
-          {/* Recording Controls - show when recording */}
-          {isRecording && (
-            <div className="text-center space-y-4 mt-12">
-              {/* Time and Control Buttons in one row */}
-              <div className="flex items-center justify-center space-x-3">
-                <div className="text-lg font-mono text-white tabular-nums">
-                  {formatDuration(recordingDuration)}
-                </div>
-                <button
-                  onClick={handlePauseResumeClick}
-                  className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center
-                           hover:bg-white/20 transition-all duration-200"
-                  aria-label={isPaused ? 'Aufnahme fortsetzen' : 'Aufnahme pausieren'}
-                >
-                  {isPaused ? (
-                    <Play size={16} className="text-white" strokeWidth={1.5} />
-                  ) : (
-                    <Pause size={16} className="text-white" strokeWidth={1.5} />
-                  )}
-                </button>
-                <button
-                  onClick={handleCancelRecording}
-                  className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center
-                           hover:bg-red-500/30 transition-all duration-200"
-                  aria-label="Aufnahme abbrechen"
-                >
-                  <X size={16} className="text-red-400" strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -307,8 +260,54 @@ export const RecordPage = () => {
             onChange={handleFileSelect}
             className="hidden"
           />
-
         </motion.div>
+
+        {/* Upload Text - außerhalb des motion.div, nur bei nicht-recording */}
+        {!isRecording && (
+          <div className="upload-hint-container">
+            <Body color="secondary" className="text-sm text-white/60">
+              Alternatively to recording, you can also upload an audio file from your device.
+            </Body>
+            <button
+              onClick={handleUploadClick}
+              className="mt-2 text-orange-500 hover:text-orange-400 text-sm underline transition-colors duration-200"
+            >
+              Upload file
+            </button>
+          </div>
+        )}
+
+        {/* Recording Controls - außerhalb des motion.div, nur bei recording */}
+        {isRecording && (
+          <div className="recording-controls-container">
+            {/* Time and Control Buttons in one row */}
+            <div className="flex items-center justify-center space-x-3">
+              <div className="text-lg font-mono text-white tabular-nums">
+                {formatDuration(recordingDuration)}
+              </div>
+              <button
+                onClick={handlePauseResumeClick}
+                className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center
+                         hover:bg-white/20 transition-all duration-200"
+                aria-label={isPaused ? 'Aufnahme fortsetzen' : 'Aufnahme pausieren'}
+              >
+                {isPaused ? (
+                  <Play size={16} className="text-white" strokeWidth={1.5} />
+                ) : (
+                  <Pause size={16} className="text-white" strokeWidth={1.5} />
+                )}
+              </button>
+              <button
+                onClick={handleCancelRecording}
+                className="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center
+                         hover:bg-red-500/30 transition-all duration-200"
+                aria-label="Aufnahme abbrechen"
+              >
+                <X size={16} className="text-red-400" strokeWidth={1.5} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </PageTransition>
   );

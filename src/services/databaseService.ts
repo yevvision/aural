@@ -121,6 +121,18 @@ class DatabaseServiceClass {
     return success;
   }
 
+  // PLAY: Play-Anzahl erhöhen
+  incrementPlay(trackId: string): boolean {
+    console.log('🔗 DatabaseService: incrementPlay()', trackId);
+    const success = centralDB.incrementPlay(trackId);
+    
+    if (success) {
+      this.notifyListeners();
+    }
+    
+    return success;
+  }
+
   // GET: User's liked tracks
   getUserLikedTracks(userId: string): AudioTrack[] {
     console.log('🔗 DatabaseService: getUserLikedTracks()', userId);

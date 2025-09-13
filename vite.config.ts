@@ -8,9 +8,17 @@ export default defineConfig({
   server: {
     host: 'localhost',
     port: 5173,
+    strictPort: false, // Erlaube andere Ports wenn 5173 belegt ist
     hmr: {
-      overlay: false // Deaktiviere Error-Overlay um Extension-Fehler zu vermeiden
-    }
+      overlay: false, // Deaktiviere Error-Overlay um Extension-Fehler zu vermeiden
+      clientPort: 5173
+    },
+    cors: true, // Aktiviere CORS für bessere Kompatibilität
+        headers: {
+          'Cross-Origin-Embedder-Policy': 'unsafe-none',
+          'Cross-Origin-Opener-Policy': 'unsafe-none',
+          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:*; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';"
+        }
   },
   build: {
     outDir: 'dist',

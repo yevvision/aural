@@ -299,7 +299,9 @@ class CentralDatabase {
       }
     });
     
-    return this.data.tracks.filter(track => likedTrackIds.includes(track.id));
+    return this.data.tracks
+      .filter(track => likedTrackIds.includes(track.id))
+      .map(track => this.enrichTrackWithUserData(track, userId));
   }
 
   // GET: User's bookmarked tracks
@@ -311,7 +313,9 @@ class CentralDatabase {
       }
     });
     
-    return this.data.tracks.filter(track => bookmarkedTrackIds.includes(track.id));
+    return this.data.tracks
+      .filter(track => bookmarkedTrackIds.includes(track.id))
+      .map(track => this.enrichTrackWithUserData(track, userId));
   }
 
   // =============================================================================
