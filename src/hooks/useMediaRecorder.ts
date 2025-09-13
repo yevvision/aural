@@ -59,7 +59,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
   // Duration tracking - fixed to handle pause correctly and page visibility
   useEffect(() => {
-    let interval: number | null = null;
+    let interval: NodeJS.Timeout | null = null;
     let lastUpdateTime = Date.now();
     let hiddenStartTime = 0;
     

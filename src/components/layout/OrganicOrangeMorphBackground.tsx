@@ -398,7 +398,7 @@ export const OrganicOrangeMorphBackground = () => {
     animationRef.current = requestAnimationFrame(loop);
     
     // Debounce resize events to prevent flickering
-    let resizeTimeout: number;
+    let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
       clearTimeout(resizeTimeout);
       // Check if mobile for debounce timing
