@@ -1,0 +1,12 @@
+# HostEurope-kompatible Minimal-.htaccess für SPA
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # vorhandene Dateien/Ordner direkt ausliefern
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # alles andere an index.html (React/Vite SPA)
+  RewriteRule ^.*$ /index.html [L]
+</IfModule>
