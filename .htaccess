@@ -1,12 +1,12 @@
+# HostEurope-kompatible Minimal-htaccess für SPA
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
 
-  # Bestehende Dateien/Ordner direkt ausliefern
+  # vorhandene Dateien/Ordner direkt ausliefern
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Alles andere an SPA Entry
-  RewriteRule . /index.html [L]
+  # alles andere auf index.html
+  RewriteRule ^.*$ /index.html [L]
 </IfModule>
