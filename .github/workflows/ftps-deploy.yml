@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 20
 
-      # Wenn kein package-lock.json vorhanden ist, ist npm ci zu streng
+      # Falls kein package-lock.json vorhanden ist, ist npm ci zu streng
       - name: Install deps
         run: |
           if [ -f package-lock.json ]; then
@@ -29,13 +29,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Sicherstellen, dass dist/ wirklich existiert
       - name: Verify build output
         run: |
           ls -la
-          ls -la dist || (echo "dist/ fehlt" && exit 1)
-          test -f dist/index.html || (echo "dist/index.html fehlt" && exit 1)
+          ls -la dist || (echo "dist/ fehlt – prüfe Vite outDir" && exit 1)
+          test -f dist/index.html || (echo "dist/index.html fehlt – Build prüfen" && exit 1)
 
-      # HostEurope-sichere .htaccess schreiben (verhindert 500)
+      # HostEurope-sichere .htaccess erzeugen (verhindert 500er)
       - name: Write HostEurope-safe .htaccess
         run: |
           cat > dist/.htaccess << 'EOF'
@@ -49,7 +50,7 @@ jobs:
           </IfModule>
           EOF
 
-      # Versionsprobe (zum schnellen Prüfen im Browser)
+      # Probe-Dateien zum schnellen Prüfen im Browser
       - name: Add version & probe
         run: |
           date -u +"%Y-%m-%dT%H:%M:%SZ" > dist/version.txt
@@ -66,8 +67,8 @@ jobs:
           FTP_PASS: aural33!
           REMOTE_DIR: /www/aural
         run: |
-          # lftp FTPS (explizit) mit robusten SSL/Passive Einstellungen
           lftp -u "$FTP_USER","$FTP_PASS" "ftps://$FTP_HOST:21" << 'EOF'
+          set cmd:fail-exit true
           set xfer:log true
           set ssl:verify-certificate no
           set ftp:ssl-allow yes
@@ -79,14 +80,12 @@ jobs:
           set net:timeout 30
           set net:reconnect-interval-base 5
           set net:reconnect-interval-max 30
-          set cmd:fail-exit true
 
-          # Zielverzeichnis
           lcd dist
           mkdir -p /www/aural
           cd /www/aural
 
-          # Spiegeln: -R upload, -n nur neuere, -p Permissions, -e Löschen verwaister aus
+          # -R = Upload (reverse), -n = nur neuere, -e = keine Löschungen, -v = verbose
           mirror -Rnev . .
           bye
           EOF
