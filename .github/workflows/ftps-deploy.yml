@@ -1,8 +1,9 @@
-name: Build & Deploy to aural.yev.vision
+name: Build & Deploy to aural.yev.vision (DISABLED)
 
 on:
-  push:
-    branches: [ "main" ]
+  # Disabled - using GitHub Pages instead
+  # push:
+  #   branches: [ "main" ]
   workflow_dispatch: {}
 
 jobs:
