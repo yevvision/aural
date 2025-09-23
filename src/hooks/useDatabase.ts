@@ -125,7 +125,6 @@ export const useDatabase = (currentUserId?: string) => {
 
     // Event Listener für Track Approval
     const handleTrackApproved = () => {
-      console.log('🔄 useDatabase: Track approved event received, reloading...');
       loadData();
     };
 
@@ -154,7 +153,6 @@ export const useDatabase = (currentUserId?: string) => {
   };
 
   const updateTrack = (trackId: string, updates: Partial<AudioTrack>): boolean => {
-    console.log('🔄 useDatabase: updateTrack()', trackId);
     return DatabaseService.updateTrack(trackId, updates);
   };
 
@@ -271,7 +269,6 @@ export const useDatabase = (currentUserId?: string) => {
   };
 
   const updateReportStatus = (reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean => {
-    console.log('🔄 useDatabase: updateReportStatus()', reportId, status);
     return DatabaseService.updateReportStatus(reportId, status, reviewedBy);
   };
 

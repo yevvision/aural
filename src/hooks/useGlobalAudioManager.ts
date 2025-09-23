@@ -78,7 +78,6 @@ export const initializeGlobalAudioManager = () => {
     // Try to handle base64 audio URLs that might have loading issues
     const currentTrack = store.currentTrack;
     if (currentTrack?.url?.startsWith('data:audio/') && audioElement) {
-      console.log('Attempting to reload base64 audio...');
       // Force reload for base64 content
       audioElement.load();
     }
@@ -257,7 +256,6 @@ export const useGlobalAudioManager = () => {
         
         // If audio is in an error state, try to reload it
         if (audio.networkState === 3) { // NETWORK_NO_SOURCE
-          console.log('Audio in error state, attempting to reload');
           if (currentTrack?.url) {
             audio.src = currentTrack.url;
             audio.load();
@@ -345,7 +343,6 @@ export const useGlobalAudioManager = () => {
       
       // If audio is in an invalid state, reload it
       if (audio && (audio.readyState === 0 || audio.networkState === 3 || !audio.src)) {
-        console.log('Audio element in invalid state, reloading before play');
         if (currentTrack?.url) {
           audio.src = currentTrack.url;
           audio.load();
@@ -398,7 +395,6 @@ export const useGlobalAudioManager = () => {
       if (currentAudio.networkState === 3 || // NETWORK_NO_SOURCE
           currentAudio.readyState === 0 ||   // HAVE_NOTHING
           !currentAudio.src) {
-        console.log('Audio element in invalid state, reloading track');
         if (currentTrack?.url) {
           currentAudio.src = currentTrack.url;
           currentAudio.load();

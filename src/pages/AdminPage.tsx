@@ -635,7 +635,7 @@ export const AdminPage: React.FC = () => {
                   onClick={() => {
                     // loadData();
                     loadPendingCount();
-                    console.log('🔄 Manual refresh triggered');
+                    // Manual refresh triggered
                   }}
                   variant="primary"
                   size="md"

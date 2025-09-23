@@ -256,7 +256,6 @@ class CentralDatabaseV2 {
   }
 
   updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    console.log('🔄 CentralDB V2: updateTrack()', trackId, Object.keys(updates));
     
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {
@@ -1124,7 +1123,6 @@ class CentralDatabaseV2 {
   }
 
   updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean {
-    console.log('📋 CentralDB V2: updateReportStatus()', reportId, status);
     
     const reportIndex = this.data.reports.findIndex(r => r.id === reportId);
     if (reportIndex === -1) {

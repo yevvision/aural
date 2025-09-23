@@ -112,7 +112,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('❤️ MiniPlayer: Like button clicked for track:', updatedCurrentTrack.id);
+    // Like button clicked
     
     // Set like animation state
     setLikeClicked(true);
@@ -129,7 +129,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🔖 MiniPlayer: Bookmark button clicked for track:', updatedCurrentTrack.id);
+    // Bookmark button clicked
     
     // Set bookmark animation state
     setBookmarkClicked(true);

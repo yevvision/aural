@@ -56,7 +56,6 @@ class DatabaseServiceV2Class {
   }
 
   updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    console.log('🔗 DatabaseService V2: updateTrack()', trackId, Object.keys(updates));
     const success = centralDBV2.updateTrack(trackId, updates);
     
     if (success) {
@@ -312,7 +311,6 @@ class DatabaseServiceV2Class {
   }
 
   updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean {
-    console.log('🔗 DatabaseService V2: updateReportStatus()', reportId, status);
     const success = centralDBV2.updateReportStatus(reportId, status, reviewedBy);
     
     if (success) {

@@ -107,7 +107,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('❤️ InlineMiniPlayer: Like button clicked for track:', updatedTrack.id);
+    // Like button clicked
     
     // Set like animation state
     setLikeClicked(true);
@@ -124,7 +124,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🔖 InlineMiniPlayer: Bookmark button clicked for track:', updatedTrack.id);
+    // Bookmark button clicked
     
     // Set bookmark animation state
     setBookmarkClicked(true);

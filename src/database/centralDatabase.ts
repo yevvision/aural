@@ -179,7 +179,6 @@ class CentralDatabase {
 
   // UPDATE: Track aktualisieren
   updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    console.log('🔄 CentralDB: updateTrack()', trackId, Object.keys(updates));
     
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {

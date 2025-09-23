@@ -157,7 +157,6 @@ export const useFeedStore = create<FeedStore>()(
         
         // Utility
         refresh: () => {
-          console.log('🔄 FeedStore: refresh()');
           get().loadTracks();
         }
       })),

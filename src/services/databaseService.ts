@@ -56,7 +56,6 @@ class DatabaseServiceClass {
 
   // UPDATE: Track aktualisieren
   updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    console.log('🔗 DatabaseService: updateTrack()', trackId, Object.keys(updates));
     const success = centralDB.updateTrack(trackId, updates);
     
     if (success) {
@@ -236,7 +235,6 @@ class DatabaseServiceClass {
 
   // UPDATE: Report-Status aktualisieren
   updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean {
-    console.log('🔗 DatabaseService: updateReportStatus()', reportId, status);
     const success = centralDB.updateReportStatus(reportId, status, reviewedBy);
     
     if (success) {
