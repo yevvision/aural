@@ -329,10 +329,6 @@ export const useGlobalAudioManager = () => {
       const store = usePlayerStore.getState();
       
       // Play called
-        hasTrack: !!track,
-        audioReadyState: audio?.readyState,
-        audioNetworkState: audio?.networkState
-      });
       
       // If audio is in an invalid state, reload it
       if (audio && (audio.readyState === 0 || audio.networkState === 3 || !audio.src)) {
@@ -366,10 +362,6 @@ export const useGlobalAudioManager = () => {
     const storeState = usePlayerStore.getState();
     
     // Toggle called
-      hasTrack: !!currentTrack,
-      audioReadyState: audio?.readyState,
-      audioNetworkState: audio?.networkState
-    });
     
     // If no audio element and we have a track, initialize it
     if (!audio && currentTrack) {
