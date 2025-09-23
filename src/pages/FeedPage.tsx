@@ -178,16 +178,7 @@ export const FeedPage = () => {
     const filteredTracks = getFilteredTracks();
     let categoryTracks = [...filteredTracks]; // Use filtered tracks with preserved state
     
-    // Debug: Log all tracks with their dates
-    console.log(`=== ${categoryId.toUpperCase()} CATEGORY DEBUG ===`);
-    console.log('All tracks before sorting:', filteredTracks.map(t => ({
-      id: t.id,
-      title: t.title,
-      createdAt: t.createdAt,
-      user: t.user?.username,
-      gender: t.gender,
-      tags: t.tags
-    })));
+    // Track filtering and sorting logic
     
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -241,17 +232,7 @@ export const FeedPage = () => {
       isRecent: categoryId === 'new' ? toSafeDate(t.createdAt) > twoWeeksAgo : 'N/A'
     })));
     
-    // Spezielle Debug-Info für "New" Kategorie
-    if (categoryId === 'new') {
-      console.log(`🔍 NEW CATEGORY DEBUG:`);
-      console.log(`- Total tracks: ${tracks.length}`);
-      console.log(`- Gender filtered tracks: ${filteredTracks.length}`);
-      console.log(`- Two weeks ago: ${twoWeeksAgo.toISOString()}`);
-      console.log(`- Final filtered tracks: ${categoryTracks.length}`);
-      console.log(`- Showing: ${Math.min(categoryTracks.length, maxItems)}`);
-    }
-    
-    console.log('=== END DEBUG ===\n');
+    // Category-specific filtering logic
     
     return categoryTracks.slice(0, maxItems);
   };

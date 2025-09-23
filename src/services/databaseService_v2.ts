@@ -93,7 +93,6 @@ class DatabaseServiceV2Class {
   // =============================================================================
 
   toggleLike(trackId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService V2: toggleLike()', trackId, userId);
     const success = centralDBV2.toggleLike(trackId, userId);
     
     if (success) {
@@ -104,7 +103,6 @@ class DatabaseServiceV2Class {
   }
 
   toggleBookmark(trackId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService V2: toggleBookmark()', trackId, userId);
     const success = centralDBV2.toggleBookmark(trackId, userId);
     
     if (success) {
@@ -115,7 +113,6 @@ class DatabaseServiceV2Class {
   }
 
   incrementPlay(trackId: string): boolean {
-    console.log('🔗 DatabaseService V2: incrementPlay()', trackId);
     const success = centralDBV2.incrementPlay(trackId);
     
     if (success) {
@@ -569,12 +566,7 @@ class DatabaseServiceV2Class {
   // =============================================================================
 
   debug(): void {
-    const stats = this.getStats();
-    console.log('🐛 DatabaseService V2: DEBUG', {
-      stats,
-      listeners: this.listeners.size,
-      tracks: this.getTracks().map(t => ({ id: t.id, title: t.title, user: t.user.username }))
-    });
+    // Debug method - logs removed for performance
   }
 }
 

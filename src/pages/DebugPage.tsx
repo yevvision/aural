@@ -9,7 +9,7 @@ export const DebugPage = () => {
     const loadStats = () => {
       const currentStats = getStats();
       setStats(currentStats);
-      console.log('🐛 DebugPage: Statistiken:', currentStats);
+      // Debug logs removed for performance
     };
 
     loadStats();
@@ -98,9 +98,7 @@ export const DebugPage = () => {
                   <div className="flex space-x-2 mt-2">
                     <button
                       onClick={() => {
-                        console.log('🐛 Debug: Like button clicked for track:', track.id);
                         const success = toggleLike(track.id, 'user-1');
-                        console.log('🐛 Debug: Like result:', success);
                       }}
                       className={`px-3 py-1 rounded text-sm ${
                         track.isLiked 
@@ -113,9 +111,7 @@ export const DebugPage = () => {
                     
                     <button
                       onClick={() => {
-                        console.log('🐛 Debug: Bookmark button clicked for track:', track.id);
                         const success = toggleBookmark(track.id, 'user-1');
-                        console.log('🐛 Debug: Bookmark result:', success);
                       }}
                       className={`px-3 py-1 rounded text-sm ${
                         track.isBookmarked 
@@ -136,9 +132,7 @@ export const DebugPage = () => {
                           likes: 0,
                           isLiked: false
                         };
-                        console.log('🐛 Debug: Adding comment to track:', track.id);
                         const success = addCommentToTrack(track.id, comment);
-                        console.log('🐛 Debug: Comment result:', success);
                       }}
                       className="px-3 py-1 rounded text-sm bg-blue-500 text-white hover:bg-blue-600"
                     >

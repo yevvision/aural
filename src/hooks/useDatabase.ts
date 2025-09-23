@@ -185,7 +185,6 @@ export const useDatabase = (currentUserId?: string) => {
   // =============================================================================
 
   const toggleLike = (trackId: string, userId: string): boolean => {
-    console.log('❤️ useDatabase: toggleLike()', trackId, userId);
     const success = DatabaseService.toggleLike(trackId, userId);
     if (success) {
       console.log('✅ useDatabase: Like erfolgreich getoggelt, lade Daten neu...');
@@ -198,7 +197,6 @@ export const useDatabase = (currentUserId?: string) => {
   };
 
   const toggleBookmark = (trackId: string, userId: string): boolean => {
-    console.log('🔖 useDatabase: toggleBookmark()', trackId, userId);
     const success = DatabaseService.toggleBookmark(trackId, userId);
     if (success) {
       console.log('✅ useDatabase: Bookmark erfolgreich getoggelt, lade Daten neu...');
@@ -318,17 +316,10 @@ export const useDatabase = (currentUserId?: string) => {
   // =============================================================================
 
   const debug = () => {
-    console.log('🐛 useDatabase: debug()');
-    DatabaseService.debug();
-    console.log('🐛 useDatabase: Hook-State:', {
-      tracksCount: tracks.length,
-      isLoading,
-      tracks: tracks.map(t => ({ id: t.id, title: t.title, user: t.user.username }))
-    });
+    // Debug method - logs removed for performance
   };
 
   const incrementPlay = (trackId: string): boolean => {
-    console.log('▶️ useDatabase: incrementPlay()', trackId);
     const success = DatabaseService.incrementPlay(trackId);
     if (success) {
       console.log('✅ useDatabase: Play erfolgreich erhöht, lade Daten neu...');

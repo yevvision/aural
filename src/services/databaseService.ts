@@ -99,7 +99,6 @@ class DatabaseServiceClass {
 
   // LIKE: Track liken/unliken
   toggleLike(trackId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService: toggleLike()', trackId, userId);
     const success = centralDB.toggleLike(trackId, userId);
     
     if (success) {
@@ -111,7 +110,6 @@ class DatabaseServiceClass {
 
   // BOOKMARK: Track bookmarken/unbookmarken
   toggleBookmark(trackId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService: toggleBookmark()', trackId, userId);
     const success = centralDB.toggleBookmark(trackId, userId);
     
     if (success) {
@@ -123,7 +121,6 @@ class DatabaseServiceClass {
 
   // PLAY: Play-Anzahl erhöhen
   incrementPlay(trackId: string): boolean {
-    console.log('🔗 DatabaseService: incrementPlay()', trackId);
     const success = centralDB.incrementPlay(trackId);
     
     if (success) {
@@ -409,12 +406,7 @@ class DatabaseServiceClass {
 
   // Debug: Aktuellen Zustand ausgeben
   debug(): void {
-    const stats = this.getStats();
-    console.log('🐛 DatabaseService: DEBUG', {
-      stats,
-      listeners: this.listeners.size,
-      tracks: this.getTracks().map(t => ({ id: t.id, title: t.title, user: t.user.username }))
-    });
+    // Debug method - logs removed for performance
   }
 }
 
