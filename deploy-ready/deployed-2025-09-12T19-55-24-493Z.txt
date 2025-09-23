@@ -1,3 +1,0 @@
-Aural App deployed at: 2025-09-12T19:55:24.494Z
-Build: 0.0.0
-Deploy-Prepare: 2025-09-12T19:55:24.494Z

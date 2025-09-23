@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSP temporär entfernt für Unicorn Studio Test -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:* https://storage.googleapis.com https://cdn.jsdelivr.net https://assets.unicorn.studio; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';"> -->
+    <title>Unicorn Studio - Raycast Hintergrund</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .unicorn-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        .content-overlay {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .main-title {
+            font-size: clamp(3rem, 8vw, 8rem);
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #60a5fa, #a855f7, #ec4899);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+        }
+
+        .subtitle {
+            font-size: clamp(1.25rem, 3vw, 2rem);
+            margin-bottom: 3rem;
+            color: #d1d5db;
+            max-width: 42rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+            max-width: 80rem;
+            width: 100%;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title.blue { color: #60a5fa; }
+        .feature-title.purple { color: #a855f7; }
+        .feature-title.pink { color: #ec4899; }
+
+        .feature-description {
+            color: #d1d5db;
+            line-height: 1.6;
+        }
+
+        .back-button {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            font-weight: 700;
+            padding: 1rem 2rem;
+            border-radius: 9999px;
+            text-decoration: none;
+            font-size: 1.125rem;
+            transition: all 0.3s ease;
+            transform: scale(1);
+            display: inline-block;
+            margin-top: 4rem;
+        }
+
+        .back-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: white;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            color: #d1d5db;
+            font-size: 1.125rem;
+        }
+
+        @media (max-width: 768px) {
+            .content-overlay {
+                padding: 1rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .feature-card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div>
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Lade Unicorn Studio...</div>
+        </div>
+    </div>
+
+    <!-- Unicorn Studio Canvas Container -->
+    <div 
+        class="unicorn-container"
+        data-us-project="3Z7rqYRTDAvnqc3BpTTz"
+        data-us-scale="1"
+        data-us-dpi="1.5"
+        data-us-lazyload="true"
+        data-us-production="true"
+        data-us-fps="60"
+        data-us-alttext="Raycast Hintergrund Szene"
+        data-us-arialabel="Interaktive 3D Raycast Hintergrund Animation"
+        style="width: 100vw; height: 100vh;"
+    ></div>
+
+    <!-- Content Overlay -->
+    <div class="content-overlay">
+        <h1 class="main-title">Unicorn Studio</h1>
+        <p class="subtitle">
+            Willkommen zur interaktiven Raycast Hintergrund Szene. 
+            Bewege deine Maus, um die Animation zu steuern und erlebe eine immersive 3D-Erfahrung.
+        </p>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3 class="feature-title blue">Interaktiv</h3>
+                <p class="feature-description">
+                    Die Szene reagiert auf Mausbewegungen und Scroll-Events für eine immersive Erfahrung. 
+                    Jede Bewegung erzeugt einzigartige visuelle Effekte.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <h3 class="feature-title purple">Performance</h3>
+                <p class="feature-description">
+                    Optimiert für 60 FPS mit WebGL-basierter Rendering-Technologie. 
+                    Smooth Animationen auch auf mobilen Geräten.
+                </p>
+            </div>
+            
+            <div class="feature-card">
+                <h3 class="feature-title pink">Responsive</h3>
+                <p class="feature-description">
+                    Automatische Anpassung an verschiedene Bildschirmgrößen und Geräte. 
+                    Perfekt für Desktop, Tablet und Mobile.
+                </p>
+            </div>
+        </div>
+        
+        <a href="javascript:history.back()" class="back-button">
+            Zurück zur App
+        </a>
+    </div>
+    
+    <!-- Status Indicator -->
+    <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>Unicorn Studio aktiv</span>
+    </div>
+
+    <!-- Unicorn Studio SDK - Local -->
+    <script src="./unicornStudio.umd.js"></script>
+    <script>
+        // Debug function
+        function debugLog(message, data = null) {
+            console.log(`[Unicorn Studio Debug] ${message}`, data || '');
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            debugLog('DOM loaded, initializing Unicorn Studio...');
+            
+            if (window.UnicornStudio) {
+                debugLog('UnicornStudio object found, initializing...');
+                
+                try {
+                    window.UnicornStudio.init().then((scenes) => {
+                        debugLog('Unicorn Studio initialized successfully:', scenes);
+                        
+                        // Hide loading overlay
+                        setTimeout(() => {
+                            loadingOverlay.style.opacity = '0';
+                            setTimeout(() => {
+                                loadingOverlay.style.display = 'none';
+                            }, 500);
+                        }, 1000);
+                    }).catch((err) => {
+                        console.error('Unicorn Studio init error:', err);
+                        loadingOverlay.innerHTML = `
+                            <div>
+                                <div style="color: #ef4444; font-size: 1.5rem; margin-bottom: 1rem;">⚠️</div>
+                                <div class="loading-text">Fehler beim Initialisieren: ${err.message}</div>
+                                <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">
+                                    Erneut versuchen
+                                </button>
+                            </div>
+                        `;
+                    });
+                } catch (err) {
+                    console.error('Unicorn Studio init exception:', err);
+                    loadingOverlay.innerHTML = `
+                        <div>
+                            <div style="color: #ef4444; font-size: 1.5rem; margin-bottom: 1rem;">⚠️</div>
+                            <div class="loading-text">Fehler beim Initialisieren: ${err.message}</div>
+                            <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">
+                                Erneut versuchen
+                            </button>
+                        </div>
+                    `;
+                }
+            } else {
+                console.error('UnicornStudio object not found');
+                loadingOverlay.innerHTML = `
+                    <div>
+                        <div style="color: #ef4444; font-size: 1.5rem; margin-bottom: 1rem;">⚠️</div>
+                        <div class="loading-text">UnicornStudio Objekt nicht gefunden</div>
+                        <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">
+                            Erneut versuchen
+                        </button>
+                    </div>
+                `;
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (window.UnicornStudio && window.UnicornStudio.destroy) {
+                debugLog('Cleaning up Unicorn Studio...');
+                window.UnicornStudio.destroy();
+            }
+        });
+    </script>
+</body>
+</html>

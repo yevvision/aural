@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Aural - Voice Social Network" />
+    <!-- Keine CSP für Python-Server -->
+    <title>Aural - Voice Social Network</title>
+    <style>
+      /* Verhindere FOUC (Flash of Unstyled Content) */
+      #root {
+        background-color: #000000;
+        min-height: 100vh;
+      }
+      /* Verstecke Loading-Spinner falls vorhanden */
+      .loading {
+        display: none;
+      }
+    </style>
+    
+    <!-- Unicorn Studio Script -->
+    <script src="/unicornStudio.umd.js"></script>
+    <script>
+      // Unicorn Studio Initialisierung
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('Initialisiere Unicorn Studio...');
+        
+        if (window.UnicornStudio) {
+          window.UnicornStudio.init().then((scenes) => {
+            console.log('Unicorn Studio erfolgreich initialisiert:', scenes);
+          }).catch((err) => {
+            console.error('Unicorn Studio Fehler:', err);
+          });
+        } else {
+          console.error('UnicornStudio nicht gefunden');
+        }
+      });
+    </script>
+  </head>
+  <body style="background-color: #000000; margin: 0; padding: 0;">
+    <!-- Unicorn Studio Canvas Container -->
+    <div 
+      id="unicorn-container"
+      style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;"
+      data-us-project="3Z7rqYRTDAvnqc3BpTTz"
+      data-us-scale="1"
+      data-us-dpi="1.5"
+      data-us-lazyload="true"
+      data-us-production="true"
+      data-us-fps="60"
+      data-us-alttext="Raycast Hintergrund Szene"
+      data-us-arialabel="Interaktive 3D Raycast Hintergrund Animation"
+    ></div>
+    
+    <!-- React App Container -->
+    <div id="root"></div>
+    
+    <!-- React App Scripts -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

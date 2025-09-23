@@ -11,9 +11,14 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+import { Button, IconButton } from '../components/ui/Button';
+import { Heading, Body, Label, Caption } from '../components/ui/Typography';
+import { TagGroup, SelectableTag } from '../components/ui/Tag';
+import { MultiToggle } from '../components/ui/Toggle';
 import { capClient } from '../utils/capClient';
 import { uploadSecurityManager } from '../utils/uploadSecurity';
 import { PendingUploadPage } from './PendingUploadPage';
+import { AudioUrlManager } from '../services/audioUrlManager';
 
 interface PendingUploadData {
   uploadId: string;
@@ -40,7 +45,7 @@ export const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedGender, setSelectedGender] = useState<'Female' | 'Male' | 'Couple' | 'Diverse' | null>(null);
+  const [selectedGender, setSelectedGender] = useState<'Female' | 'Male' | 'Couple' | 'Diverse' | null>('Diverse');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
   const [duration, setDuration] = useState(0);
@@ -56,90 +61,83 @@ export const UploadPage = () => {
 
   // Load file from sessionStorage if coming from record page or audio editor
   useEffect(() => {
-    const recordingData = sessionStorage.getItem('recordingData');
-    if (recordingData) {
-      try {
-        const data = JSON.parse(recordingData);
-        const { file, title: recordedTitle } = data;
-        
-        if (file && file.data) {
-          // Check if it's a blob URL or base64 data
-          if (file.data.startsWith('blob:')) {
-            console.log('Loading blob URL from recording data...');
-            fetch(file.data)
-              .then(res => {
-                if (!res.ok) {
-                  throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.blob();
-              })
-              .then(blob => {
-                console.log('Created blob from URL', {
-                  blobSize: blob.size,
-                  blobType: blob.type
-                });
+    const loadRecordingData = async () => {
+      const recordingData = sessionStorage.getItem('recordingData');
+      if (recordingData) {
+        try {
+          const data = JSON.parse(recordingData);
+          const { file, title: recordedTitle } = data;
+          
+          if (file && file.data) {
+            console.log('🎵 UploadPage: Loading recording data...');
+            
+            let blob: Blob;
+            
+            // Prüfe ob es eine AudioUrlManager URL ist
+            if (file.tempTrackId) {
+              console.log('🔍 UploadPage: Found tempTrackId, loading from AudioUrlManager...');
+              const audioUrl = AudioUrlManager.getAudioUrl(file.tempTrackId);
+              
+              if (audioUrl) {
+                // Konvertiere die AudioUrlManager URL zurück zu einem Blob
+                const response = await fetch(audioUrl);
+                blob = await response.blob();
                 
-                // Create a File object from the blob
-                const fileName = file.name || (data.edited ? 'edited-audio.wav' : 'recording.wav');
-                const fileObj = new File([blob], fileName, { type: blob.type });
-                setSelectedFile(fileObj);
-                setTitle(recordedTitle || (data.edited ? 'Bearbeitete Aufnahme' : 'Meine Aufnahme'));
-                
-                // Get duration
-                getAudioDuration(fileObj).then(dur => {
-                  setDuration(dur);
-                });
-                
-                // Clear sessionStorage
-                sessionStorage.removeItem('recordingData');
-              })
-              .catch(err => {
-                console.error('Error loading recording data from blob URL:', err);
-                setError('Error loading recording');
-              });
+                // Lösche die temporären Daten aus dem AudioUrlManager
+                AudioUrlManager.clearTrackUrls(file.tempTrackId);
+              } else {
+                throw new Error('No URL found in AudioUrlManager');
+              }
+            } else if (file.data.startsWith('data:')) {
+              // Fallback: Normale Data URL
+              console.log('🔍 UploadPage: Loading data URL...');
+              const response = await fetch(file.data);
+              blob = await response.blob();
+            } else if (file.data.startsWith('blob:')) {
+              // Fallback: Blob URL
+              console.log('🔍 UploadPage: Loading blob URL...');
+              const response = await fetch(file.data);
+              blob = await response.blob();
+            } else {
+              // Fallback: Base64
+              console.log('🔍 UploadPage: Loading base64 data...');
+              const response = await fetch(file.data);
+              blob = await response.blob();
+            }
+            
+            console.log('✅ UploadPage: Created blob from recording data:', {
+              blobSize: blob.size,
+              blobType: blob.type
+            });
+            
+            // Create a File object from the blob
+            const fileName = file.name || (data.edited ? 'edited-audio.wav' : 'recording.wav');
+            const fileObj = new File([blob], fileName, { type: blob.type });
+            setSelectedFile(fileObj);
+            setTitle(recordedTitle || (data.edited ? 'Bearbeitete Aufnahme' : 'Meine Aufnahme'));
+            
+            // Get duration
+            try {
+              const dur = await getAudioDuration(fileObj);
+              setDuration(dur);
+            } catch (err) {
+              console.error('Error getting duration:', err);
+              setDuration(data.duration || 0);
+            }
+            
+            // Clear sessionStorage
+            sessionStorage.removeItem('recordingData');
           } else {
-            // Convert base64 back to blob (legacy support)
-            console.log('Converting base64 to blob...');
-            fetch(file.data)
-              .then(res => {
-                if (!res.ok) {
-                  throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.blob();
-              })
-              .then(blob => {
-                console.log('Created blob from base64', {
-                  blobSize: blob.size,
-                  blobType: blob.type
-                });
-                
-                // Create a File object from the blob
-                const fileName = file.name || (data.edited ? 'edited-audio.wav' : 'recording.wav');
-                const fileObj = new File([blob], fileName, { type: blob.type });
-                setSelectedFile(fileObj);
-                setTitle(recordedTitle || (data.edited ? 'Bearbeitete Aufnahme' : 'Meine Aufnahme'));
-                
-                // Get duration
-                getAudioDuration(fileObj).then(dur => {
-                  setDuration(dur);
-                });
-                
-                // Clear sessionStorage
-                sessionStorage.removeItem('recordingData');
-              })
-              .catch(err => {
-                console.error('Error loading recording data from base64:', err);
-                setError('Error loading recording');
-              });
+            throw new Error('No file data found in recording data');
           }
-        } else {
-          throw new Error('No file data found in recording data');
+        } catch (err) {
+          console.error('❌ UploadPage: Error loading recording data:', err);
+          setError('Fehler beim Laden der Aufnahme');
         }
-      } catch (err) {
-        console.error('Error parsing recording data:', err);
-        setError('Fehler beim Laden der Aufnahme');
       }
-    }
+    };
+
+    loadRecordingData();
   }, []);
 
 
@@ -586,11 +584,24 @@ export const UploadPage = () => {
       }
       
       // 7. Normale Verarbeitung - Track erstellen
+      // Erstelle eine lokale Base64-URL für sofortige Wiedergabe
+      const audioBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
+      });
+      
+      const trackId = generateId();
+      
+      // Speichere die Audio-URL im AudioUrlManager
+      const audioUrl = await AudioUrlManager.storeAudioUrl(trackId, selectedFile, 'base64');
+      
       const newTrack: AudioTrack = {
-        id: generateId(),
+        id: trackId,
         title: title.trim(),
         description: description.trim(),
-        url: result.data.url,
+        url: audioUrl, // Verwende die lokale Base64-URL für sofortige Wiedergabe
         duration: duration,
         user: currentUser,
         likes: 0,
@@ -647,28 +658,27 @@ export const UploadPage = () => {
       <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
         {/* Title */}
-        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+        <Heading level={1} className="text-4xl mb-8">
           Upload Audio
-        </h1>
-
+        </Heading>
 
         {/* File Upload Area */}
         {!selectedFile ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-gray-500 rounded-xl p-8 text-center 
+            className="border-2 border-dashed border-gray-500 rounded-xl p-12 text-center mb-8
                      hover:border-orange-500 hover:bg-orange-500/5 transition-all duration-300 cursor-pointer"
           >
-            <Upload size={48} className="text-orange-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">
+            <Upload size={48} className="text-orange-500 mx-auto mb-6" />
+            <Heading level={3} className="mb-3">
               Select Audio File
-            </h3>
-            <p className="text-gray-400 text-sm mb-4">
+            </Heading>
+            <Body color="secondary" className="text-sm mb-6">
               MP3, WAV, WebM, OGG, M4A (max 50MB)
-            </p>
-            <div className="inline-flex items-center px-4 py-2 bg-orange-500 rounded-lg text-white font-medium">
+            </Body>
+            <Button variant="primary" size="md">
               Dateien durchsuchen
-            </div>
+            </Button>
           </div>
         ) : (
           /* File Selected - no preview shown */
@@ -685,18 +695,18 @@ export const UploadPage = () => {
 
         {/* Metadata Form - im Stil der Audio-Detail-Seite */}
         {selectedFile && (
-          <div className="flex-1 space-y-6">
+          <div className="flex-1 space-y-8">
             {/* Title Input */}
             <div>
-              <label className="block text-sm font-medium text-white mb-2">
+              <Label className="block mb-3">
                 What is the title of this recording?
-              </label>
+              </Label>
               <input
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
                 placeholder="Create title"
-                className={`w-full px-4 py-3 bg-transparent border rounded-lg
+                className={`w-full px-4 py-4 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
                          focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
                          transition-all duration-200 ${
@@ -705,92 +715,81 @@ export const UploadPage = () => {
                 maxLength={85}
                 required
               />
-              <div className="flex justify-between items-center mt-1">
+              <div className="flex justify-between items-center mt-2">
                 {titleError && (
-                  <p className="text-red-400 text-xs">{titleError}</p>
+                  <Caption className="text-red-400">{titleError}</Caption>
                 )}
-                <div className="text-right text-xs text-gray-400 ml-auto">
+                <Caption color="secondary" className="text-right ml-auto">
                   {title.length}/85
-                </div>
+                </Caption>
               </div>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-white mb-2">
+              <Label className="block mb-3">
                 Add a description if you like
-              </label>
+              </Label>
               <textarea
                 value={description}
                 onChange={handleDescriptionChange}
                 placeholder="Hier eingeben"
-                rows={3}
-                className="w-full px-4 py-3 bg-transparent border border-gray-500 rounded-lg
+                rows={4}
+                className="w-full px-4 py-4 bg-transparent border border-gray-500 rounded-lg
                          text-white placeholder-gray-400 resize-none
                          focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
                          transition-all duration-200"
                 maxLength={1000}
               />
-              <div className="text-right text-xs text-gray-400 mt-1">
+              <Caption color="secondary" className="text-right mt-2">
                 {description.length}/1000
-              </div>
+              </Caption>
             </div>
 
             {/* Gender Selection */}
             <div>
-              <label className="block text-sm font-medium text-white mb-3">
+              <Label className="block mb-4">
                 Who is on the recording?
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {genderOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setSelectedGender(
-                      selectedGender === option.value ? null : option.value
-                    )}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                      selectedGender === option.value
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-transparent border border-gray-500 text-gray-400 hover:border-orange-500 hover:text-orange-500'
-                    }`}
-                    aria-label={`${option.label} ${
-                      selectedGender === option.value ? 'ausgewählt' : 'nicht ausgewählt'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              </Label>
+              <MultiToggle
+                options={genderOptions.map(option => ({
+                  value: option.value,
+                  label: option.label
+                }))}
+                value={selectedGender || ''}
+                onChange={(value) => setSelectedGender(value as typeof selectedGender)}
+                variant="segmented"
+                size="md"
+                className="flex flex-wrap gap-2"
+              />
             </div>
 
             {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-white mb-3">
+              <Label className="block mb-4">
                 Add tags to your recording
-              </label>
+              </Label>
 
               {/* Predefined Tags */}
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {predefinedTags.map((tag) => (
-                  <button
+                  <SelectableTag
                     key={tag}
-                    onClick={() => handleTagToggle(tag)}
-                    className={`px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                      selectedTags.includes(tag)
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-transparent border border-gray-500 text-gray-400 hover:border-orange-500 hover:text-orange-500'
-                    }`}
+                    value={tag}
+                    selectedValues={selectedTags}
+                    onSelectionChange={setSelectedTags}
+                    size="md"
                     aria-label={`Tag: ${tag}, ${
                       selectedTags.includes(tag) ? 'selected' : 'not selected'
                     }`}
                   >
                     {tag}
-                  </button>
+                  </SelectableTag>
                 ))}
               </div>
 
               {/* Custom Tag Input */}
-              <div className="flex space-x-2 mb-3">
+              <div className="flex space-x-2 mb-4">
                 <input
                   type="text"
                   value={customTag}
@@ -804,38 +803,36 @@ export const UploadPage = () => {
                   maxLength={24}
                   aria-label="Enter your own tag"
                 />
-                <button
+                <IconButton
                   onClick={handleAddCustomTag}
                   disabled={!customTag.trim() || selectedTags.length >= 10}
-                  className="px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-gray-400
-                           hover:border-orange-500 hover:text-orange-500 transition-all duration-200
-                           disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={selectedTags.length >= 10 ? 'Maximum 10 tags allowed' : 'Add tag'}
-                >
-                  <Plus size={16} />
-                </button>
+                  variant="outline"
+                  size="sm"
+                  icon={<Plus size={16} />}
+                  aria-label={selectedTags.length >= 10 ? 'Maximum 10 tags allowed' : 'Add tag'}
+                />
               </div>
 
               {/* Selected Tags */}
               {selectedTags.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-2">
+                  <Caption color="secondary" className="mb-2">
                     Ausgewählte Tags ({selectedTags.length}/10):
-                  </p>
+                  </Caption>
                   <div className="flex flex-wrap gap-2">
                     {selectedTags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center space-x-1 px-2 py-1 bg-orange-500/20
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500/20
                                  text-orange-500 text-xs rounded-full"
                       >
                         <span>{tag}</span>
                         <button
                           onClick={() => handleRemoveTag(tag)}
-                          className="hover:text-red-400 transition-colors duration-200"
+                          className="hover:text-red-400 transition-colors duration-200 p-0 w-3 h-3 flex items-center justify-center"
                           aria-label={`Tag ${tag} entfernen`}
                         >
-                          <X size={12} />
+                          <X size={10} className="w-2.5 h-2.5" />
                         </button>
                       </span>
                     ))}
@@ -844,9 +841,9 @@ export const UploadPage = () => {
               )}
 
               {selectedTags.length === 0 && (
-                <p className="text-xs text-gray-400 mt-2">
+                <Caption color="secondary" className="mt-2">
                   You can set tags to be found better
-                </p>
+                </Caption>
               )}
             </div>
 
@@ -856,29 +853,31 @@ export const UploadPage = () => {
         {/* Error Messages */}
         {error && (
           <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-red-400 text-sm text-center">{error}</p>
+            <Body className="text-red-400 text-sm text-center">{error}</Body>
           </div>
         )}
 
         {/* Upload Button - Full Width */}
         {selectedFile && (
           <div className="mt-8">
-            <button
+            <Button
               onClick={handleUpload}
               disabled={!title.trim() || titleError !== '' || isUploading}
-              className="w-full py-4 px-6 rounded-xl border border-orange-500 bg-orange-500/20 flex items-center justify-center space-x-3
-                       disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-500/30 transition-all duration-200"
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="py-4 flex items-center justify-center space-x-3"
               aria-label="Aufnahme hochladen"
             >
               {isUploading ? (
-                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
-                <Upload size={20} className="text-orange-500" strokeWidth={1.5} />
+                <Upload size={20} strokeWidth={1.5} />
               )}
-              <span className="text-orange-500 font-medium">
+              <span>
                 {isUploading ? 'Wird hochgeladen...' : 'Upload'}
               </span>
-            </button>
+            </Button>
           </div>
         )}
       </div>

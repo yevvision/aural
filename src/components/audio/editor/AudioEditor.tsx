@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Scissors, AlertCircle, Trash2, Play, Download, ArrowRight } from 'lucide-react';
 import WaveformVisualizer from './WaveformVisualizer';
 import { concatenateSegments, encodeWithFfmpegWorker, trimToWav } from '../../../hooks/useTrimExport';
+import { Button, IconButton } from '../../ui/Button';
+import { Body } from '../../ui/Typography';
 
 type EncodeFormat = 'mp3' | 'aac';
 
@@ -15,11 +17,12 @@ export default function AudioEditor({
   onDone: (out: Blob) => void; // gibt den geschnittenen/encodierten Blob zurück
   enableFfmpeg?: boolean;
 }) {
-  console.log('AudioEditor: Received recording blob:', {
+  console.log('🎵 AudioEditor: Received recording blob:', {
     size: recordingBlob?.size,
     type: recordingBlob?.type,
     hasBlob: !!recordingBlob
   });
+  
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +31,9 @@ export default function AudioEditor({
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [waveformDuration, setWaveformDuration] = useState<number>(0);
   const [clickedSelection, setClickedSelection] = useState<{ start: number; end: number } | null>(null);
+  const [isFixingAudio, setIsFixingAudio] = useState(false);
+  const [fixedBlob, setFixedBlob] = useState<Blob | null>(null);
+  const [currentBlob, setCurrentBlob] = useState<Blob | null>(null);
   const canExport = allRegions.length > 0 || selectedSegments.length > 0 || (sel !== null && sel.start < sel.end && sel.end > sel.start);
   
   // Haptic feedback helper
@@ -38,17 +44,17 @@ export default function AudioEditor({
   };
 
   const handleSelectionChange = (selection: { start: number; end: number } | null) => {
-    console.log('AudioEditor: Selection changed to:', selection);
+    console.log('🎵 AudioEditor: Selection changed to:', selection);
     setSel(selection);
   };
 
   const handleDurationChange = (duration: number) => {
-    console.log('AudioEditor: Duration received from waveform:', duration);
+    console.log('🎵 AudioEditor: Duration received from waveform:', duration);
     setWaveformDuration(duration);
   };
 
   const handleRegionsChange = (regions: { start: number; end: number; id: string }[]) => {
-    console.log('AudioEditor: Regions changed:', regions);
+    console.log('🎵 AudioEditor: Regions changed:', regions);
     setAllRegions(regions);
   };
 
@@ -63,31 +69,87 @@ export default function AudioEditor({
     setRemoveRegionFn(() => removeFn);
   };
 
-  // Get audio duration when blob is available
+  // Hilfsfunktion zum Reparieren von Audio-Blobs
+  const fixAudioBlob = async (blob: Blob): Promise<Blob | null> => {
+    try {
+      console.log('🔧 AudioEditor: Attempting to fix audio blob using AudioContext...');
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      console.log('🔧 AudioEditor: Audio buffer decoded successfully', { 
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        numberOfChannels: audioBuffer.numberOfChannels
+      });
+      
+      // Konvertiere zurück zu WAV-Format
+      const wavBlob = await audioBufferToWav(audioBuffer);
+      await audioContext.close();
+      
+      console.log('🔧 AudioEditor: Audio blob fixed successfully', { 
+        originalSize: blob.size, 
+        fixedSize: wavBlob.size 
+      });
+      
+      return wavBlob;
+    } catch (error) {
+      console.error('❌ AudioEditor: Failed to fix audio blob:', error);
+      return null;
+    }
+  };
+
+  // Hilfsfunktion zum Konvertieren von AudioBuffer zu WAV
+  const audioBufferToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const length = audioBuffer.length;
+    
+    // Erstelle WAV-Header
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV-Header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * numberOfChannels * 2, true);
+    
+    // Konvertiere Audio-Daten
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
+
+  // Set current blob immediately - let useWaveformEditor handle validation and repair
   useEffect(() => {
     if (recordingBlob) {
-      const audio = new Audio();
-      const url = URL.createObjectURL(recordingBlob);
-      audio.src = url;
-      
-      const handleLoadedMetadata = () => {
-        console.log('AudioEditor: Audio duration loaded:', audio.duration);
-        setAudioDuration(audio.duration);
-        URL.revokeObjectURL(url);
-        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      };
-      
-      const handleError = (error: Event) => {
-        console.error('AudioEditor: Error loading audio metadata:', error);
-        URL.revokeObjectURL(url);
-        audio.removeEventListener('error', handleError);
-      };
-      
-      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.addEventListener('error', handleError);
-      
-      // Force load metadata
-      audio.load();
+      console.log('🎵 AudioEditor: Setting current blob for WaveformVisualizer');
+      setCurrentBlob(recordingBlob);
+      setError(null);
+      setIsFixingAudio(false);
     }
   }, [recordingBlob]);
 
@@ -96,362 +158,261 @@ export default function AudioEditor({
       // Directly add the segment without showing confirmation buttons
       setSelectedSegments(prev => [...prev, sel]);
       setSel(null);
-      console.log('AudioEditor: Segment added directly:', sel);
+      console.log('🎵 AudioEditor: Segment added directly:', sel);
     }
   };
-
 
   const handleRemoveSegment = (index: number) => {
     setSelectedSegments(prev => prev.filter((_, i) => i !== index));
-    console.log('AudioEditor: Segment removed at index:', index);
+    console.log('🎵 AudioEditor: Segment removed at index:', index);
   };
 
-  const handleSelectionClick = (selection: { start: number; end: number }) => {
-    setClickedSelection(selection);
-    console.log('AudioEditor: Selection clicked:', selection);
+  const handleClearAllSegments = () => {
+    setSelectedSegments([]);
+    setSel(null);
+    console.log('🎵 AudioEditor: All segments cleared');
   };
 
-  const handleDeleteSelection = (start?: number, end?: number) => {
-    if (start !== undefined && end !== undefined) {
-      // Delete specific region from both state and waveform
-      if (removeRegionFn) {
-        removeRegionFn(start, end);
-      }
-      // The region will be removed from state via the region-removed event
-      console.log('AudioEditor: Region deleted:', { start, end });
-    } else if (clickedSelection) {
-      // Delete clicked selection (legacy)
-      setSelectedSegments(prev => prev.filter(segment => 
-        segment.start !== clickedSelection.start || segment.end !== clickedSelection.end
-      ));
-      setClickedSelection(null);
-      console.log('AudioEditor: Selection deleted:', clickedSelection);
-    }
-  };
-
-  const handlePlaySelection = (start?: number, end?: number) => {
-    const playStart = start !== undefined ? start : clickedSelection?.start;
-    const playEnd = end !== undefined ? end : clickedSelection?.end;
+  const handleExport = async () => {
+    if (busy) return;
     
-    if (playStart !== undefined && playEnd !== undefined && recordingBlob) {
-      // Create audio element and play the selected segment
-      const audio = new Audio();
-      const url = URL.createObjectURL(recordingBlob);
-      audio.src = url;
-      
-      audio.onloadedmetadata = () => {
-        audio.currentTime = playStart;
-        audio.play();
-        
-        // Stop at the end of the selection
-        const stopAt = playEnd;
-        const checkTime = () => {
-          if (audio.currentTime >= stopAt) {
-            audio.pause();
-            audio.removeEventListener('timeupdate', checkTime);
-            URL.revokeObjectURL(url);
-          }
-        };
-        audio.addEventListener('timeupdate', checkTime);
-      };
-      
-      console.log('AudioEditor: Playing selection:', { start: playStart, end: playEnd });
-    }
-  };
-
-  const handleExport = async (format: 'wav' | 'mp3' | 'aac' = 'wav', quality: number = 128) => {
-    console.log('🚀 Export called:', { format, quality, canExport, selectedSegments, sel, busy, allRegions });
-    if (!canExport || busy) {
-      console.log('❌ Export blocked:', { canExport, busy });
-      return; // Prevent double-click
-    }
-    
-    console.log('✅ Starting export...');
     setBusy(true);
     setError(null);
     
     try {
-      // Use all regions if available, otherwise use selected segments or current selection
-      let segmentsToExport = allRegions.length > 0 
-        ? allRegions.map(region => ({ start: region.start, end: region.end }))
-        : selectedSegments.length > 0 
-          ? selectedSegments 
-          : sel 
-            ? [sel] 
-            : [];
+      console.log('🚀 AudioEditor: Starting export process...');
+      console.log('🎵 AudioEditor: Selected segments:', selectedSegments);
+      console.log('🎵 AudioEditor: All regions:', allRegions);
+      console.log('🎵 AudioEditor: Current selection:', sel);
       
-      console.log('📊 Segments to export:', segmentsToExport);
-      console.log('📊 All regions:', allRegions);
-      console.log('📊 Selected segments:', selectedSegments);
-      console.log('📊 Current selection:', sel);
+      // Verwende den reparierten Blob falls verfügbar
+      const blobToUse = currentBlob || recordingBlob;
+      console.log('🎵 AudioEditor: Using blob for export:', {
+        isFixed: !!currentBlob,
+        size: blobToUse.size,
+        type: blobToUse.type
+      });
       
-      if (segmentsToExport.length === 0) {
-        throw new Error('Keine Segmente ausgewählt. Bitte wähle mindestens einen Bereich aus.');
-      }
+      let resultBlob: Blob;
       
-      // Sort segments by start time to ensure correct order
-      const sortedSegments = [...segmentsToExport].sort((a, b) => a.start - b.start);
-      
-      // Validate segments
-      for (const segment of sortedSegments) {
-        if (segment.start >= segment.end) {
-          throw new Error('Ungültige Segment-Auswahl: Start-Zeit muss vor End-Zeit liegen.');
-        }
-        if (segment.start < 0 || segment.end > waveformDuration) {
-          throw new Error('Segment-Auswahl liegt außerhalb der Audio-Dauer.');
-        }
-      }
-      
-      // Concatenate all segments into one audio file
-      console.log('🔄 Concatenating segments...');
-      const wav = await concatenateSegments(recordingBlob, sortedSegments);
-      console.log('✅ Concatenated WAV created, size:', wav.size);
-
-      // 2) Optional: MP3/AAC via ffmpeg.wasm im Worker (auf Mobile evtl. langsam)
-      if (format !== 'wav' && enableFfmpeg) {
-        console.log('Encoding with ffmpeg...');
-        try {
-          const encoded = await encodeWithFfmpegWorker(wav, format as EncodeFormat, quality);
-          console.log('Encoded file size:', encoded.size);
-          onDone(encoded);
-        } catch (ffmpegError) {
-          console.warn('FFmpeg encoding failed, falling back to WAV:', ffmpegError);
-          setError('MP3/AAC-Encoding fehlgeschlagen. Verwende WAV-Export.');
-          // Fallback to WAV
-          onDone(wav);
-        }
+      if (selectedSegments.length > 0) {
+        // Export selected segments
+        console.log('🎵 AudioEditor: Exporting selected segments...');
+        resultBlob = await concatenateSegments(blobToUse, selectedSegments);
+      } else if (allRegions.length > 0) {
+        // Export all regions
+        console.log('🎵 AudioEditor: Exporting all regions...');
+        const regionSegments = allRegions.map(region => ({
+          start: region.start,
+          end: region.end
+        }));
+        resultBlob = await concatenateSegments(blobToUse, regionSegments);
+      } else if (sel && sel.start < sel.end && sel.end > sel.start) {
+        // Export current selection
+        console.log('🎵 AudioEditor: Exporting current selection...');
+        resultBlob = await trimToWav(blobToUse, sel.start, sel.end);
       } else {
-        console.log('🎵 Using WAV directly');
-        // Default: WAV zurückgeben (oder WebM-Flow ergänzen)
-        console.log('📤 Calling onDone with WAV blob...');
-        onDone(wav);
-        console.log('✅ onDone called successfully');
+        throw new Error('Keine gültige Auswahl zum Exportieren');
       }
+      
+      console.log('✅ AudioEditor: Export completed, result blob:', {
+        size: resultBlob.size,
+        type: resultBlob.type
+      });
+      
+      // Encode if ffmpeg is enabled
+      if (enableFfmpeg && resultBlob) {
+        console.log('🎵 AudioEditor: Encoding with ffmpeg...');
+        const encodedBlob = await encodeWithFfmpegWorker(resultBlob, 'mp3');
+        console.log('✅ AudioEditor: Encoding completed:', {
+          size: encodedBlob.size,
+          type: encodedBlob.type
+        });
+        onDone(encodedBlob);
+      } else {
+        onDone(resultBlob);
+      }
+      
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error('❌ AudioEditor: Export failed:', err);
       setError(err instanceof Error ? err.message : 'Export fehlgeschlagen');
     } finally {
       setBusy(false);
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const selectionDuration = sel ? sel.end - sel.start : 0;
-
+  // Zeige Fehler oder Reparatur-Status
+  if (error) {
   return (
-    <div className="flex flex-col gap-6">
-      {/* Waveform - im Stil der Audio-Detail-Seite */}
-      <div className="bg-transparent">
-        <WaveformVisualizer
-          blob={recordingBlob} 
-          onSelectionChange={handleSelectionChange}
-          onDurationChange={handleDurationChange}
-          onAddSegment={handleAddSegment}
-          onRegionsChange={handleRegionsChange}
-          onRemoveRegionReady={handleRemoveRegionReady}
-        />
-      </div>
-
-
-
-      {/* All Regions - Mobile-optimized individual boxes */}
       <div className="space-y-4">
-        {allRegions.length > 0 ? (
-          allRegions.map((region, index) => {
-            // All regions are orange
-            const regionColor = 'rgba(245, 158, 11, 0.25)'; // orange
-            
-            return (
-              <div 
-                key={region.id} 
-                className="rounded-xl p-4 sm:p-4 border-2 touch-manipulation"
-                style={{ 
-                  backgroundColor: regionColor,
-                  borderColor: regionColor.replace('0.25', '0.5')
-                }}
-              >
-                <div className="text-center mb-4">
-                  <span className="text-sm font-medium text-white">
-                    Region {index + 1}: {formatTime(region.start)} → {formatTime(region.end)}
-                  </span>
+        <div className="w-full h-32 rounded bg-red-900/20 border border-red-500/30 flex items-center justify-center">
+          <div className="text-center">
+            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <p className="text-red-400 text-sm mb-2">{error}</p>
+            <Button 
+              onClick={() => window.location.href = '/recorder'}
+              variant="primary"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Neu aufnehmen
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Zeige Reparatur-Status
+  if (isFixingAudio) {
+    return (
+      <div className="space-y-4">
+        <div className="w-full h-32 rounded bg-orange-900/20 border border-orange-500/30 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <Body className="text-orange-400 text-sm">Audio wird repariert...</Body>
+            <Body className="text-orange-300 text-xs mt-1">Bitte warten Sie einen Moment</Body>
                 </div>
-                
-                {/* Mobile-optimized Action Buttons with larger touch targets */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <motion.button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      triggerHaptic();
-                      handlePlaySelection(region.start, region.end);
-                    }}
-                    className="flex-1 py-4 sm:py-3 px-4 rounded-full border-2 border-white bg-transparent flex items-center justify-center space-x-2 hover:bg-white/10 active:bg-white/20 transition-all duration-200 touch-manipulation"
-                    style={{ minHeight: '48px' }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Play size={16} className="text-white" strokeWidth={1.5} />
-                    <span className="text-white text-sm font-medium">Play</span>
-                  </motion.button>
-                  
-                  <motion.button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (index !== 0) {
-                        triggerHaptic();
-                        handleDeleteSelection(region.start, region.end);
-                      }
-                    }}
-                    disabled={index === 0}
-                    className={`flex-1 py-4 sm:py-3 px-4 rounded-full border-2 flex items-center justify-center space-x-2 transition-all duration-200 touch-manipulation ${
-                      index === 0 
-                        ? 'border-white/50 bg-transparent cursor-not-allowed opacity-50'
-                        : 'border-white bg-transparent hover:bg-white/10 active:bg-white/20'
-                    }`}
-                    style={{ minHeight: '48px' }}
-                    whileHover={index === 0 ? {} : { scale: 1.02 }}
-                    whileTap={index === 0 ? {} : { scale: 0.98 }}
-                  >
-                    <Trash2 size={16} className={index === 0 ? 'text-white/50' : 'text-white'} strokeWidth={1.5} />
-                    <span className={`text-sm font-medium ${index === 0 ? 'text-white/50' : 'text-white'}`}>
-                      Delete
-                    </span>
-                  </motion.button>
                 </div>
               </div>
             );
-          })
-        ) : (
-          <div className="text-center py-8 px-4">
-            <div className="text-gray-400 text-sm">
-              Tap "New Area" to mark a region
-            </div>
+  }
+
+  // Zeige Wellenform nur wenn wir einen gültigen Blob haben
+  if (!currentBlob) {
+    return (
+      <div className="space-y-4">
+        <div className="w-full h-32 rounded bg-gray-900/20 border border-gray-500/30 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <Body className="text-gray-400 text-sm">Audio wird vorbereitet...</Body>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Waveform Visualizer mit repariertem Blob */}
+      <WaveformVisualizer
+        blob={currentBlob}
+        onSelectionChange={handleSelectionChange}
+        onDurationChange={handleDurationChange}
+        onRegionsChange={handleRegionsChange}
+        onRemoveRegionReady={handleRemoveRegionReady}
+        className="w-full"
+      />
+
+      {/* Audio Info */}
+      <div className="text-center text-sm text-gray-400 mb-6">
+        {audioDuration > 0 && (
+          <p>Audio-Dauer: {Math.round(audioDuration)} Sekunden</p>
+        )}
+        {fixedBlob && (
+          <p className="text-green-400">✓ Audio erfolgreich repariert</p>
         )}
       </div>
 
-      {/* Selected Segments Info */}
-      {selectedSegments.length > 0 && (
-        <div className="py-4 px-6 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-          <div className="text-center">
-            <div className="text-blue-400 text-sm font-medium mb-2">
-              {selectedSegments.length} Segment{selectedSegments.length !== 1 ? 'e' : ''} ausgewählt
-            </div>
-            <div className="text-blue-300 text-xs space-y-2">
-              {selectedSegments.map((segment, index) => (
-                <div key={index} className="space-y-2">
-                  <motion.div 
-                    className={`p-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                      clickedSelection && clickedSelection.start === segment.start && clickedSelection.end === segment.end
-                        ? 'bg-orange-500/20 border border-orange-500/40 text-orange-300'
-                        : 'hover:bg-white/5 hover:text-blue-200'
-                    }`}
-                    onClick={() => handleSelectionClick(segment)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Segment {index + 1}: {formatTime(segment.start)} → {formatTime(segment.end)}
-                  </motion.div>
-                  
-                  {/* Action Buttons for clicked segment */}
-                  {clickedSelection && clickedSelection.start === segment.start && clickedSelection.end === segment.end && (
-                    <motion.div 
-                      className="flex gap-2"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <motion.button
-                        onClick={() => handlePlaySelection()}
-                        className="flex-1 py-1.5 px-2 rounded-lg border border-green-500 bg-green-500/20 flex items-center justify-center space-x-1 hover:bg-green-500/30 transition-all duration-200"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Play size={12} className="text-green-500" strokeWidth={1.5} />
-                        <span className="text-green-500 text-xs font-medium">Play</span>
-                      </motion.button>
-                      
-                      <motion.button
-                        onClick={() => handleDeleteSelection()}
-                        className="flex-1 py-1.5 px-2 rounded-lg border border-red-500 bg-red-500/20 flex items-center justify-center space-x-1 hover:bg-red-500/30 transition-all duration-200"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Trash2 size={12} className="text-red-500" strokeWidth={1.5} />
-                        <span className="text-red-500 text-xs font-medium">Delete</span>
-                      </motion.button>
-                    </motion.div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Instructions when no selection */}
-      {!canExport && !busy && (
-        <div className="text-center py-6 px-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-          <div className="text-blue-400 text-sm font-medium mb-2">
-            🎯 Wählen Sie einen Bereich aus
-          </div>
-          <div className="text-blue-300 text-xs space-y-1">
-            <p>• Drag over the waveform to mark an area</p>
-            <p>• Or click "Set Region" for automatic selection</p>
-            <p>• Add multiple segments to combine them</p>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile-optimized Export Button */}
-      <motion.button
-        onClick={() => {
-          if (canExport) {
-            triggerHaptic();
-            handleExport();
-          }
-        }}
-        disabled={!canExport || busy}
-        className="w-full py-5 sm:py-4 px-6 rounded-full border border-orange-500 bg-orange-500/20 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-500/30 active:bg-orange-500/40 transition-all duration-200 touch-manipulation"
-        style={{ minHeight: '56px' }}
-        whileHover={!busy && canExport ? { scale: 1.02 } : {}}
-        whileTap={!busy && canExport ? { scale: 0.98 } : {}}
-      >
-        {busy ? (
-          <motion.div
-            className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          />
-        ) : (
-          <ArrowRight size={22} className="text-orange-500" strokeWidth={1.5} />
-        )}
-        <span className="text-orange-500 font-medium text-base sm:text-sm">
-          {busy ? 'Processing...' : canExport ? 'Export' : 'Select area'}
-        </span>
-      </motion.button>
-
-      {/* Error Display */}
-      {error && (
+      {/* Selection Controls */}
+      {sel && (
         <motion.div 
-          className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg"
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row gap-3 justify-center mb-6"
         >
-          <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-          <span className="text-red-400 text-sm">{error}</span>
+          <Button
+            onClick={handleAddSegment}
+            variant="primary"
+            size="sm"
+            className="flex items-center justify-center gap-2"
+          >
+            <Scissors size={16} />
+            Segment hinzufügen
+          </Button>
+          <Button
+            onClick={() => setSel(null)}
+            variant="secondary"
+            size="sm"
+          >
+            Abbrechen
+          </Button>
         </motion.div>
       )}
 
+      {/* Selected Segments */}
+      {selectedSegments.length > 0 && (
+        <div className="space-y-3 mb-6">
+          <h3 className="text-sm font-medium text-gray-300">Ausgewählte Segmente:</h3>
+          <div className="space-y-2">
+            {selectedSegments.map((segment, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between bg-gray-800 rounded px-3 py-2"
+              >
+                <span className="text-sm text-gray-300">
+                  {Math.round(segment.start)}s - {Math.round(segment.end)}s
+                </span>
+                <IconButton
+                  onClick={() => handleRemoveSegment(index)}
+                  variant="ghost"
+                  size="sm"
+                  icon={<Trash2 size={16} />}
+                  aria-label="Segment entfernen"
+                  className="text-red-400 hover:text-red-300"
+                />
+          </div>
+            ))}
+          </div>
+          <Button
+            onClick={handleClearAllSegments}
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-gray-300"
+          >
+            Alle löschen
+          </Button>
+        </div>
+      )}
 
+      {/* Export Button */}
+      <div className="flex justify-center mt-8">
+        <Button
+          onClick={handleExport}
+          disabled={!canExport || busy}
+          variant="primary"
+          size="lg"
+          className="flex items-center gap-2"
+        >
+        {busy ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Exportiere...
+            </>
+          ) : (
+            <>
+              <Download size={20} />
+              Exportieren
+              <ArrowRight size={20} />
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Export Info */}
+      {canExport && (
+        <div className="text-center text-sm text-gray-400 mt-4">
+          {selectedSegments.length > 0 && (
+            <p>{selectedSegments.length} Segment(e) ausgewählt</p>
+          )}
+          {allRegions.length > 0 && selectedSegments.length === 0 && (
+            <p>{allRegions.length} Region(en) ausgewählt</p>
+          )}
+          {sel && selectedSegments.length === 0 && allRegions.length === 0 && (
+            <p>Aktuelle Auswahl: {Math.round(sel.start)}s - {Math.round(sel.end)}s</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

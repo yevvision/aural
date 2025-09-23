@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { Settings, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
+import { Heading, Body } from '../components/ui/Typography';
 import AudioEditor from '../components/audio/editor/AudioEditor';
+import { AudioUrlManager } from '../services/audioUrlManager';
 type EncodeFormat = 'mp3' | 'aac';
 
 export const AudioEditorPage = () => {
@@ -165,14 +167,20 @@ export const AudioEditorPage = () => {
       type: processedBlob.type
     });
     
+    // Erstelle eine temporäre Track-ID für den AudioUrlManager
+    const tempTrackId = `temp_${Date.now()}`;
+    
+    // Speichere den verarbeiteten Blob im AudioUrlManager
+    const audioUrl = AudioUrlManager.storeAudioUrl(tempTrackId, processedBlob, 'base64');
+    
     // Store the processed blob for upload
-    const blobUrl = URL.createObjectURL(processedBlob);
     const processedData = {
       file: {
         name: `edited_${Date.now()}.wav`,
         size: processedBlob.size,
         type: processedBlob.type,
-        data: blobUrl // Use blob URL instead of base64
+        data: audioUrl, // Use the AudioUrlManager URL
+        tempTrackId: tempTrackId // Store the temp ID for later use
       },
       duration: 0, // Will be calculated in upload page
       recordedAt: new Date().toISOString(),
@@ -181,7 +189,7 @@ export const AudioEditorPage = () => {
 
     try {
       sessionStorage.setItem('recordingData', JSON.stringify(processedData));
-      console.log('✅ Processed recording data stored successfully with blob URL');
+      console.log('✅ Processed recording data stored successfully with AudioUrlManager URL');
       console.log('🚀 Navigating to /upload...');
       navigate('/upload');
     } catch (err) {
@@ -199,12 +207,12 @@ export const AudioEditorPage = () => {
           <RevealOnScroll direction="up">
             <div className="true-black-card text-center">
               <div className="w-8 h-8 border-2 border-gradient-strong border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <h2 className="text-lg font-medium text-text-primary mb-2">
+              <Heading level={2} className="mb-2">
                 Audio wird geladen...
-              </h2>
-              <p className="text-text-secondary text-sm">
+              </Heading>
+              <Body color="secondary" className="text-sm">
                 Bereite deine Aufnahme für die Bearbeitung vor
-              </p>
+              </Body>
             </div>
           </RevealOnScroll>
         </div>
@@ -220,18 +228,18 @@ export const AudioEditorPage = () => {
       <div className="px-4 sm:px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
         {/* Mobile-optimized Title */}
-        <h1 className="text-white text-3xl sm:text-4xl font-bold leading-tight mb-3 sm:mb-4">
+        <Heading level={1} className="text-3xl sm:text-4xl mb-4 sm:mb-6">
           Edit Audio
-        </h1>
+        </Heading>
 
         {/* Mobile-optimized Description */}
-        <p className="text-gray-400 mb-4 sm:mb-6 leading-snug text-sm sm:text-xs">
+        <Body color="secondary" className="mb-6 sm:mb-8 leading-snug text-sm sm:text-base">
           Select the desired area and export your recording
-        </p>
+        </Body>
 
         {/* Audio Editor with mobile optimizations */}
         {recordingBlob ? (
-          <div className="flex-1 space-y-4">
+          <div className="flex-1 space-y-6">
             <AudioEditor
               recordingBlob={recordingBlob}
               onDone={handleEditorDone}
@@ -247,7 +255,7 @@ export const AudioEditorPage = () => {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               ></motion.div>
-              <p className="text-gray-400 text-sm">Loading audio data...</p>
+              <Body color="secondary" className="text-sm">Loading audio data...</Body>
             </div>
           </div>
         )}

@@ -1,161 +1,263 @@
-import { centralDB } from './centralDatabase';
-import { database as simulatedDB } from './simulatedDatabase';
-import type { AudioTrack, User, Comment } from '../types';
+import { centralDBV2 } from './centralDatabase_v2';
 
-// Migrationsfunktion: Überträgt alle Daten von simulatedDatabase zu centralDatabase
-export const migrateToCentralDatabase = (): boolean => {
-  console.log('🔄 MIGRATION: Starte Migration von simulatedDatabase zu centralDatabase...');
+// Migrations-Script für V1 zu V2
+export class DatabaseMigration {
   
-  try {
-    // 1. Lade alle Daten aus der alten Datenbank
-    const oldTracks = simulatedDB.getAllTracks();
-    const oldUsers = simulatedDB.getAllUsers();
+  // Führe die Migration von V1 zu V2 durch
+  static async migrateV1ToV2(): Promise<boolean> {
+    console.log('🔄 Migration: Starte V1 zu V2 Migration...');
     
-    console.log('📥 MIGRATION: Gefundene Daten in alter DB:');
-    console.log('📥 MIGRATION: - Tracks:', oldTracks.length);
-    console.log('📥 MIGRATION: - Users:', oldUsers.length);
-    
-    // 2. Prüfe, ob zentrale DB bereits Daten hat
-    const existingTracks = centralDB.getAllTracks();
-    const existingUsers = centralDB.getAllUsers();
-    
-    if (existingTracks.length > 0 || existingUsers.length > 0) {
-      console.log('⚠️ MIGRATION: Zentrale DB hat bereits Daten. Überspringe Migration.');
-      console.log('⚠️ MIGRATION: - Existierende Tracks:', existingTracks.length);
-      console.log('⚠️ MIGRATION: - Existierende Users:', existingUsers.length);
+    try {
+      // Prüfe, ob V1-Daten vorhanden sind
+      const v1Data = localStorage.getItem('aural-central-database');
+      if (!v1Data) {
+        console.log('📭 Migration: Keine V1-Daten gefunden - frische Installation');
+        return true;
+      }
+
+      // Prüfe, ob V2 bereits migriert wurde
+      const v2Data = localStorage.getItem('aural-central-database-v2');
+      if (v2Data) {
+        console.log('✅ Migration: V2-Daten bereits vorhanden - Migration übersprungen');
+        return true;
+      }
+
+      console.log('🔄 Migration: Führe Migration durch...');
+      
+      // Die Migration wird automatisch in CentralDatabaseV2 durchgeführt
+      // beim ersten Laden der Instanz
+      const db = centralDBV2;
+      
+      console.log('✅ Migration: V1 zu V2 Migration erfolgreich abgeschlossen');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Migration: Fehler bei V1 zu V2 Migration:', error);
       return false;
     }
+  }
+
+  // Validiere die migrierten Daten
+  static validateMigration(): { isValid: boolean; errors: string[] } {
+    console.log('🔍 Migration: Validiere migrierte Daten...');
     
-    // 3. Migriere Benutzer
-    console.log('👥 MIGRATION: Migriere Benutzer...');
-    oldUsers.forEach(user => {
-      // Prüfe, ob User bereits existiert
-      const existingUser = centralDB.getAllUsers().find(u => u.id === user.id);
-      if (!existingUser) {
-        // User wird automatisch hinzugefügt, wenn Track hinzugefügt wird
-        console.log('👤 MIGRATION: User wird über Track-Migration hinzugefügt:', user.username);
+    const errors: string[] = [];
+    
+    try {
+      const stats = centralDBV2.getStats();
+      
+      // Prüfe grundlegende Struktur
+      if (stats.totalUsers === 0) {
+        errors.push('Keine Benutzer nach Migration gefunden');
       }
-    });
+      
+      if (stats.totalTracks === 0) {
+        errors.push('Keine Tracks nach Migration gefunden');
+      }
+      
+      // Prüfe, ob alle Tracks eine userId haben
+      const tracks = centralDBV2.getAllTracks();
+      const tracksWithoutUserId = tracks.filter(track => !track.userId);
+      if (tracksWithoutUserId.length > 0) {
+        errors.push(`${tracksWithoutUserId.length} Tracks ohne userId gefunden`);
+      }
+      
+      // Prüfe, ob alle Tracks gültige Tags haben
+      const tracksWithInvalidTags = tracks.filter(track => 
+        track.tags && !Array.isArray(track.tags)
+      );
+      if (tracksWithInvalidTags.length > 0) {
+        errors.push(`${tracksWithInvalidTags.length} Tracks mit ungültigen Tags gefunden`);
+      }
+      
+      console.log('✅ Migration: Validierung abgeschlossen', {
+        errors: errors.length,
+        stats
+      });
+      
+      return {
+        isValid: errors.length === 0,
+        errors
+      };
+      
+    } catch (error) {
+      console.error('❌ Migration: Fehler bei Validierung:', error);
+      return {
+        isValid: false,
+        errors: [`Validierungsfehler: ${error}`]
+      };
+    }
+  }
+
+  // Erstelle Backup der V1-Daten vor Migration
+  static createV1Backup(): boolean {
+    console.log('💾 Migration: Erstelle V1-Backup...');
     
-    // 4. Migriere Tracks
-    console.log('🎵 MIGRATION: Migriere Tracks...');
-    let migratedTracks = 0;
-    let skippedTracks = 0;
+    try {
+      const v1Data = localStorage.getItem('aural-central-database');
+      if (!v1Data) {
+        console.log('📭 Migration: Keine V1-Daten für Backup gefunden');
+        return true;
+      }
+      
+      const backupKey = `aural-central-database-v1-backup-${Date.now()}`;
+      localStorage.setItem(backupKey, v1Data);
+      
+      console.log('✅ Migration: V1-Backup erstellt:', backupKey);
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Migration: Fehler beim Erstellen des V1-Backups:', error);
+      return false;
+    }
+  }
+
+  // Stelle V1-Daten aus Backup wieder her
+  static restoreV1FromBackup(backupKey: string): boolean {
+    console.log('🔄 Migration: Stelle V1-Daten aus Backup wieder her...', backupKey);
     
-    oldTracks.forEach(track => {
-      // Prüfe, ob Track bereits existiert
-      const existingTrack = centralDB.getTrackById(track.id);
-      if (!existingTrack) {
-        // Konvertiere Track für zentrale DB
-        const migratedTrack: AudioTrack = {
-          ...track,
-          // Stelle sicher, dass alle erforderlichen Felder vorhanden sind
-          comments: track.comments || [],
-          commentsCount: track.commentsCount || 0,
-          likes: track.likes || 0,
-          isLiked: track.isLiked || false,
-          isBookmarked: track.isBookmarked || false,
-          createdAt: track.createdAt || new Date(),
-          fileSize: track.fileSize || 0,
-          filename: track.filename || `${track.title.toLowerCase().replace(/\s+/g, '_')}.wav`,
-          tags: track.tags || [],
-          gender: track.gender || 'Female'
-        };
-        
-        const success = centralDB.addTrack(migratedTrack);
-        if (success) {
-          migratedTracks++;
-          console.log('✅ MIGRATION: Track migriert:', track.title);
-        } else {
-          skippedTracks++;
-          console.log('⚠️ MIGRATION: Track übersprungen:', track.title);
-        }
+    try {
+      const backupData = localStorage.getItem(backupKey);
+      if (!backupData) {
+        console.log('❌ Migration: Backup nicht gefunden:', backupKey);
+        return false;
+      }
+      
+      localStorage.setItem('aural-central-database', backupData);
+      
+      console.log('✅ Migration: V1-Daten aus Backup wiederhergestellt');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Migration: Fehler beim Wiederherstellen des V1-Backups:', error);
+      return false;
+    }
+  }
+
+  // Führe komplette Migration mit Backup durch
+  static async migrateWithBackup(): Promise<{ success: boolean; errors: string[] }> {
+    console.log('🚀 Migration: Starte komplette Migration mit Backup...');
+    
+    const errors: string[] = [];
+    
+    try {
+      // 1. Erstelle Backup
+      const backupCreated = this.createV1Backup();
+      if (!backupCreated) {
+        errors.push('Fehler beim Erstellen des V1-Backups');
+      }
+      
+      // 2. Führe Migration durch
+      const migrationSuccess = await this.migrateV1ToV2();
+      if (!migrationSuccess) {
+        errors.push('Fehler bei der V1 zu V2 Migration');
+      }
+      
+      // 3. Validiere Migration
+      const validation = this.validateMigration();
+      if (!validation.isValid) {
+        errors.push(...validation.errors);
+      }
+      
+      const success = errors.length === 0;
+      
+      if (success) {
+        console.log('✅ Migration: Komplette Migration erfolgreich abgeschlossen');
       } else {
-        skippedTracks++;
-        console.log('⚠️ MIGRATION: Track bereits vorhanden:', track.title);
+        console.log('❌ Migration: Migration mit Fehlern abgeschlossen:', errors);
       }
+      
+      return { success, errors };
+      
+    } catch (error) {
+      console.error('❌ Migration: Unerwarteter Fehler bei Migration:', error);
+      return {
+        success: false,
+        errors: [`Unerwarteter Fehler: ${error}`]
+      };
+    }
+  }
+
+  // Zeige Migration-Status
+  static getMigrationStatus(): {
+    hasV1Data: boolean;
+    hasV2Data: boolean;
+    needsMigration: boolean;
+    v1Stats?: any;
+    v2Stats?: any;
+  } {
+    console.log('📊 Migration: Prüfe Migration-Status...');
+    
+    const v1Data = localStorage.getItem('aural-central-database');
+    const v2Data = localStorage.getItem('aural-central-database-v2');
+    
+    const hasV1Data = !!v1Data;
+    const hasV2Data = !!v2Data;
+    const needsMigration = hasV1Data && !hasV2Data;
+    
+    let v1Stats = null;
+    let v2Stats = null;
+    
+    try {
+      if (hasV1Data) {
+        const parsed = JSON.parse(v1Data);
+        v1Stats = {
+          tracks: parsed.tracks?.length || 0,
+          users: parsed.users?.length || 0,
+          comments: parsed.comments?.length || 0,
+          likes: parsed.likes?.length || 0,
+          bookmarks: parsed.bookmarks?.length || 0
+        };
+      }
+      
+      if (hasV2Data) {
+        v2Stats = centralDBV2.getStats();
+      }
+    } catch (error) {
+      console.error('❌ Migration: Fehler beim Lesen der Stats:', error);
+    }
+    
+    console.log('📊 Migration: Status:', {
+      hasV1Data,
+      hasV2Data,
+      needsMigration,
+      v1Stats,
+      v2Stats
     });
     
-    // 5. Migriere Likes und Bookmarks (falls in alten Stores vorhanden)
-    console.log('❤️ MIGRATION: Migriere Likes und Bookmarks...');
-    // TODO: Likes und Bookmarks aus alten Stores migrieren, falls verfügbar
-    
-    // 6. Setze Migrations-Flag
-    localStorage.setItem('aural-migration-completed', 'true');
-    localStorage.setItem('aural-migration-timestamp', new Date().toISOString());
-    
-    console.log('✅ MIGRATION: Migration abgeschlossen!');
-    console.log('✅ MIGRATION: - Migrierte Tracks:', migratedTracks);
-    console.log('✅ MIGRATION: - Übersprungene Tracks:', skippedTracks);
-    console.log('✅ MIGRATION: - Migrierte Users:', oldUsers.length);
-    
-    return true;
-    
-  } catch (error) {
-    console.error('❌ MIGRATION: Fehler bei der Migration:', error);
-    return false;
+    return {
+      hasV1Data,
+      hasV2Data,
+      needsMigration,
+      v1Stats,
+      v2Stats
+    };
   }
-};
+}
 
-// Prüfe, ob Migration bereits durchgeführt wurde
-export const isMigrationCompleted = (): boolean => {
-  const migrationFlag = localStorage.getItem('aural-migration-completed');
-  return migrationFlag === 'true';
-};
-
-// Führe Migration automatisch durch, falls noch nicht geschehen
-export const autoMigrate = (): boolean => {
-  if (isMigrationCompleted()) {
-    console.log('✅ AUTO-MIGRATION: Migration bereits durchgeführt');
+// Automatische Migration beim Import
+export const autoMigrate = async (): Promise<boolean> => {
+  console.log('🔄 Auto-Migration: Starte automatische Migration...');
+  
+  const status = DatabaseMigration.getMigrationStatus();
+  
+  if (!status.needsMigration) {
+    console.log('✅ Auto-Migration: Keine Migration erforderlich');
     return true;
   }
   
-  console.log('🔄 AUTO-MIGRATION: Starte automatische Migration...');
-  return migrateToCentralDatabase();
-};
-
-// Cleanup: Lösche alte Datenbank-Daten nach erfolgreicher Migration
-export const cleanupOldDatabase = (): void => {
-  console.log('🧹 CLEANUP: Lösche alte Datenbank-Daten...');
+  console.log('🔄 Auto-Migration: Migration erforderlich, führe durch...');
   
-  try {
-    // Lösche localStorage-Einträge der alten Datenbank
-    localStorage.removeItem('simulated-database');
-    localStorage.removeItem('aural-feed-store');
-    localStorage.removeItem('aural-user-store');
-    localStorage.removeItem('aural-activity-store');
-    localStorage.removeItem('aural-notifications-store');
-    
-    // Lösche Flags
-    localStorage.removeItem('jochen-data-created');
-    localStorage.removeItem('database-initialized');
-    
-    console.log('✅ CLEANUP: Alte Datenbank-Daten gelöscht');
-  } catch (error) {
-    console.error('❌ CLEANUP: Fehler beim Löschen alter Daten:', error);
-  }
-};
-
-// Vollständige Migration mit Cleanup
-export const fullMigration = (): boolean => {
-  console.log('🚀 FULL-MIGRATION: Starte vollständige Migration...');
+  const result = await DatabaseMigration.migrateWithBackup();
   
-  const migrationSuccess = migrateToCentralDatabase();
-  
-  if (migrationSuccess) {
-    // Warte kurz, dann führe Cleanup durch
-    setTimeout(() => {
-      cleanupOldDatabase();
-    }, 1000);
+  if (result.success) {
+    console.log('✅ Auto-Migration: Automatische Migration erfolgreich');
+  } else {
+    console.log('❌ Auto-Migration: Automatische Migration fehlgeschlagen:', result.errors);
   }
   
-  return migrationSuccess;
+  return result.success;
 };
 
-export default {
-  migrateToCentralDatabase,
-  isMigrationCompleted,
-  autoMigrate,
-  cleanupOldDatabase,
-  fullMigration
-};
+// Export für einfache Verwendung
+export default DatabaseMigration;

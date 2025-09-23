@@ -21,6 +21,7 @@ export interface AudioTrack {
   description?: string;
   duration: number; // in seconds
   url: string;
+  userId: string; // NEU: Redundante User-ID für bessere Performance
   user: User;
   likes: number;
   isLiked?: boolean;
@@ -299,4 +300,59 @@ export interface ApiResponse<T> {
     limit?: number;
     hasMore?: boolean;
   };
+}
+
+// =============================================================================
+// NEUE DATENTYPEN FÜR V2 MIGRATION
+// =============================================================================
+
+// NEU: Notification System
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'UPLOAD_APPROVED' | 'NEW_COMMENT' | 'LIKE' | 'FOLLOW' | 'BOOKMARK' | 'COMMENT_LIKE';
+  payload: Record<string, any>; // Kleines JSON für spezifische Daten
+  createdAt: Date;
+  readAt?: Date;
+}
+
+// NEU: Pending Upload Queue
+export interface PendingUpload {
+  id: string;
+  tempTrackId?: string; // Falls UI-Vorschau benötigt wird
+  userId?: string; // Auch anonym möglich
+  deviceId: string; // Aus First-Party-Token
+  fileHash: string; // Zur 5×-Duplikat-Regel
+  reason: 'rate' | 'duplicate5';
+  createdAt: Date;
+  status: 'pending' | 'approved' | 'rejected';
+  decidedAt?: Date;
+  decidedBy?: string;
+}
+
+// NEU: Follow System
+export interface Follow {
+  followerId: string;
+  followeeId: string;
+  createdAt: Date;
+}
+
+// NEU: Top Tags Cache
+export interface TopTag {
+  tag: string;
+  count: number;
+}
+
+// NEU: Comment Like System
+export interface CommentLike {
+  commentId: string;
+  userId: string;
+  createdAt: Date;
+}
+
+// NEU: Play Tracking
+export interface Play {
+  trackId: string;
+  count: number;
+  lastPlayedAt: Date;
 }

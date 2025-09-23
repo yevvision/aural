@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 sync_config.jsonc
+*storybook.log
+storybook-static

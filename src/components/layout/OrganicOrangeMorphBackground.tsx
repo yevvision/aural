@@ -105,40 +105,13 @@ const state6 = () => [
   makeBlob(0.50,0.25,0.20, 1.0,1.0, 0.00, 15,80,35,0.70),
 ];
 
-// State 13: Mobile-optimiert - Fragmentierte rot-orange Struktur mit dunklen Rändern (für /search)
-const state13 = () => [
-  // Dunkle obere Bereiche (mobile portrait)
-  makeBlob(0.50,0.05,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
-  makeBlob(0.20,0.08,0.60, 1.5,1.0, 0.00, 6,25,1,0.90),
-  makeBlob(0.80,0.08,0.60, 1.5,1.0, 0.00, 7,35,2,0.90),
-  // Fragmentierte rot-orange Bereiche
-  makeBlob(0.25,0.35,0.35, 1.2,1.0, 0.20, 12,85,50,0.90),
-  makeBlob(0.60,0.25,0.30, 1.0,1.2, -0.15, 14,80,48,0.85),
-  makeBlob(0.80,0.50,0.40, 1.3,1.1, 0.30, 16,75,45,0.88),
-  makeBlob(0.20,0.65,0.35, 1.1,1.3, -0.25, 18,70,42,0.85),
-  makeBlob(0.70,0.75,0.30, 1.0,1.0, 0.10, 20,65,40,0.80),
-  makeBlob(0.40,0.80,0.35, 1.2,1.1, -0.20, 15,80,45,0.82),
-  // Orange Verbindungen
-  makeBlob(0.50,0.50,0.20, 1.5,1.0, 0.00, 17,70,35,0.60),
-  makeBlob(0.30,0.45,0.20, 1.0,1.5, 0.00, 19,65,32,0.60),
-  makeBlob(0.70,0.55,0.20, 1.0,1.5, 0.00, 21,60,30,0.60),
-  // Dunkle untere Bereiche (mobile portrait)
-  makeBlob(0.50,0.95,0.90, 2.0,0.6, 0.00, 8,30,2,0.95),
-  makeBlob(0.15,0.92,0.50, 1.2,1.0, 0.00, 6,25,1,0.90),
-  makeBlob(0.85,0.92,0.50, 1.2,1.0, 0.00, 7,35,2,0.90),
-];
+// State 13 entfernt - nicht verwendet
 
 // State 1: Komplett schwarz (aus HTML State 1) - für /news
-const state1 = () => {
-  // Create 12 blobs with zero alpha and minimal size so they do not render
-  const arr = [];
-  for(let i=0;i<12;i++){
-    arr.push(makeBlob(0.5,0.5,0.1, 1,1, 0, 0, 0, 10, 0));
-  }
-  return arr;
-};
+// State 1 entfernt - nicht verwendet
 
-const states = [state0(), state1(), state5(), state6(), state13()];
+// Nur die tatsächlich verwendeten States
+const states = [state0(), state5(), state6()];
 
 export const OrganicOrangeMorphBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -152,24 +125,20 @@ export const OrganicOrangeMorphBackground = () => {
   const initialLoadRef = useRef(true); // Track initial page load
   const [isBackgroundReady, setIsBackgroundReady] = useState(false); // Track background readiness
 
-  // Map routes to background states (5 states for different pages)
+  // Map routes to background states (3 states for different pages)
   const getStateIndex = () => {
-    // Neue Zuordnung basierend auf den gewünschten Zuständen:
-    // State 0: Komplett schwarz (für Aufnahme)
-    // State 1: Komplett schwarz (aus HTML State 1) - für /news 
-    // State 2: State 5 aus HTML (für /profile)
-    // State 3: State 6 aus HTML (für Startseite)
-    // State 4: State 13 aus HTML (für /search)
+    // State 0: Schwarzer Hintergrund (für Record, Audio Editor, Upload, Search, Player)
+    // State 1: State 5 - Profile (Keil mit großer Fläche)
+    // State 2: State 6 - Startseite (zentrale Komposition)
     
-    if (location.pathname === '/') return 3; // Startseite -> State 6 (zentrale Komposition)
-    if (location.pathname.startsWith('/news')) return 1; // News -> State 1 (komplett schwarz aus HTML)
-    if (location.pathname.startsWith('/profile')) return 2; // Profile -> State 5 (Keil mit großer Fläche)
+    if (location.pathname === '/') return 2; // Startseite -> State 6 (zentrale Komposition)
+    if (location.pathname.startsWith('/profile')) return 1; // Profile -> State 5 (Keil mit großer Fläche)
     if (location.pathname.startsWith('/record')) return 0; // Record -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/audio-editor')) return 0; // Audio Editor -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/upload')) return 0; // Upload -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/search')) return 0; // Search -> State 0 (schwarzer Hintergrund)
     if (location.pathname.startsWith('/player') || location.pathname.startsWith('/aufnahme')) return 0; // Player/Aufnahme -> State 0 (schwarz)
-    return 3; // default to State 6 (Startseite)
+    return 2; // default to State 6 (Startseite)
   };
 
   // Change state smoothly from wherever we are

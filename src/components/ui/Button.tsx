@@ -3,7 +3,7 @@ import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '../../utils';
 
 // Button Variants
-type ButtonVariant = 'primary' | 'glass' | 'voice' | 'secondary' | 'outline' | 'ghost';
+type ButtonVariant = 'primary' | 'glass' | 'voice' | 'secondary' | 'outline' | 'ghost' | 'orange-fill';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'size'> {
@@ -41,10 +41,10 @@ export const Button: React.FC<ButtonProps> = ({
 
   // Size variants
   const sizeClasses = {
-    sm: 'px-3 py-2 text-sm rounded-lg min-h-[36px]',
-    md: 'px-6 py-3 text-base rounded-xl min-h-[44px]',
-    lg: 'px-8 py-4 text-lg rounded-xl min-h-[52px]',
-    xl: 'px-10 py-5 text-xl rounded-2xl min-h-[60px]'
+    sm: 'px-3 py-2 text-sm rounded-full min-h-[36px]',
+    md: 'px-6 py-3 text-base rounded-full min-h-[44px]',
+    lg: 'px-8 py-4 text-lg rounded-full min-h-[52px]',
+    xl: 'px-10 py-5 text-xl rounded-full min-h-[60px]'
   };
 
   // Variant styles
@@ -86,6 +86,12 @@ export const Button: React.FC<ButtonProps> = ({
       'text-text-secondary font-medium',
       'bg-transparent border-0',
       'hover:bg-white/5 hover:text-text-primary',
+      'active:scale-[0.98]'
+    ),
+    'orange-fill': cn(
+      'bg-gradient-primary/20 text-gradient-strong font-medium',
+      'border border-gradient-strong/50',
+      'hover:bg-gradient-primary/30 hover:border-gradient-strong/70',
       'active:scale-[0.98]'
     )
   };

@@ -11,6 +11,9 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+import { Button, IconButton } from '../components/ui/Button';
+import { Heading, Body, Caption } from '../components/ui/Typography';
+import { MultiToggle } from '../components/ui/Toggle';
 
 // Gender filters for audio content
 const genderFilters = [
@@ -265,38 +268,29 @@ export const FeedPage = () => {
             transition={{ duration: 0.6 }}
           >
             <div className="text-center">
-              <h1 className="text-xl font-bold text-text-primary mb-2">
+              <Heading level={1} className="mb-2">
                 Hear desire, live fantasy
-              </h1>
-              <p className="text-sm text-text-secondary leading-relaxed">
+              </Heading>
+              <Body color="secondary" className="text-sm leading-relaxed">
                 Aural is the platform for erotic audio. Listen, explore, and publish recordings — 
                 anonymous, sensual, and free from images.
-              </p>
+              </Body>
             </div>
           </motion.div>
         </RevealOnScroll>
 
-        {/* Enhanced "Show me" Filter tabs with animations - full width */}
+        {/* Gender Filter as Segment Control */}
         <RevealOnScroll direction="up" className="mb-6">
-          <StaggerWrapper className="grid grid-cols-5 gap-2">
-            {genderFilters.map((filterOption) => (
-              <StaggerItem key={filterOption.type} className="w-full">
-                <motion.button
-                  onClick={() => handleGenderFilterChange(filterOption.type)}
-                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
-                    selectedGenderFilter === filterOption.type
-                      ? 'bg-gradient-primary text-white'
-                      : 'glass-surface text-text-secondary hover:text-text-primary hover:bg-white/15'
-                  }`}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <span>{filterOption.label}</span>
-                </motion.button>
-              </StaggerItem>
-            ))}
-          </StaggerWrapper>
+          <MultiToggle
+            options={genderFilters.map(filter => ({
+              value: filter.type,
+              label: filter.label
+            }))}
+            value={selectedGenderFilter}
+            onChange={handleGenderFilterChange}
+            variant="segmented"
+            size="sm"
+          />
         </RevealOnScroll>
 
         {/* Enhanced Loading State */}
@@ -340,12 +334,12 @@ export const FeedPage = () => {
                   >
                     🎙️
                   </motion.div>
-                  <h3 className="text-xl font-medium text-text-primary mb-2">
+                  <Heading level={3} className="mb-2">
                     No audio content found
-                  </h3>
-                  <p className="text-base text-text-secondary">
+                  </Heading>
+                  <Body color="secondary">
                     Be the first to share your voice!
-                  </p>
+                  </Body>
                 </div>
               </RevealOnScroll>
             ) : (
@@ -374,18 +368,20 @@ export const FeedPage = () => {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: filteredIndex * 0.1 }}
                         >
-                          <h2 className="text-lg font-semibold text-text-primary">
+                          <Body className="text-lg font-medium">
                             {category.name}
-                          </h2>
-                          <motion.button
+                          </Body>
+                          <Button
                             onClick={() => navigate(`/category/${category.id}`)}
-                            className="flex items-center text-sm text-text-secondary hover:text-gradient-strong transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            className="flex items-center text-lg hover:text-gradient-strong"
                             whileHover={{ x: 5 }}
                             transition={{ duration: 0.2 }}
                           >
                             View all
                             <ChevronRight className="w-4 h-4 ml-1" />
-                          </motion.button>
+                          </Button>
                         </motion.div>
                         
                         <StaggerWrapper className="space-y-3">
@@ -408,12 +404,12 @@ export const FeedPage = () => {
                     transition={{ delay: 0.3 }}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-text-primary">
+                      <Body className="text-lg font-medium">
                         All Recordings
-                      </h2>
-                      <span className="text-sm text-text-secondary">
+                      </Body>
+                      <Caption color="secondary">
                         {getFilteredTracks().length} recordings
-                      </span>
+                      </Caption>
                     </div>
                     
                     <StaggerWrapper className="space-y-3">

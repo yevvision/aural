@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' ws: wss: blob: data: http://localhost:* https://storage.googleapis.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' blob:; object-src 'none';">
+    <title>Unicorn Studio - Local SDK</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            text-align: center;
+        }
+        
+        h1 {
+            margin-bottom: 2rem;
+            color: #fff;
+        }
+        
+        .scene-container {
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .loading {
+            color: #666;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Unicorn Studio - Local SDK</h1>
+        <div class="scene-container">
+            <div 
+                data-us-project="3Z7rqYRTDAvnqc3BpTTz" 
+                style="width:800px; height: 600px;"
+            ></div>
+        </div>
+        <div class="loading" id="loading">Lade Unicorn Studio...</div>
+    </div>
+    
+    <script src="./unicornStudio.umd.js"></script>
+    <script>
+        // Debug function
+        function debugLog(message, data = null) {
+            console.log(`[Unicorn Studio Debug] ${message}`, data || '');
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('DOM loaded, initializing Unicorn Studio...');
+            
+            if (window.UnicornStudio) {
+                debugLog('UnicornStudio object found, initializing...');
+                
+                try {
+                    window.UnicornStudio.init().then((scenes) => {
+                        debugLog('Unicorn Studio initialized successfully:', scenes);
+                        document.getElementById('loading').textContent = 'Unicorn Studio geladen!';
+                        document.getElementById('loading').style.color = '#4ade80';
+                    }).catch((err) => {
+                        console.error('Unicorn Studio init error:', err);
+                        document.getElementById('loading').textContent = 'Fehler beim Initialisieren: ' + err.message;
+                        document.getElementById('loading').style.color = '#ef4444';
+                    });
+                } catch (err) {
+                    console.error('Unicorn Studio init exception:', err);
+                    document.getElementById('loading').textContent = 'Fehler beim Initialisieren: ' + err.message;
+                    document.getElementById('loading').style.color = '#ef4444';
+                }
+            } else {
+                console.error('UnicornStudio object not found');
+                document.getElementById('loading').textContent = 'UnicornStudio Objekt nicht gefunden';
+                document.getElementById('loading').style.color = '#ef4444';
+            }
+        });
+    </script>
+</body>
+</html>

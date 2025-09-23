@@ -5,7 +5,7 @@ import { MiniPlayer } from '../audio/MiniPlayer';
 import { usePlayerStore } from '../../stores/playerStore';
 import { initializeGlobalAudioManager, useGlobalAudioManager } from '../../hooks/useGlobalAudioManager';
 import { useEffect, useState, useCallback } from 'react';
-import { OrganicOrangeMorphBackground } from './OrganicOrangeMorphBackground';
+import UnicornBackgroundSimple from '../UnicornBackgroundSimple';
 import { motion } from 'framer-motion';
 import { useScrollBlur } from '../../hooks/useScrollBlur';
 import { createContext, useContext } from 'react';
@@ -83,15 +83,14 @@ export const AppLayout = () => {
     setVisibleAudioCardIdsState(new Set());
   }, [location.pathname]);
 
-  // Check if we're on the record page for mobile layout
+  // Check if we're on the record page or player page for mobile layout
   const isRecordPage = location.pathname === '/record' || location.pathname === '/aural/record';
+  const isPlayerPage = location.pathname.startsWith('/player/');
+  const isBlackBackgroundPage = isRecordPage || isPlayerPage;
   
   return (
     <BackNavigationContext.Provider value={{ showBackButton, setShowBackButton }}>
-      <div className={`min-h-screen ${isRecordPage ? 'mobile-record-layout' : ''}`}>
-        {/* Organic Orange Morph Background - Changes with route navigation */}
-        <OrganicOrangeMorphBackground />
-        
+      <UnicornBackgroundSimple className={`min-h-screen ${isBlackBackgroundPage ? `mobile-record-layout record-page-background ${isPlayerPage ? 'player-page-background' : ''}` : ''}`}>
         {/* Content loads after background is ready */}
         {isContentReady && (
           <div className="min-h-screen flex flex-col text-text-primary relative">
@@ -116,7 +115,7 @@ export const AppLayout = () => {
             <Footer />
           </div>
         )}
-      </div>
+      </UnicornBackgroundSimple>
     </BackNavigationContext.Provider>
   );
 };

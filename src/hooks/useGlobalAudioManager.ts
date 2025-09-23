@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { usePlayerStore } from '../stores/playerStore';
 import { useRecordingStore } from '../stores/userStore';
+import { AudioUrlManager } from '../services/audioUrlManager';
 import type { AudioTrack } from '../types';
 
 // Global singleton audio element - only one instance across the entire app
@@ -112,73 +113,58 @@ export const useGlobalAudioManager = () => {
     
     setLoading(true);
     console.log('🎵 Loading track:', currentTrack.title, 'URL type:', typeof currentTrack.url);
-    console.log('🎵 URL starts with data:', currentTrack.url?.startsWith('data:'));
-    console.log('🎵 URL length:', currentTrack.url?.length);
-    console.log('🎵 Full track object:', {
-      id: currentTrack.id,
-      title: currentTrack.title,
-      url: currentTrack.url ? currentTrack.url.substring(0, 100) + '...' : 'NO URL',
-      filename: currentTrack.filename,
-      format: currentTrack.format
-    });
     
-    // Debug: Test if the URL is valid
-    if (currentTrack.url) {
-      console.log('🔍 Testing audio URL validity...');
-      const testAudio = new Audio();
-      testAudio.oncanplay = () => {
-        console.log('✅ Audio URL is valid and can play');
-        testAudio.remove();
-      };
-      testAudio.onerror = (e) => {
-        console.error('❌ Audio URL is invalid:', e);
-        console.error('❌ Error details:', {
-          code: testAudio.error?.code,
-          message: testAudio.error?.message,
-          src: testAudio.src
-        });
-        testAudio.remove();
-      };
-      testAudio.src = currentTrack.url;
+    // Versuche zuerst die URL aus dem AudioUrlManager zu laden
+    let audioUrl = currentTrack.url;
+    
+    // Wenn die URL nicht funktioniert, versuche sie aus dem AudioUrlManager zu laden
+    if (!audioUrl || audioUrl === '') {
+      console.log('🔍 No URL in track, trying AudioUrlManager...');
+      audioUrl = AudioUrlManager.getAudioUrl(currentTrack.id);
+      
+      if (audioUrl) {
+        console.log('✅ Found URL in AudioUrlManager');
+      } else {
+        console.error('❌ No URL found in AudioUrlManager for track:', currentTrack.id);
+        setLoading(false);
+        return;
+      }
     }
     
-    // Ensure we have a valid URL
-    if (currentTrack.url) {
+    // Für Base64-URLs, lade direkt ohne Validierung
+    if (audioUrl.startsWith('data:audio/')) {
+      console.log('✅ Base64 audio URL detected, loading directly...');
+      
       // Reset audio element before setting new source
       audio.src = '';
       audio.load();
       
-      // Validate base64 data URLs
-      if (currentTrack.url.startsWith('data:audio/')) {
-        console.log('Loading base64 audio, first 100 chars:', currentTrack.url.substring(0, 100));
-        
-        // Check if base64 data is valid
-        try {
-          const base64Data = currentTrack.url.split(',')[1];
-          if (!base64Data || base64Data.length === 0) {
-            console.error('❌ Base64 data is empty');
-            setLoading(false);
-            return;
-          }
-          
-          // Try to decode a small portion to validate
-          atob(base64Data.substring(0, 100));
-          console.log('✅ Base64 data appears valid');
-        } catch (error) {
-          console.error('❌ Base64 data is invalid:', error);
+      // Setze die URL und lade das Audio
+      audio.src = audioUrl;
+      audio.load();
+    } else {
+      // Für andere URLs, validiere sie
+      AudioUrlManager.validateAudioUrl(audioUrl).then(isValid => {
+        if (!isValid) {
+          console.error('❌ Audio URL is invalid:', audioUrl);
           setLoading(false);
           return;
         }
         
-        // For base64 audio, set a longer timeout since it might take longer to decode
-        audio.preload = 'auto';
-      }
-      
-      audio.src = currentTrack.url;
-      audio.load();
-    } else {
-      console.error('Track has no URL:', currentTrack);
-      setLoading(false);
+        console.log('✅ Audio URL is valid, loading...');
+        
+        // Reset audio element before setting new source
+        audio.src = '';
+        audio.load();
+        
+        // Setze die URL und lade das Audio
+        audio.src = audioUrl;
+        audio.load();
+        
+      }).catch(error => {
+        console.error('❌ Error validating audio URL:', error);
+        setLoading(false);
+      });
     }
   }, [currentTrack, setLoading]);
 

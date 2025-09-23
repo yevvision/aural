@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicorn Studio Test - Fixed</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' blob: https://cdn.jsdelivr.net; object-src 'none';">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            text-align: center;
+        }
+        
+        h1 {
+            margin-bottom: 2rem;
+            color: #fff;
+        }
+        
+        .scene-container {
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .loading {
+            color: #666;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Unicorn Studio Test - Fixed</h1>
+        <div class="scene-container">
+            <div 
+                data-us-project="3Z7rqYRTDAvnqc3BpTTz" 
+                style="width:800px; height: 600px;"
+            ></div>
+        </div>
+        <div class="loading" id="loading">Lade Unicorn Studio...</div>
+    </div>
+    
+    <script>
+        // Debug function
+        function debugLog(message, data = null) {
+            console.log(`[Unicorn Studio Debug] ${message}`, data || '');
+        }
+
+        // Load script with error handling
+        function loadUnicornStudio() {
+            debugLog('Starting to load Unicorn Studio SDK...');
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v1.4.31/dist/unicornStudio.umd.js';
+            script.async = true;
+            
+            script.onload = function() {
+                debugLog('SDK script loaded successfully');
+                
+                // Initialize Unicorn Studio
+                if (window.UnicornStudio) {
+                    debugLog('UnicornStudio object found, initializing...');
+                    
+                    try {
+                        window.UnicornStudio.init().then((scenes) => {
+                            debugLog('Unicorn Studio initialized successfully:', scenes);
+                            document.getElementById('loading').textContent = 'Unicorn Studio geladen!';
+                            document.getElementById('loading').style.color = '#4ade80';
+                        }).catch((err) => {
+                            console.error('Unicorn Studio init error:', err);
+                            document.getElementById('loading').textContent = 'Fehler beim Initialisieren: ' + err.message;
+                            document.getElementById('loading').style.color = '#ef4444';
+                        });
+                    } catch (err) {
+                        console.error('Unicorn Studio init exception:', err);
+                        document.getElementById('loading').textContent = 'Fehler beim Initialisieren: ' + err.message;
+                        document.getElementById('loading').style.color = '#ef4444';
+                    }
+                } else {
+                    console.error('UnicornStudio object not found after script load');
+                    document.getElementById('loading').textContent = 'UnicornStudio Objekt nicht gefunden';
+                    document.getElementById('loading').style.color = '#ef4444';
+                }
+            };
+            
+            script.onerror = function() {
+                console.error('Failed to load Unicorn Studio SDK');
+                document.getElementById('loading').textContent = 'Fehler beim Laden des SDKs';
+                document.getElementById('loading').style.color = '#ef4444';
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // Start loading when DOM is ready
+        document.addEventListener('DOMContentLoaded', loadUnicornStudio);
+    </script>
+</body>
+</html>

@@ -92,12 +92,12 @@ export const Heading: React.FC<HeadingProps> = ({
   ...props
 }) => {
   const levelClasses = {
-    1: 'text-4xl md:text-5xl font-bold leading-tight tracking-tight',
-    2: 'text-3xl md:text-4xl font-bold leading-tight tracking-tight',
-    3: 'text-2xl md:text-3xl font-bold leading-snug',
-    4: 'text-xl md:text-2xl font-semibold leading-snug',
-    5: 'text-lg md:text-xl font-semibold leading-normal',
-    6: 'text-base md:text-lg font-semibold leading-normal'
+    1: 'text-3xl md:text-4xl font-bold leading-tight tracking-tight',
+    2: 'text-2xl md:text-3xl font-bold leading-tight tracking-tight',
+    3: 'text-xl md:text-2xl font-bold leading-snug',
+    4: 'text-lg md:text-xl font-semibold leading-snug',
+    5: 'text-base md:text-lg font-semibold leading-normal',
+    6: 'text-sm md:text-base font-semibold leading-normal'
   };
 
   const classes = cn(

@@ -7,309 +7,359 @@ interface UseMediaRecorderOptions {
 }
 
 export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
-  const [isSupported, setIsSupported] = useState(true); // Default to true to avoid initial false negative
+  const [isSupported, setIsSupported] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [duration, setDuration] = useState(0);
   const [isCheckingSupport, setIsCheckingSupport] = useState(true);
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
-  const pausedDurationRef = useRef<number>(0);
-  const isCancellingRef = useRef<boolean>(false);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isCancellingRef = useRef(false);
+  const { setRecordedBlob } = useRecordingStore();
 
-  const {
-    isRecording,
-    isPaused,
-    duration,
-    setDuration,
-    startRecording: storeStartRecording,
-    pauseRecording,
-    resumeRecording,
-    stopRecording: storeStopRecording,
-    setRecordedBlob,
-    reset,
-  } = useRecordingStore();
+  // Debug logging helper
+  const addDebugLog = (message: string, data?: any) => {
+    console.log(`🎤 MediaRecorder: ${message}`, data || '');
+  };
 
-  // Expose the current stream for audio analysis
-  const getCurrentStream = useCallback(() => streamRef.current, []);
+  // Hilfsfunktion zum Konvertieren von AudioBuffer zu WAV
 
-  // Check browser support with retry mechanism
-  useEffect(() => {
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    const checkSupport = () => {
-      const supported = 
-        typeof navigator !== 'undefined' &&
-        navigator.mediaDevices &&
-        typeof navigator.mediaDevices.getUserMedia === 'function' &&
-        typeof MediaRecorder !== 'undefined';
-      
-      if (supported || retryCount >= maxRetries) {
-        setIsSupported(supported);
-        setIsCheckingSupport(false);
-      } else {
-        retryCount++;
-        // Retry after a short delay
-        setTimeout(checkSupport, 100);
-      }
-    };
-    
-    checkSupport();
-  }, []);
-
-  // Duration tracking - fixed to handle pause correctly and page visibility
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    let lastUpdateTime = Date.now();
-    let hiddenStartTime = 0;
-    
-    const updateDuration = () => {
-      if (!isPaused && isRecording) {
-        const now = Date.now();
-        const currentElapsed = (now - startTimeRef.current - pausedDurationRef.current) / 1000;
-        setDuration(currentElapsed);
-        lastUpdateTime = now;
-      }
-    };
-    
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Page became hidden - store the time
-        hiddenStartTime = Date.now();
-        console.log('📱 Page became hidden, pausing timer updates');
-      } else {
-        // Page became visible - adjust for hidden time
-        if (hiddenStartTime > 0) {
-          const hiddenDuration = Date.now() - hiddenStartTime;
-          pausedDurationRef.current += hiddenDuration;
-          console.log('📱 Page became visible, adjusting for hidden time:', hiddenDuration, 'ms');
-          hiddenStartTime = 0;
-        }
-        // Immediately update duration when page becomes visible
-        updateDuration();
-      }
-    };
-    
-    if (isRecording) {
-      // Start the interval
-      interval = setInterval(updateDuration, 100);
-      
-      // Listen for page visibility changes
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      
-      // Also listen for window focus/blur events as backup
-      window.addEventListener('focus', handleVisibilityChange);
-      window.addEventListener('blur', handleVisibilityChange);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
-      window.removeEventListener('blur', handleVisibilityChange);
-    };
-  }, [isRecording, isPaused, setDuration]);
+  // Audio repair functions removed - let useWaveformEditor handle validation and repair
 
   const initializeMediaRecorder = useCallback(async (): Promise<boolean> => {
     try {
-      // Wait for support check to complete
-      if (isCheckingSupport) {
-        // Wait a bit for the support check to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      addDebugLog('Initializing MediaRecorder...');
       
-      if (!isSupported) {
-        options.onError?.('Media recording is not supported in this browser');
+      // Check for MediaRecorder support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        addDebugLog('MediaDevices API not supported');
+        setIsSupported(false);
+        setIsCheckingSupport(false);
         return false;
       }
 
-      // Request microphone permission with better configuration
+      if (!window.MediaRecorder) {
+        addDebugLog('MediaRecorder not supported');
+        setIsSupported(false);
+        setIsCheckingSupport(false);
+        return false;
+      }
+
+      // Get user media
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100,
-          channelCount: 1, // Mono recording
           autoGainControl: true,
+          sampleRate: 44100
         }
+      });
+      
+      addDebugLog('Got user media stream', { 
+        tracks: stream.getTracks().length,
+        audioTracks: stream.getAudioTracks().length
       });
 
       streamRef.current = stream;
       
-      // Create MediaRecorder with better configuration
+      // Check supported MIME types
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/wav'
+      ];
+      
+      let selectedMimeType = '';
+      for (const type of supportedTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          selectedMimeType = type;
+          addDebugLog('Selected MIME type', { type });
+          break;
+        }
+      }
+      
+      if (!selectedMimeType) {
+        addDebugLog('No supported MIME types found');
+        setIsSupported(false);
+        setIsCheckingSupport(false);
+        return false;
+      }
+
+      // Create MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000 // Set a reasonable bitrate
+        mimeType: selectedMimeType,
+        audioBitsPerSecond: 128000
+      });
+      
+      addDebugLog('MediaRecorder created', { 
+        mimeType: selectedMimeType,
+        state: mediaRecorder.state
       });
       
       mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
 
-      // Event listeners
+      // Set up event handlers
       mediaRecorder.ondataavailable = (event) => {
-        console.log('MediaRecorder data available:', event.data.size);
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           chunksRef.current.push(event.data);
+          addDebugLog('MediaRecorder data available', { size: event.data.size });
         }
       };
-      
-      // Add error handling for MediaRecorder
-      mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
-        options.onError?.('Fehler beim Aufnehmen der Audio-Daten');
+
+      mediaRecorder.onstart = () => {
+        addDebugLog('MediaRecorder started');
+        setIsRecording(true);
+        setIsPaused(false);
+        startTimeRef.current = Date.now();
+        chunksRef.current = [];
+        
+        // Start duration timer
+        durationIntervalRef.current = setInterval(() => {
+          const elapsed = (Date.now() - startTimeRef.current) / 1000;
+          setDuration(elapsed);
+        }, 100);
       };
-      
-      // Add warning handling (if supported)
-      if ('onwarning' in mediaRecorder) {
-        (mediaRecorder as any).onwarning = (event: any) => {
-          console.warn('MediaRecorder warning:', event);
-        };
-      }
+
+      mediaRecorder.onpause = () => {
+        addDebugLog('MediaRecorder paused');
+        setIsPaused(true);
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+          durationIntervalRef.current = null;
+        }
+      };
+
+      mediaRecorder.onresume = () => {
+        addDebugLog('MediaRecorder resumed');
+        setIsPaused(false);
+        startTimeRef.current = Date.now() - (duration * 1000);
+        
+        // Resume duration timer
+        durationIntervalRef.current = setInterval(() => {
+          const elapsed = (Date.now() - startTimeRef.current) / 1000;
+          setDuration(elapsed);
+        }, 100);
+      };
 
       mediaRecorder.onstop = () => {
-        console.log('MediaRecorder stopped, chunks count:', chunksRef.current.length);
+        addDebugLog('MediaRecorder stopped', { chunksCount: chunksRef.current.length });
+        
+        // Clear duration timer
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+          durationIntervalRef.current = null;
+        }
+        
+        setIsRecording(false);
+        setIsPaused(false);
         
         // Check if this is a cancellation
         if (isCancellingRef.current) {
-          console.log('Recording was cancelled, not processing data');
+          addDebugLog('Recording was cancelled, not processing data');
           isCancellingRef.current = false;
           return;
         }
         
         const totalSize = chunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0);
-        console.log('Total recording data size:', totalSize);
+        addDebugLog('Total recording data size', { totalSize });
         
         if (chunksRef.current.length === 0 || totalSize === 0) {
-          console.error('No recording data available');
+          addDebugLog('No recording data available');
           options.onError?.('Keine Aufnahmedaten vorhanden');
           return;
         }
         
         try {
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          console.log('Created recording blob:', {
+          const blob = new Blob(chunksRef.current, { type: selectedMimeType });
+          addDebugLog('Created recording blob', {
             size: blob.size,
             type: blob.type
           });
           
           if (blob.size === 0) {
-            console.error('Created blob is empty');
+            addDebugLog('Created blob is empty');
             options.onError?.('Aufnahme ist leer');
             return;
           }
           
-          setRecordedBlob(blob);
-          options.onRecordingComplete?.(blob, duration);
+          // Store the blob immediately
+              setRecordedBlob(blob);
+              
+          // Call the completion callback with the original blob
+          // Let the downstream components handle validation and repair
+          addDebugLog('Recording completed, calling completion callback');
+              options.onRecordingComplete?.(blob, duration);
+          
         } catch (error) {
-          console.error('Failed to create recording blob:', error);
+          addDebugLog('Error creating blob', { error: error.message || error });
           options.onError?.('Fehler beim Erstellen der Aufnahme');
         }
-        
-        // Cleanup stream
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
       };
 
-      // Error handler is already added above
+      mediaRecorder.onerror = (event) => {
+        addDebugLog('MediaRecorder error', { error: event });
+        options.onError?.('Aufnahmefehler');
+        setIsRecording(false);
+        setIsPaused(false);
+      };
 
+      setIsSupported(true);
+      setIsCheckingSupport(false);
       return true;
+
     } catch (error) {
-      console.error('Failed to initialize media recorder:', error);
-      options.onError?.('Failed to access microphone');
+      addDebugLog('Failed to initialize MediaRecorder', { error: error.message || error });
+      setIsSupported(false);
+      setIsCheckingSupport(false);
+      options.onError?.('Fehler beim Initialisieren der Aufnahme');
       return false;
     }
-  }, [isSupported, isCheckingSupport, options, setRecordedBlob, duration]);
+  }, [options, setRecordedBlob]);
 
   const startRecording = useCallback(async () => {
-    const initialized = await initializeMediaRecorder();
-    if (!initialized || !mediaRecorderRef.current) return;
+    if (!mediaRecorderRef.current || isRecording) {
+      addDebugLog('Cannot start recording', { 
+        hasRecorder: !!mediaRecorderRef.current, 
+        isRecording 
+      });
+      return;
+    }
 
-    storeStartRecording();
-    startTimeRef.current = Date.now();
-    pausedDurationRef.current = 0;
-    
-    // Start recording with optimal timeslice
-    mediaRecorderRef.current.start(100); // Collect data every 100ms
-    
-    console.log('MediaRecorder started with 100ms timeslice');
-  }, [initializeMediaRecorder, storeStartRecording]);
+    try {
+      addDebugLog('Starting recording...');
+      mediaRecorderRef.current.start(100); // 100ms timeslice
+      addDebugLog('MediaRecorder started with 100ms timeslice');
+    } catch (error) {
+      addDebugLog('Error starting recording', { error: error.message || error });
+      options.onError?.('Fehler beim Starten der Aufnahme');
+    }
+  }, [isRecording, options]);
 
-  const pauseRecordingAction = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording && !isPaused) {
+  const pauseRecording = useCallback(() => {
+    if (!mediaRecorderRef.current || !isRecording || isPaused) {
+      addDebugLog('Cannot pause recording', { 
+        hasRecorder: !!mediaRecorderRef.current, 
+        isRecording, 
+        isPaused 
+      });
+      return;
+    }
+
+    try {
+      addDebugLog('Pausing recording...');
       mediaRecorderRef.current.pause();
-      pauseRecording();
-      pausedDurationRef.current += Date.now() - startTimeRef.current;
+    } catch (error) {
+      addDebugLog('Error pausing recording', { error: error.message || error });
+      options.onError?.('Fehler beim Pausieren der Aufnahme');
     }
-  }, [isRecording, isPaused, pauseRecording]);
+  }, [isRecording, isPaused, options]);
 
-  const resumeRecordingAction = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording && isPaused) {
-      mediaRecorderRef.current.resume();
-      resumeRecording();
-      startTimeRef.current = Date.now();
+  const resumeRecording = useCallback(() => {
+    if (!mediaRecorderRef.current || !isRecording || !isPaused) {
+      addDebugLog('Cannot resume recording', { 
+        hasRecorder: !!mediaRecorderRef.current, 
+        isRecording, 
+        isPaused 
+      });
+      return;
     }
-  }, [isRecording, isPaused, resumeRecording]);
+
+    try {
+      addDebugLog('Resuming recording...');
+      mediaRecorderRef.current.resume();
+    } catch (error) {
+      addDebugLog('Error resuming recording', { error: error.message || error });
+      options.onError?.('Fehler beim Fortsetzen der Aufnahme');
+    }
+  }, [isRecording, isPaused, options]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      console.log('Stopping MediaRecorder...');
-      
-      // Set a timeout to detect if the MediaRecorder gets stuck
-      const stopTimeout = setTimeout(() => {
-        console.error('MediaRecorder stop timeout - forcing cleanup');
-        options.onError?.('Fehler beim Stoppen der Aufnahme. Bitte versuche es erneut.');
-        
-        // Force cleanup
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-        reset();
-      }, 10000); // 10 second timeout
-      
-      // Override the onstop handler to clear the timeout
-      const originalOnStop = mediaRecorderRef.current.onstop;
-      mediaRecorderRef.current.onstop = (event) => {
-        clearTimeout(stopTimeout);
-        if (originalOnStop && mediaRecorderRef.current) {
-          originalOnStop.call(mediaRecorderRef.current, event);
-        }
-      };
-      
-      try {
-        mediaRecorderRef.current.stop();
-        storeStopRecording();
-      } catch (error) {
-        console.error('Error stopping MediaRecorder:', error);
-        clearTimeout(stopTimeout);
-        options.onError?.('Fehler beim Stoppen der Aufnahme');
-      }
+    if (!mediaRecorderRef.current || !isRecording) {
+      addDebugLog('Cannot stop recording', { 
+        hasRecorder: !!mediaRecorderRef.current, 
+        isRecording 
+      });
+      return;
     }
-  }, [isRecording, storeStopRecording, options, reset]);
+
+    try {
+      addDebugLog('Stopping MediaRecorder...');
+        mediaRecorderRef.current.stop();
+      } catch (error) {
+      addDebugLog('Error stopping recording', { error: error.message || error });
+        options.onError?.('Fehler beim Stoppen der Aufnahme');
+    }
+  }, [isRecording, options]);
 
   const cancelRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      // Set cancellation flag before stopping
-      isCancellingRef.current = true;
-      mediaRecorderRef.current.stop();
-      
-      // Clear recorded data
-      chunksRef.current = [];
-      
-      // Cleanup stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
+    if (!mediaRecorderRef.current) {
+      addDebugLog('Cannot cancel recording - no recorder');
+      return;
     }
-    reset();
-  }, [isRecording, reset]);
+
+    try {
+      addDebugLog('Cancelling recording...');
+      isCancellingRef.current = true;
+      
+      if (isRecording) {
+      mediaRecorderRef.current.stop();
+      }
+      
+      setIsRecording(false);
+      setIsPaused(false);
+      setDuration(0);
+      
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      
+      chunksRef.current = [];
+    } catch (error) {
+      addDebugLog('Error cancelling recording', { error: error.message || error });
+      options.onError?.('Fehler beim Abbrechen der Aufnahme');
+    }
+  }, [isRecording, options]);
+
+  const formatDuration = useCallback((seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  const getCurrentStream = useCallback(() => {
+    return streamRef.current;
+  }, []);
+
+  // Initialize on mount - only once
+  useEffect(() => {
+    let mounted = true;
+    
+    const init = async () => {
+      if (mounted) {
+        await initializeMediaRecorder();
+      }
+    };
+    
+    init();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+      
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -317,28 +367,17 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
   }, []);
 
   return {
-    // State
     isSupported,
     isRecording,
     isPaused,
     duration,
-    isCheckingSupport, // Expose this state
-    
-    // Actions
+    isCheckingSupport,
     startRecording,
-    pauseRecording: pauseRecordingAction,
-    resumeRecording: resumeRecordingAction,
+    pauseRecording,
+    resumeRecording,
     stopRecording,
     cancelRecording,
-    
-    // Audio stream access
+    formatDuration,
     getCurrentStream,
-    
-    // Utils
-    formatDuration: (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
-    },
   };
-}
+};

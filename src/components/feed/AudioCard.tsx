@@ -210,17 +210,17 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
             </div>
             
             {/* Metadata in gray with unified font size */}
-            <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
               <Link 
                 to={`/profile/${safeUser.id}`}
-                className="text-gray-400 hover:text-gray-300 transition-colors flex items-center space-x-1"
+                className="text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"
                 onClick={(e) => e.stopPropagation()}
               >
                 <User size={12} />
                 <span>{safeUser.username}</span>
               </Link>
               
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center gap-1">
                 <Play 
                   size={13} 
                   className="text-gray-400"
@@ -229,7 +229,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <span className="text-gray-400">{safeTrack.plays || 0}</span>
               </div>
               
-              <button 
+              <div 
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -237,8 +237,19 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                   const success = toggleLike(safeTrack.id, 'user-1');
                   console.log('❤️ AudioCard: Like result:', success);
                 }}
-                className="flex items-center space-x-1 hover:scale-105 transition-transform cursor-pointer"
+                className="flex items-center gap-1 hover:scale-105 transition-transform cursor-pointer"
                 title={safeTrack.isLiked ? 'Unlike' : 'Like'}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('❤️ AudioCard: Like button clicked for track:', safeTrack.id);
+                    const success = toggleLike(safeTrack.id, 'user-1');
+                    console.log('❤️ AudioCard: Like result:', success);
+                  }
+                }}
               >
                 <Heart 
                   size={12} 
@@ -248,10 +259,8 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <span className="text-gray-400">
                   {safeTrack.likes}
                 </span>
-              </button>
-              
-              
-              <div className="flex items-center space-x-1">
+              </div>
+              <div className="flex items-center gap-1">
                 <Clock size={12} />
                 <span className="tabular-nums">{formatDuration(safeTrack.duration)}</span>
               </div>

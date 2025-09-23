@@ -15,6 +15,8 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+import { Button, IconButton } from '../components/ui/Button';
+import { Heading, Body } from '../components/ui/Typography';
 import type { AudioTrack } from '../types';
 
 export const RecorderPage = () => {
@@ -364,12 +366,12 @@ export const RecorderPage = () => {
           <RevealOnScroll direction="up">
             <div className="true-black-card text-center">
               <Loader2 size={48} className="text-gradient-strong mx-auto mb-6 animate-spin" />
-              <h2 className="text-xl font-medium text-text-primary mb-3">
+              <Heading level={2} className="mb-3">
                 Browser wird überprüft...
-              </h2>
-              <p className="text-text-secondary">
+              </Heading>
+              <Body color="secondary">
                 Überprüfung der Audioaufnahme-Funktion
-              </p>
+              </Body>
             </div>
           </RevealOnScroll>
         </div>
@@ -384,19 +386,19 @@ export const RecorderPage = () => {
           <RevealOnScroll direction="up">
             <div className="true-black-card text-center">
               <MicOff size={64} className="text-text-secondary mx-auto mb-6" />
-              <h2 className="text-xl font-medium text-text-primary mb-3">
+              <Heading level={2} className="mb-3">
                 Aufnahme nicht unterstützt
-              </h2>
-              <p className="text-text-secondary mb-6">
+              </Heading>
+              <Body color="secondary" className="mb-6">
                 Ihr Browser unterstützt die Audioaufnahme nicht
-              </p>
-              <button
+              </Body>
+              <Button
                 onClick={handleBack}
-                className="px-6 py-3 bg-gradient-primary rounded-lg text-white font-medium 
-                         hover:scale-105 active:scale-95 transition-transform duration-200"
+                variant="primary"
+                size="md"
               >
                 Zurück
-              </button>
+              </Button>
             </div>
           </RevealOnScroll>
         </div>
@@ -413,12 +415,12 @@ export const RecorderPage = () => {
 
         {/* Title - "Aufnahme läuft" - zentriert */}
         <div className="text-center mb-8">
-          <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+          <Heading level={1} className="text-4xl mb-4">
             {isRecording && !isPaused ? 'Aufnahme läuft' : 
              isRecording && isPaused ? 'Aufnahme pausiert' :
              !isRecording && !recordedBlob ? 'Bereit zur Aufnahme' :
              'Aufnahme abgeschlossen'}
-          </h1>
+          </Heading>
           
           {/* Duration Display - direkt unter dem Titel */}
           <div className="text-6xl font-mono text-white mb-8 tabular-nums">
@@ -455,42 +457,45 @@ export const RecorderPage = () => {
         {/* Recording Controls - zentriert unter dem Visualizer */}
         {isRecording && (
           <div className="flex justify-center items-center space-x-6">
-            <button
+            <IconButton
               onClick={handlePauseResume}
-              className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center ${
-                isPaused ? "border-orange-500 bg-orange-500/20" : ""
-              }`}
-            >
-              {isPaused ? (
-                <Play size={24} className="text-orange-500" strokeWidth={1.5} />
-              ) : (
+              variant="glass"
+              size="lg"
+              icon={isPaused ? 
+                <Play size={24} className="text-orange-500" strokeWidth={1.5} /> :
                 <Pause size={24} className="text-gray-400" strokeWidth={1.5} />
-              )}
-            </button>
+              }
+              aria-label={isPaused ? "Resume recording" : "Pause recording"}
+              className={isPaused ? "border-orange-500 bg-orange-500/20" : ""}
+            />
             
-            <button
+            <IconButton
               onClick={handleStopRecording}
-              className="w-[56px] h-[56px] rounded-full border border-red-500 bg-red-500/20 flex items-center justify-center"
-            >
-              <Square size={24} className="text-red-400" strokeWidth={1.5} />
-            </button>
+              variant="glass"
+              size="lg"
+              icon={<Square size={24} className="text-red-400" strokeWidth={1.5} />}
+              aria-label="Stop recording"
+              className="border-red-500 bg-red-500/20"
+            />
           </div>
         )}
 
         {/* Error Message Display */}
         {error && !recordedBlob && !isRecording && (
           <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-red-400 text-sm text-center">{error}</p>
-            <button
+            <Body color="secondary" className="text-red-400 text-sm text-center">{error}</Body>
+            <Button
               onClick={() => {
                 setError('');
                 handleDiscard();
               }}
-              className="mt-2 w-full py-2 bg-white/10 rounded-lg text-white font-medium 
-                       hover:bg-white/20 transition-colors duration-200"
+              variant="glass"
+              size="sm"
+              fullWidth
+              className="mt-2"
             >
               Erneut versuchen
-            </button>
+            </Button>
           </div>
         )}
 
@@ -501,55 +506,57 @@ export const RecorderPage = () => {
             {autoProceed && (
               <div className="flex-1 text-center">
                 <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p className="text-white text-sm">Aufnahme wird vorbereitet...</p>
+                <Body className="text-white text-sm">Aufnahme wird vorbereitet...</Body>
               </div>
             )}
             
             {/* Playback Control */}
             {!autoProceed && (
-              <button
+              <IconButton
                 onClick={handlePlayPause}
-                className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center ${
-                  currentTrack?.id === previewTrack?.id && isPlaying ? "border-orange-500 bg-orange-500/20" : ""
-                }`}
-                disabled={autoProceed}
-              >
-                {currentTrack?.id === previewTrack?.id && isPlaying ? (
-                  <Pause size={24} className="text-orange-500" strokeWidth={1.5} />
-                ) : (
+                variant="glass"
+                size="lg"
+                icon={currentTrack?.id === previewTrack?.id && isPlaying ? 
+                  <Pause size={24} className="text-orange-500" strokeWidth={1.5} /> :
                   <Play size={24} className="text-gray-400" strokeWidth={1.5} />
-                )}
-              </button>
+                }
+                aria-label={currentTrack?.id === previewTrack?.id && isPlaying ? "Pause" : "Play"}
+                disabled={autoProceed}
+                className={currentTrack?.id === previewTrack?.id && isPlaying ? "border-orange-500 bg-orange-500/20" : ""}
+              />
             )}
 
             {/* Error Message */}
             {error && (
               <div className="flex-1 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <p className="text-red-400 text-sm text-center">{error}</p>
+                <Body color="secondary" className="text-red-400 text-sm text-center">{error}</Body>
               </div>
             )}
 
             {/* Action Buttons - only show if not auto-proceeding */}
             {!autoProceed && (
               <>
-                <button
+                <IconButton
                   onClick={handleDiscard}
-                  className="w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center hover:border-red-500 hover:bg-red-500/20"
-                >
-                  <Trash2 size={24} className="text-gray-400 hover:text-red-400" strokeWidth={1.5} />
-                </button>
+                  variant="glass"
+                  size="lg"
+                  icon={<Trash2 size={24} className="text-gray-400 hover:text-red-400" strokeWidth={1.5} />}
+                  aria-label="Discard recording"
+                  className="hover:border-red-500 hover:bg-red-500/20"
+                />
                 
-                <button
+                <IconButton
                   onClick={handleSave}
                   disabled={!recordedBlob || isSaving}
-                  className="w-[56px] h-[56px] rounded-full border border-orange-500 bg-orange-500/20 flex items-center justify-center disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                  ) : (
+                  variant="glass"
+                  size="lg"
+                  icon={isSaving ? 
+                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> :
                     <Save size={24} className="text-orange-500" strokeWidth={1.5} />
-                  )}
-                </button>
+                  }
+                  aria-label="Save recording"
+                  className="border-orange-500 bg-orange-500/20"
+                />
               </>
             )}
           </div>

@@ -17,12 +17,32 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
   const [isReady, setIsReady] = useState(false);
   const [allRegions, setAllRegions] = useState<{ start: number; end: number; id: string }[]>([]);
 
+  // Debug logging function
+  const addDebugLog = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${message}`;
+    console.log(`🔍 useWaveformEditor: ${logMessage}`, data || '');
+  };
+
   const create = useCallback(() => {
-    if (!container) return;
+    if (!container) {
+      addDebugLog('Container not available, skipping WaveSurfer creation');
+      return;
+    }
     
     try {
+      addDebugLog('Creating WaveSurfer instance', { 
+        container: container.tagName, 
+        barWidth, 
+        height,
+        hasPreviousInstance: !!wsRef.current 
+      });
+      
       // Destroy previous instance if any
-      wsRef.current?.destroy();
+      if (wsRef.current) {
+        addDebugLog('Destroying previous WaveSurfer instance');
+        wsRef.current.destroy();
+      }
 
       const ws = WaveSurfer.create({
         container,
@@ -79,12 +99,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
       });
 
       ws.on('ready', () => {
-        console.log('WaveSurfer: Ready, duration:', ws.getDuration());
+        const duration = ws.getDuration();
+        addDebugLog('WaveSurfer ready event fired', { duration, isFinite: isFinite(duration) });
+        console.log('WaveSurfer: Ready, duration:', duration);
         setIsReady(true);
-        setDuration(ws.getDuration());
+        setDuration(duration);
         
         // Add mobile touch event listeners
         if (container) {
+          addDebugLog('Adding mobile touch event listeners');
           // Haptic feedback for touch interactions
           const triggerHaptic = () => {
             if ('vibrate' in navigator) {
@@ -113,12 +136,18 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
       });
 
       ws.on('error', (error: any) => {
+        addDebugLog('WaveSurfer error event', { error: error.message || error });
         console.error('WaveSurfer error:', error);
       });
 
       wsRef.current = ws;
       regionsRef.current = regions;
+      addDebugLog('WaveSurfer instance created successfully', { 
+        hasWaveSurfer: !!wsRef.current, 
+        hasRegions: !!regionsRef.current 
+      });
     } catch (error) {
+      addDebugLog('Failed to create WaveSurfer instance', { error: error.message || error });
       console.error('Failed to create WaveSurfer instance:', error);
     }
   }, [container, barWidth, height]);
@@ -130,16 +159,175 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
   }, [container]); // Remove create from dependencies to prevent infinite loop
 
   useEffect(() => {
-    if (audioBlob && wsRef.current) {
-      console.log('WaveSurfer: Loading audio blob, size:', audioBlob.size);
+    if (!audioBlob || !wsRef.current) {
+      if (audioBlob && !wsRef.current) {
+        addDebugLog('Audio blob available but WaveSurfer not ready', { 
+          blobSize: audioBlob.size, 
+          hasWaveSurfer: !!wsRef.current 
+        });
+      }
+      return;
+    }
+
+    addDebugLog('Starting audio blob loading process', { 
+      blobSize: audioBlob.size, 
+      blobType: audioBlob.type,
+      hasWaveSurfer: !!wsRef.current 
+    });
+    console.log('WaveSurfer: Loading audio blob, size:', audioBlob.size);
+    
+    // Validate and fix audio blob before loading
+    const validateAndLoadAudio = async () => {
       try {
-        // Directly load recording blob
-        wsRef.current.loadBlob(audioBlob);
+        addDebugLog('Starting audio validation before WaveSurfer loading');
+        // First, validate the audio blob by creating an Audio element
+        const audio = new Audio();
+        const url = URL.createObjectURL(audioBlob);
+        audio.src = url;
+        addDebugLog('Created audio element for validation', { url });
+        
+        const loadPromise = new Promise<boolean>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            addDebugLog('Audio validation timeout after 15 seconds');
+            reject(new Error('Audio loading timeout'));
+          }, 15000);
+          
+          audio.addEventListener('loadedmetadata', () => {
+            clearTimeout(timeout);
+            addDebugLog('Audio metadata loaded in validation', { duration: audio.duration });
+            console.log('Audio metadata loaded, duration:', audio.duration);
+            
+            // Check if duration is valid (not Infinity or NaN)
+            if (isFinite(audio.duration) && audio.duration > 0) {
+              addDebugLog('Audio validation successful, proceeding to WaveSurfer', { duration: audio.duration });
+              console.log('Audio duration is valid:', audio.duration);
+              URL.revokeObjectURL(url);
+              resolve(true);
+            } else {
+              addDebugLog('Audio duration is invalid in validation', { duration: audio.duration });
+              console.warn('Audio duration is invalid:', audio.duration);
+              URL.revokeObjectURL(url);
+              reject(new Error('Invalid audio duration'));
+            }
+          });
+          
+          audio.addEventListener('error', (e) => {
+            clearTimeout(timeout);
+            addDebugLog('Audio validation error', { error: e });
+            console.error('Audio loading error:', e);
+            URL.revokeObjectURL(url);
+            reject(new Error('Audio loading failed'));
+          });
+          
+          // Force load
+          addDebugLog('Starting audio load for validation');
+          audio.load();
+        });
+        
+        await loadPromise;
+        
+        // If validation passed, load into WaveSurfer
+        addDebugLog('Validation passed, loading blob into WaveSurfer');
+        if (wsRef.current) {
+          wsRef.current.loadBlob(audioBlob);
+        }
+        
       } catch (error) {
-        console.error('Failed to load audio blob:', error);
+        addDebugLog('Audio validation failed, attempting to fix blob', { error: error.message || error });
+        console.error('Failed to validate or load audio blob:', error);
+        
+        // Try to fix the audio blob by converting it
+        try {
+          addDebugLog('Attempting to fix audio blob using AudioContext');
+          console.log('Attempting to fix audio blob...');
+          const fixedBlob = await fixAudioBlob(audioBlob);
+          if (fixedBlob && wsRef.current) {
+            addDebugLog('Audio blob fixed successfully, loading into WaveSurfer', { 
+              originalSize: audioBlob.size, 
+              fixedSize: fixedBlob.size 
+            });
+            console.log('Audio blob fixed, loading into WaveSurfer');
+            wsRef.current.loadBlob(fixedBlob);
+          } else {
+            addDebugLog('Failed to fix audio blob - no fixed blob returned or WaveSurfer not available');
+            throw new Error('Could not fix audio blob');
+          }
+        } catch (fixError) {
+          addDebugLog('Failed to fix audio blob', { error: fixError.message || fixError });
+          console.error('Failed to fix audio blob:', fixError);
+          // Show error to user
+          setIsReady(false);
+        }
+      }
+    };
+    
+    validateAndLoadAudio();
+  }, [audioBlob]);
+
+  // Helper function to fix audio blob
+  const fixAudioBlob = async (blob: Blob): Promise<Blob | null> => {
+    try {
+      // Create a new AudioContext to process the audio
+      const audioContext = new AudioContext();
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      console.log('Audio buffer decoded successfully, duration:', audioBuffer.duration);
+      
+      // Convert back to WAV format
+      const wavBlob = await audioBufferToWav(audioBuffer);
+      await audioContext.close();
+      
+      return wavBlob;
+    } catch (error) {
+      console.error('Failed to fix audio blob:', error);
+      return null;
+    }
+  };
+
+  // Helper function to convert AudioBuffer to WAV
+  const audioBufferToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const length = audioBuffer.length;
+    
+    // Create WAV header
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * numberOfChannels * 2, true);
+    
+    // Convert audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
       }
     }
-  }, [audioBlob]);
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
 
   const addOrReplaceRegion = useCallback((start = 0, end?: number) => {
     if (!regionsRef.current || !wsRef.current || !isReady) return;

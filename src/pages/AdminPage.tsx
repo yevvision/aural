@@ -6,6 +6,8 @@ import type { AudioTrack, User } from '../types';
 import { MiniPlayer } from '../components/audio/MiniPlayer';
 import { useGlobalAudioManager } from '../hooks/useGlobalAudioManager';
 import { useDatabase } from '../hooks/useDatabase';
+import { Button, IconButton } from '../components/ui/Button';
+import { Heading, Body, Caption } from '../components/ui/Typography';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminFilters } from '../components/admin/AdminFilters';
 import { AdminUploadsTable } from '../components/admin/AdminUploadsTable';
@@ -154,8 +156,8 @@ export const AdminPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Zugriff verweigert</h1>
-          <p className="text-gray-600">Sie haben keine Berechtigung, diese Seite zu besuchen.</p>
+          <Heading level={1} className="text-2xl mb-4">Zugriff verweigert</Heading>
+          <Body color="secondary">Sie haben keine Berechtigung, diese Seite zu besuchen.</Body>
         </div>
       </div>
     );
@@ -296,8 +298,8 @@ export const AdminPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-text-secondary">Verwalten Sie Benutzer, Uploads und Inhalte</p>
+          <Heading level={1} className="text-4xl mb-2">Admin Dashboard</Heading>
+          <Body color="secondary">Verwalten Sie Benutzer, Uploads und Inhalte</Body>
         </motion.div>
 
         {/* Statistiken */}
@@ -319,8 +321,8 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Benutzer</p>
-                <p className="text-2xl font-semibold text-white">{stats.totalUsers}</p>
+                <Caption color="secondary">Benutzer</Caption>
+                <Body className="text-2xl font-semibold text-white">{stats.totalUsers}</Body>
               </div>
             </div>
           </motion.div>
@@ -337,8 +339,8 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Tracks</p>
-                <p className="text-2xl font-semibold text-white">{stats.totalTracks}</p>
+                <Caption color="secondary">Tracks</Caption>
+                <Body className="text-2xl font-semibold text-white">{stats.totalTracks}</Body>
               </div>
             </div>
           </motion.div>
@@ -355,8 +357,8 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Kommentare</p>
-                <p className="text-2xl font-semibold text-white">{stats.totalComments}</p>
+                <Caption color="secondary">Kommentare</Caption>
+                <Body className="text-2xl font-semibold text-white">{stats.totalComments}</Body>
               </div>
             </div>
           </motion.div>
@@ -373,8 +375,8 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Likes</p>
-                <p className="text-2xl font-semibold text-white">{stats.totalLikes}</p>
+                <Caption color="secondary">Likes</Caption>
+                <Body className="text-2xl font-semibold text-white">{stats.totalLikes}</Body>
               </div>
             </div>
           </motion.div>
@@ -391,8 +393,8 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Speicher</p>
-                <p className="text-2xl font-semibold text-white">{formatFileSize(stats.totalFileSize)}</p>
+                <Caption color="secondary">Speicher</Caption>
+                <Body className="text-2xl font-semibold text-white">{formatFileSize(stats.totalFileSize)}</Body>
               </div>
             </div>
           </motion.div>
@@ -409,10 +411,10 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">Reports</p>
-                <p className="text-2xl font-semibold text-white">{stats.totalReports}</p>
+                <Caption color="secondary">Reports</Caption>
+                <Body className="text-2xl font-semibold text-white">{stats.totalReports}</Body>
                 {stats.pendingReports > 0 && (
-                  <p className="text-xs text-gradient-strong">{stats.pendingReports} pending</p>
+                  <Caption className="text-gradient-strong">{stats.pendingReports} pending</Caption>
                 )}
               </div>
             </div>
@@ -426,25 +428,25 @@ export const AdminPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <motion.button
+          <Button
             onClick={() => {/* TODO: Implement create post */}}
-            className="glass-button px-4 py-2 rounded-lg text-text-secondary hover:text-white transition-colors flex items-center gap-2"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            variant="glass"
+            size="md"
+            className="flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Neuen Post erstellen
-          </motion.button>
+          </Button>
           
-          <motion.button
+          <Button
             onClick={handleDeleteAllUserContent}
-            className="glass-button px-4 py-2 rounded-lg text-text-secondary hover:text-red-400 transition-colors flex items-center gap-2"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            variant="glass"
+            size="md"
+            className="flex items-center gap-2 hover:text-red-400"
           >
             <Trash2 className="w-4 h-4" />
             Alle Benutzerinhalte löschen
-          </motion.button>
+          </Button>
         </motion.div>
 
         {/* Toggle-Menü für Tabs */}
@@ -465,23 +467,19 @@ export const AdminPage: React.FC = () => {
             ].map((tab) => {
               const Icon = tab.icon;
               return (
-                <motion.button
+                <Button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? 'bg-gradient-primary text-white'
-                      : 'glass-surface text-text-secondary hover:text-white hover:bg-white/10'
-                  } ${tab.id === 'pending' && tab.count > 0 ? 'border-2 border-red-500/50 bg-red-500/10' : ''}`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  variant={activeTab === tab.id ? 'primary' : 'glass'}
+                  size="sm"
+                  className={`flex items-center gap-2 ${tab.id === 'pending' && tab.count > 0 ? 'border-2 border-red-500/50 bg-red-500/10' : ''}`}
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label} ({tab.count})
                   {tab.id === 'pending' && tab.count > 0 && (
                     <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                   )}
-                </motion.button>
+                </Button>
               );
             })}
           </div>
@@ -556,18 +554,18 @@ export const AdminPage: React.FC = () => {
             >
               <div className="panel-floating">
                 <div className="px-6 py-4 border-b border-white/10">
-                  <h3 className="text-lg font-medium text-white">Kommentare ({comments.length})</h3>
+                  <Heading level={3} className="text-lg">Kommentare ({comments.length})</Heading>
                 </div>
                 <div className="p-6">
                   {comments.length === 0 ? (
-                    <p className="text-text-secondary text-center py-8">Keine Kommentare vorhanden.</p>
+                    <Body color="secondary" className="text-center py-8">Keine Kommentare vorhanden.</Body>
                   ) : (
                     <div className="space-y-4">
                       {comments.map((comment) => (
                         <div key={comment.id} className="border-b border-white/10 pb-4 last:border-b-0">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <p className="text-white mb-2">{comment.content}</p>
+                              <Body className="text-white mb-2">{comment.content}</Body>
                               <div className="text-sm text-text-secondary">
                                 <span className="font-medium">{comment.user.username}</span>
                                 <span className="mx-2">•</span>
@@ -578,12 +576,14 @@ export const AdminPage: React.FC = () => {
                                 <span>{getCommentLikeCount(comment.id)} Likes</span>
                               </div>
                             </div>
-                            <button
+                            <Button
                               onClick={() => handleDeleteComment(comment.trackId, comment.id)}
-                              className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-300"
                             >
                               Löschen
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -631,16 +631,18 @@ export const AdminPage: React.FC = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="mb-4">
-                <button
+                <Button
                   onClick={() => {
                     // loadData();
                     loadPendingCount();
                     console.log('🔄 Manual refresh triggered');
                   }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  variant="primary"
+                  size="md"
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   🔄 Daten aktualisieren
-                </button>
+                </Button>
               </div>
               <PendingUploadsQueue
                 onUploadProcessed={(uploadId, action) => {

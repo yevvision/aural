@@ -22,6 +22,15 @@ export default function WaveformVisualizer({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  
+  // Debug logging function
+  const addDebugLog = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${message}`;
+    console.log(`🔍 WaveformVisualizer: ${logMessage}`, data || '');
+    setDebugInfo(prev => [...prev.slice(-9), logMessage]); // Keep last 10 logs
+  };
   
   // Haptic feedback helper
   const triggerHaptic = () => {
@@ -32,6 +41,16 @@ export default function WaveformVisualizer({
   
   const { selection, addOrReplaceRegion, addNewRegion, removeRegion, allRegions, isReady, zoom, play, pause, playing, duration } =
     useWaveformEditor({ container: containerRef.current, audioBlob: blob, height: 120, barWidth: 2 });
+
+  // Log component state changes
+  useEffect(() => {
+    addDebugLog('Component mounted/updated', {
+      blob: blob ? { size: blob.size, type: blob.type } : null,
+      container: containerRef.current ? 'available' : 'null',
+      isReady,
+      duration
+    });
+  }, [blob, isReady, duration]);
 
   useEffect(() => { onSelectionChange(selection); }, [selection]); // Remove onSelectionChange from dependencies to prevent infinite loop
   
@@ -53,37 +72,72 @@ export default function WaveformVisualizer({
     }
   }, [removeRegion]); // Remove onRemoveRegionReady from dependencies to prevent infinite loop
 
-  // Error boundary effect
+  // Error boundary effect with better error handling
   useEffect(() => {
     if (blob && !isReady) {
+      addDebugLog('Starting timeout for waveform loading', { blobSize: blob.size, blobType: blob.type });
       const timeout = setTimeout(() => {
         if (!isReady) {
+          addDebugLog('TIMEOUT: Waveform failed to load within 20 seconds', { isReady, duration });
           setError('Wellenform konnte nicht geladen werden. Bitte versuchen Sie es erneut.');
         }
-      }, 5000); // 5 second timeout
+      }, 20000); // 20 second timeout for audio processing
       
-      return () => clearTimeout(timeout);
+      return () => {
+        addDebugLog('Clearing timeout (component unmounting or isReady changed)');
+        clearTimeout(timeout);
+      };
     }
   }, [blob, isReady]);
 
+  // Remove duplicate audio validation - let useWaveformEditor handle it
+  // The validation is already done in useWaveformEditor, so we don't need to duplicate it here
+
   if (error) {
-  return (
-    <div className={className ?? ''}>
+    return (
+      <div className={className ?? ''}>
         <div className="w-full h-28 rounded bg-red-900/20 border border-red-500/30 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-400 text-sm mb-2">{error}</p>
-            <button 
-              onClick={() => {
-                setError(null);
-                // Retry by recreating the component
-                window.location.reload();
-              }}
-              className="px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700"
-            >
-              Erneut versuchen
-            </button>
+            
+            {/* Debug Information */}
+            {debugInfo.length > 0 && (
+              <div className="mb-3 p-2 bg-black/50 rounded text-xs text-gray-300 max-h-20 overflow-y-auto">
+                <p className="text-gray-400 mb-1">Debug Log:</p>
+                {debugInfo.map((log, index) => (
+                  <div key={index} className="text-xs text-gray-400">{log}</div>
+                ))}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <button 
+                onClick={() => {
+                  addDebugLog('Retry button clicked');
+                  setError(null);
+                  // Retry by recreating the component
+                  window.location.reload();
+                }}
+                className="px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 mr-2"
+              >
+                Erneut versuchen
+              </button>
+              <button 
+                onClick={() => {
+                  addDebugLog('New recording button clicked');
+                  // Navigate back to recorder
+                  window.location.href = '/recorder';
+                }}
+                className="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+              >
+                Neu aufnehmen
+              </button>
+            </div>
+            <p className="text-red-300 text-xs mt-2">
+              Tipp: Versuchen Sie eine kürzere Aufnahme oder warten Sie einen Moment.
+            </p>
           </div>
-          </div>
+        </div>
       </div>
     );
   }

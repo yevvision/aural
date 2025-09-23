@@ -19,6 +19,7 @@ import { DatenschutzPage } from './pages/DatenschutzPage';
 import { AGBPage } from './pages/AGBPage';
 import { ImpressumPage } from './pages/ImpressumPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import UnicornStudioPage from './pages/UnicornStudioPage';
 import './App.css';
 
 // German spec: Enhanced routing structure for Aural mobile web app
@@ -43,6 +44,7 @@ function App() {
           <Route path="comment-track" element={<CommentTrackPage />} />
           <Route path="test" element={<TestPage />} />
           <Route path="debug" element={<DebugPage />} />
+          <Route path="unicorn" element={<UnicornStudioPage />} />
         </Route>
         
         {/* AURAL ROOT ROUTES */}
@@ -59,6 +61,7 @@ function App() {
           <Route path="search" element={<SearchPage />} />
           <Route path="news" element={<CommentsPage />} />
           <Route path="comment-track" element={<CommentTrackPage />} />
+          <Route path="unicorn" element={<UnicornStudioPage />} />
         </Route>
         
         {/* AURAL WITH TRAILING SLASH */}
@@ -75,6 +78,7 @@ function App() {
           <Route path="search" element={<SearchPage />} />
           <Route path="news" element={<CommentsPage />} />
           <Route path="comment-track" element={<CommentTrackPage />} />
+          <Route path="unicorn" element={<UnicornStudioPage />} />
         </Route>
         
         {/* ADDITIONAL ROUTES */}

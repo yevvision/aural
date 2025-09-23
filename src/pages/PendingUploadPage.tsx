@@ -2,6 +2,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Shield, Clock, ArrowLeft } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { Heading, Body } from '../components/ui/Typography';
 
 interface PendingUploadData {
   uploadId: string;
@@ -44,13 +46,13 @@ export const PendingUploadPage: React.FC<PendingUploadPageProps> = ({ uploadData
             <Shield className="w-10 h-10 text-orange-500" />
           </motion.div>
           
-          <h1 className="text-3xl font-bold text-white mb-4">
+          <Heading level={1} className="text-3xl mb-4">
             Sicherheitsprüfung läuft
-          </h1>
+          </Heading>
           
-          <p className="text-gray-400 text-lg">
+          <Body color="secondary" className="text-lg">
             Hey, zur Sicherheit prüfen wir deinen Upload. Du erhältst automatisch eine Benachrichtigung, sobald dein Audio freigegeben wurde.
-          </p>
+          </Body>
         </div>
 
         {/* Upload Info Card */}
@@ -65,8 +67,8 @@ export const PendingUploadPage: React.FC<PendingUploadPageProps> = ({ uploadData
               <Clock className="w-6 h-6 text-orange-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-orange-500">{uploadData.title}</h3>
-              <p className="text-gray-400">Upload ID: {uploadData.uploadId}</p>
+              <Heading level={3} className="text-xl text-orange-500">{uploadData.title}</Heading>
+              <Body color="secondary">Upload ID: {uploadData.uploadId}</Body>
             </div>
           </div>
           
@@ -88,9 +90,9 @@ export const PendingUploadPage: React.FC<PendingUploadPageProps> = ({ uploadData
           </div>
           
           <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <p className="text-orange-400 text-sm">
+            <Body className="text-orange-400 text-sm">
               <strong>Grund für Prüfung:</strong> {uploadData.reason}
-            </p>
+            </Body>
           </div>
         </motion.div>
 
@@ -102,29 +104,37 @@ export const PendingUploadPage: React.FC<PendingUploadPageProps> = ({ uploadData
           className="space-y-4"
         >
           {/* Verstanden Button */}
-          <button
+          <Button
             onClick={handleVerstanden}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
+            variant="primary"
+            size="lg"
+            fullWidth
+            className="py-4 text-lg"
           >
             Verstanden
-          </button>
+          </Button>
           
           {/* Warum Button */}
-          <button
+          <Button
             onClick={handleWarum}
-            className="w-full bg-gray-800/50 border border-gray-600 text-gray-300 py-3 px-6 rounded-xl font-medium hover:bg-gray-700/50 hover:text-white transition-all duration-200 backdrop-blur-sm"
+            variant="glass"
+            size="md"
+            fullWidth
           >
             Warum?
-          </button>
+          </Button>
           
           {/* Zurück Button */}
-          <button
+          <Button
             onClick={() => navigate('/')}
-            className="w-full flex items-center justify-center space-x-2 text-gray-400 hover:text-white transition-colors duration-200"
+            variant="ghost"
+            size="md"
+            fullWidth
+            className="flex items-center justify-center space-x-2"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Zurück zur Startseite</span>
-          </button>
+          </Button>
         </motion.div>
 
         {/* Info Footer */}

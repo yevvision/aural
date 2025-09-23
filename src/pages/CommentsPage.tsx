@@ -10,6 +10,7 @@ import { timeAgo, sanitizeAudioTrack } from '../utils';
 import { groupActivitiesByTime, getRecentUnreadCount, type TimePeriod, type GroupedActivities } from '../utils/notificationUtils';
 import { Button } from '../components/ui/Button';
 import { PageTransition, RevealOnScroll } from '../components/ui';
+import { MultiToggle } from '../components/ui/Toggle';
 import type { AudioTrack, NotificationActivity } from '../types';
 
 export const CommentsPage = () => {
@@ -156,30 +157,17 @@ export const CommentsPage = () => {
         >
           {/* Activity View Toggle - Reorganized with notifications on left and my_activity on right */}
           <RevealOnScroll direction="up">
-            <div className="glass-surface rounded-full p-1 mb-6">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setViewMode('notifications')}
-                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all duration-200 ${
-                    viewMode === 'notifications'
-                      ? 'bg-gradient-primary text-white shadow-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                  }`}
-                >
-                  Notifications
-                </button>
-                <button
-                  onClick={() => setViewMode('my_activity')}
-                  className={`flex-1 py-2 px-4 rounded-full text-sm font-medium transition-all duration-200 ${
-                    viewMode === 'my_activity'
-                      ? 'bg-gradient-primary text-white shadow-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                  }`}
-                >
-                  My Activities
-                </button>
-              </div>
-            </div>
+            <MultiToggle
+              options={[
+                { value: 'notifications', label: 'Notifications' },
+                { value: 'my_activity', label: 'My Activities' }
+              ]}
+              value={viewMode}
+              onChange={setViewMode}
+              variant="segmented"
+              size="md"
+              className="mb-6"
+            />
           </RevealOnScroll>
 
           {/* Activities List - Grouped by Time Period */}

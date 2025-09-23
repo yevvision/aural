@@ -17,7 +17,7 @@ export default defineConfig({
         headers: {
           'Cross-Origin-Embedder-Policy': 'unsafe-none',
           'Cross-Origin-Opener-Policy': 'unsafe-none',
-          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:*; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';"
+          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://assets.unicorn.studio; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:* https://assets.unicorn.studio; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';"
         }
   },
   build: {
