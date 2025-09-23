@@ -91,8 +91,7 @@ export const usePlayerStore = create<PlayerStore>()(
       togglePlay: () => {
         set((state) => {
           // Log the toggle action for debugging
-          console.log('Toggling play state from', state.isPlaying, 'to', !state.isPlaying);
-          console.log('Current track:', state.currentTrack?.title);
+          // Toggling play state
           return { isPlaying: !state.isPlaying };
         });
       },

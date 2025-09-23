@@ -24,7 +24,6 @@ import './App.css';
 
 // German spec: Enhanced routing structure for Aural mobile web app
 function App() {
-  console.log('Aural App with German specification is rendering');
   return (
     <Router>
       <Routes>

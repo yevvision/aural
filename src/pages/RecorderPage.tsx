@@ -68,7 +68,7 @@ export const RecorderPage = () => {
 
   // Clear any previous recording state when entering the recorder
   useEffect(() => {
-    console.log('RecorderPage mounted, clearing previous recording state');
+    // RecorderPage mounted, clearing previous recording state
     // Clear any existing session storage from previous recordings
     sessionStorage.removeItem('recordingData');
     sessionStorage.removeItem('uploadFile');
@@ -156,9 +156,9 @@ export const RecorderPage = () => {
 
   // Create preview track when recording is completed
   useEffect(() => {
-    console.log('Preview track useEffect triggered', { recordedBlob: !!recordedBlob, previewTrack: !!previewTrack, duration });
+    // Preview track useEffect triggered
     if (recordedBlob && !previewTrack) {
-      console.log('Creating preview track from recorded blob:', {
+      // Creating preview track from recorded blob
         blobSize: recordedBlob.size,
         blobType: recordedBlob.type,
         duration
@@ -343,9 +343,9 @@ export const RecorderPage = () => {
 
   // Auto-proceed to upload page after preview is created
   useEffect(() => {
-    console.log('Auto-proceed useEffect triggered', { autoProceed, previewTrack: !!previewTrack, recordedBlob: !!recordedBlob });
+    // Auto-proceed useEffect triggered
     if (autoProceed && previewTrack && recordedBlob) {
-      console.log('Auto-proceeding to upload page in 1.5 seconds');
+      // Auto-proceeding to upload page in 1.5 seconds
       const timer = setTimeout(() => {
         console.log('Auto-proceed timer triggered, calling handleSave');
         handleSave();

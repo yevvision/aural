@@ -174,7 +174,6 @@ export const useFeedStore = create<FeedStore>()(
 
 // Listener für Datenbank-Änderungen
 DatabaseService.addListener(() => {
-  console.log('🔄 FeedStore: Datenbank-Änderung erkannt, lade Tracks neu...');
   useFeedStore.getState().refresh();
 });
 

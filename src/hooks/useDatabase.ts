@@ -101,12 +101,10 @@ export const useDatabase = (currentUserId?: string) => {
 
   // Beim ersten Laden und bei Änderungen
   useEffect(() => {
-    console.log('🎯 useDatabase: useEffect - Initiales Laden');
     loadData();
 
     // Listener für Datenbank-Änderungen
     const removeListener = DatabaseService.addListener(() => {
-      console.log('🔄 useDatabase: Datenbank-Änderung erkannt, lade neu...');
       loadData();
     });
 
@@ -118,7 +116,6 @@ export const useDatabase = (currentUserId?: string) => {
       
       // Prüfe auf neue Tracks in localStorage oder DB
       if (localTracks.length > tracks.length || dbTracks.length > tracks.length) {
-        console.log('🔄 useDatabase: Neue Tracks gefunden (localStorage:', localTracks.length, 'DB:', dbTracks.length, 'Current:', tracks.length, '), lade neu...');
         loadData();
       }
     }, 1000); // Reduziere Intervall auf 1 Sekunde für schnellere Reaktion

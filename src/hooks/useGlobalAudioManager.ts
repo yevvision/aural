@@ -194,9 +194,7 @@ export const useGlobalAudioManager = () => {
       return;
     }
     
-    console.log('Play/pause effect triggered. isPlaying:', isPlaying, 'audio state:', {
-      readyState: audio.readyState,
-      networkState: audio.networkState,
+    // Play/pause effect triggered
       paused: audio.paused,
       src: audio.src ? 'set' : 'empty'
     });
@@ -333,9 +331,7 @@ export const useGlobalAudioManager = () => {
       const audio = getGlobalAudio();
       const store = usePlayerStore.getState();
       
-      console.log('Play called. Current state:', {
-        isPlaying: store.isPlaying,
-        hasAudio: !!audio,
+      // Play called
         hasTrack: !!track,
         audioReadyState: audio?.readyState,
         audioNetworkState: audio?.networkState
@@ -372,9 +368,7 @@ export const useGlobalAudioManager = () => {
     const audio = getGlobalAudio();
     const storeState = usePlayerStore.getState();
     
-    console.log('Toggle called. Current state:', {
-      isPlaying: storeState.isPlaying,
-      hasAudio: !!audio,
+    // Toggle called
       hasTrack: !!currentTrack,
       audioReadyState: audio?.readyState,
       audioNetworkState: audio?.networkState
