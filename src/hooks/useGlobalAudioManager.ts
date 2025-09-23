@@ -10,7 +10,7 @@ let isAudioManagerInitialized = false;
 
 export const initializeGlobalAudio = (): HTMLAudioElement => {
   if (!globalAudio) {
-    console.log('Creating global audio element...');
+    // Creating global audio element
     globalAudio = new Audio();
     globalAudio.preload = 'metadata';
     
@@ -37,11 +37,11 @@ export const getGlobalAudio = (): HTMLAudioElement | null => {
 // Initialize the global audio manager - should only be called once from AppLayout
 export const initializeGlobalAudioManager = () => {
   if (isAudioManagerInitialized) {
-    console.log('Global audio manager already initialized');
+    // Global audio manager already initialized
     return;
   }
   
-  console.log('Initializing global audio manager...');
+    // Initializing global audio manager
   isAudioManagerInitialized = true;
   
   const audio = initializeGlobalAudio();

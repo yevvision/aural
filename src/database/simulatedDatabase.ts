@@ -44,7 +44,7 @@ class SimulatedDatabase {
     }
     
     // WICHTIG: Erstelle jochen-Daten nur einmal
-    console.log('Erstelle neue jochen-Daten...');
+    // Erstelle neue jochen-Daten
     
     // Erstelle neuen jochen-Benutzer
     const jochenUser: User = {
@@ -134,7 +134,7 @@ class SimulatedDatabase {
     // Setze Flag, dass jochen-Daten erstellt wurden
     localStorage.setItem('jochen-data-created', 'true');
     
-    console.log('Neue jochen-Daten erfolgreich erstellt: 2 Tracks');
+    // jochen-Daten erfolgreich erstellt
   }
 
   // Initialisiere mit Demo-Daten
@@ -747,20 +747,13 @@ class SimulatedDatabase {
           });
         }
         
-        console.log('Datenbank aus localStorage geladen:', {
-          users: this.users.size,
-          tracks: this.tracks.size,
-          files: this.files.size,
-          comments: this.comments.size,
-          reports: this.reports.size,
-          commentLikes: this.commentLikes.size
-        });
+        // Datenbank aus localStorage geladen
       } catch (error) {
         console.error('Fehler beim Laden der Datenbank:', error);
         this.initializeWithDemoData();
       }
     } else {
-      console.log('Keine Daten in localStorage gefunden, initialisiere mit Demo-Daten');
+      // Keine Daten in localStorage gefunden, initialisiere mit Demo-Daten
       this.initializeWithDemoData();
     }
   }

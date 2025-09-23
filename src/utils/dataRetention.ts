@@ -55,16 +55,12 @@ export class DataRetentionManager {
    * Führt die Datenbereinigung durch
    */
   public async performCleanup(): Promise<void> {
-    console.log('🧹 Data Retention: Starting cleanup...');
-    
     try {
       await this.cleanupDeviceStats();
       await this.cleanupFileHashes();
       await this.cleanupPendingUploads();
-      
-      console.log('✅ Data Retention: Cleanup completed');
     } catch (error) {
-      console.error('❌ Data Retention: Cleanup failed:', error);
+      console.error('Data Retention: Cleanup failed:', error);
     }
   }
 
@@ -100,9 +96,7 @@ export class DataRetentionManager {
         }
       }
 
-      if (cleanedCount > 0) {
-        console.log(`🧹 Data Retention: Cleaned ${cleanedCount} device stats`);
-      }
+      // Device stats cleaned if needed
     } catch (error) {
       console.error('Failed to cleanup device stats:', error);
     }
@@ -140,9 +134,7 @@ export class DataRetentionManager {
         }
       }
 
-      if (cleanedCount > 0) {
-        console.log(`🧹 Data Retention: Cleaned ${cleanedCount} file hash records`);
-      }
+      // File hash records cleaned if needed
     } catch (error) {
       console.error('Failed to cleanup file hashes:', error);
     }
@@ -154,7 +146,6 @@ export class DataRetentionManager {
   private async cleanupPendingUploads(): Promise<void> {
     // In einer echten App würde hier ein API-Call stehen
     // Für Demo-Zwecke simulieren wir die Bereinigung
-    console.log('🧹 Data Retention: Pending uploads cleanup (simulated)');
   }
 
   /**
@@ -243,9 +234,7 @@ export class DataRetentionManager {
       }
     }
 
-    if (deletedCount > 0) {
-      console.log(`🧹 Data Retention: Deleted ${deletedCount} expired records`);
-    }
+    // Expired records deleted if needed
   }
 
   /**
@@ -266,7 +255,6 @@ export class DataRetentionManager {
    * Manueller Cleanup-Trigger
    */
   public async forceCleanup(): Promise<void> {
-    console.log('🧹 Data Retention: Force cleanup triggered');
     await this.performCleanup();
   }
 }

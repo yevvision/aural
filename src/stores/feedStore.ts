@@ -552,9 +552,7 @@ export const useFeedStore = create<FeedStore>()(
           if (!error && state) {
             // Load tracks from database after rehydration
             setTimeout(() => {
-              console.log('FeedStore: Rehydration - lade Tracks aus Datenbank...');
               const dbTracks = database.getAllTracks();
-              console.log('FeedStore: Rehydration - geladene Tracks:', dbTracks.length);
               state.setTracks(dbTracks);
               state.syncWithUserStore();
             }, 0);

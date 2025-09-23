@@ -28,7 +28,6 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
   useEffect(() => {
     // Only load Unicorn Studio for non-black background pages
     if (isBlackBackgroundPage) {
-      console.log('🎨 UnicornBackgroundSimple: Skipping Unicorn Studio for black background page');
       // Immediately hide any existing unicorn canvas
       const existingCanvas = document.querySelector('.unicorn-background-container');
       if (existingCanvas) {
@@ -37,12 +36,11 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
       return;
     }
     
-    console.log('🎨 UnicornBackgroundSimple: Initializing or re-initializing...');
+    // Initializing Unicorn Studio
     
     // Always ensure the script is loaded and working
     const loadUnicornStudio = () => {
       if (window.UnicornStudio && window.UnicornStudio.isInitialized) {
-        console.log('🎨 UnicornBackgroundSimple: Unicorn Studio already initialized, ensuring visibility');
         // Force re-initialization to ensure canvas is visible
         setTimeout(() => {
           const unicornElements = document.querySelectorAll('[data-us-project]');
@@ -54,10 +52,9 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
           // Also try to re-initialize the canvas
           if (window.UnicornStudio && window.UnicornStudio.init) {
             window.UnicornStudio.init().then((scenes) => {
-              console.log('🎨 Unicorn Studio re-initialized:', scenes);
               window.unicornScenes = scenes;
             }).catch((err) => {
-              console.error('🎨 Unicorn Studio re-initialization error:', err);
+              console.error('Unicorn Studio re-initialization error:', err);
             });
           }
         }, 100);
@@ -67,20 +64,37 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
       // Load the script if not already loaded
       const existingScript = document.querySelector('script[src="/unicornStudio.umd.js"]');
       if (existingScript) {
-        console.log('🎨 UnicornBackgroundSimple: Script already exists, triggering load');
         // Script exists but might not be loaded yet, trigger the load
         const event = new Event('load');
         existingScript.dispatchEvent(event);
         return;
       }
       
-      // Use the exact same script loading as the working HTML version
+      // Load UnicornStudio script safely
       const script = document.createElement('script');
       script.type = 'text/javascript';
-      script.innerHTML = `!function(){if(!window.UnicornStudio){window.UnicornStudio={isInitialized:!1};var i=document.createElement("script");i.src="/unicornStudio.umd.js",i.onload=function(){console.log('🎨 Unicorn Studio script loaded');window.UnicornStudio.isInitialized||(console.log('🎨 Initializing Unicorn Studio...'),UnicornStudio.init().then((scenes)=>{console.log('🎨 Unicorn Studio initialized:',scenes);window.unicornScenes=scenes;console.log('🎨 Unicorn Studio ready');}).catch((err)=>{console.error('🎨 Unicorn Studio error:',err)}),window.UnicornStudio.isInitialized=!0)},(document.head || document.body).appendChild(i)}}();`;
+      script.src = '/unicornStudio.umd.js';
+      script.onload = () => {
+        // Wait for UnicornStudio to be available
+        const checkUnicornStudio = () => {
+          if (window.UnicornStudio && typeof window.UnicornStudio.init === 'function') {
+            window.UnicornStudio.init().then((scenes) => {
+              window.unicornScenes = scenes;
+            }).catch((err) => {
+              console.error('Unicorn Studio error:', err);
+            });
+          } else {
+            // Retry after a short delay
+            setTimeout(checkUnicornStudio, 100);
+          }
+        };
+        checkUnicornStudio();
+      };
+      script.onerror = () => {
+        console.warn('Failed to load UnicornStudio script');
+      };
       
       document.head.appendChild(script);
-      console.log('🎨 UnicornBackgroundSimple: Script added to head');
     };
     
     loadUnicornStudio();
@@ -101,7 +115,6 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
       });
     } else {
       // Force show unicorn studio elements when leaving black background page
-      console.log('🎨 UnicornBackgroundSimple: Showing unicorn elements after leaving black background page');
       
       // Immediate visibility
       const unicornElements = document.querySelectorAll('[data-us-project]');
@@ -119,13 +132,11 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
       
       // Force re-render of unicorn studio if it exists
       if (window.UnicornStudio && window.UnicornStudio.init) {
-        console.log('🎨 UnicornBackgroundSimple: Forcing Unicorn Studio re-initialization');
         setTimeout(() => {
           window.UnicornStudio!.init().then((scenes) => {
-            console.log('🎨 Unicorn Studio forced re-initialization successful:', scenes);
             window.unicornScenes = scenes;
           }).catch((err) => {
-            console.error('🎨 Unicorn Studio forced re-initialization failed:', err);
+            console.error('Unicorn Studio forced re-initialization failed:', err);
           });
         }, 200);
       }
@@ -135,19 +146,12 @@ const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, c
   // Third effect specifically for ensuring canvas visibility after leaving black background page
   useEffect(() => {
     if (!isBlackBackgroundPage) {
-      console.log('🎨 UnicornBackgroundSimple: Ensuring canvas visibility after page change');
-      
       // Multiple attempts to ensure visibility
       const ensureVisibility = () => {
         const unicornElements = document.querySelectorAll('[data-us-project]');
         const unicornContainer = document.querySelector('.unicorn-background-container');
         
-        console.log('🎨 UnicornBackgroundSimple: Found elements:', {
-          unicornElements: unicornElements.length,
-          unicornContainer: !!unicornContainer,
-          windowUnicornStudio: !!window.UnicornStudio,
-          isInitialized: window.UnicornStudio?.isInitialized
-        });
+        // Elements found and visibility ensured
         
         if (unicornElements.length > 0) {
           unicornElements.forEach(element => {

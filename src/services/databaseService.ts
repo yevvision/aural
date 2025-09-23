@@ -12,25 +12,21 @@ class DatabaseServiceClass {
 
   // GET: Alle Tracks abrufen (mit User-spezifischen Daten)
   getTracks(currentUserId?: string): AudioTrack[] {
-    console.log('🔗 DatabaseService: getTracks()', currentUserId ? `für User: ${currentUserId}` : '');
     return centralDB.getAllTracks(currentUserId);
   }
 
   // GET: Track by ID
   getTrack(id: string): AudioTrack | undefined {
-    console.log('🔗 DatabaseService: getTrack()', id);
     return centralDB.getTrackById(id);
   }
 
   // GET: Alle Benutzer abrufen
   getUsers(): any[] {
-    console.log('🔗 DatabaseService: getUsers()');
     return centralDB.getAllUsers();
   }
 
   // ADD: Neuen Track hinzufügen
   addTrack(track: AudioTrack): boolean {
-    console.log('🔗 DatabaseService: addTrack()', { id: track.id, title: track.title });
     const success = centralDB.addTrack(track);
     
     if (success) {
@@ -43,7 +39,6 @@ class DatabaseServiceClass {
 
   // DELETE: Track löschen
   deleteTrack(trackId: string): boolean {
-    console.log('🔗 DatabaseService: deleteTrack()', trackId);
     const success = centralDB.deleteTrack(trackId);
     
     if (success) {
@@ -68,7 +63,6 @@ class DatabaseServiceClass {
 
   // ADD: Kommentar zu Track hinzufügen
   addCommentToTrack(trackId: string, comment: any): boolean {
-    console.log('🔗 DatabaseService: addCommentToTrack()', trackId);
     const success = centralDB.addCommentToTrack(trackId, comment);
     
     if (success) {
@@ -81,7 +75,6 @@ class DatabaseServiceClass {
 
   // DELETE: Kommentar von Track löschen
   deleteCommentFromTrack(trackId: string, commentId: string): boolean {
-    console.log('🔗 DatabaseService: deleteCommentFromTrack()', trackId, commentId);
     const success = centralDB.deleteCommentFromTrack(trackId, commentId);
     
     if (success) {
@@ -131,13 +124,11 @@ class DatabaseServiceClass {
 
   // GET: User's liked tracks
   getUserLikedTracks(userId: string): AudioTrack[] {
-    console.log('🔗 DatabaseService: getUserLikedTracks()', userId);
     return centralDB.getUserLikedTracks(userId);
   }
 
   // GET: User's bookmarked tracks
   getUserBookmarkedTracks(userId: string): AudioTrack[] {
-    console.log('🔗 DatabaseService: getUserBookmarkedTracks()', userId);
     return centralDB.getUserBookmarkedTracks(userId);
   }
 
@@ -147,7 +138,6 @@ class DatabaseServiceClass {
 
   // LIKE: Comment liken/unliken
   toggleCommentLike(commentId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService: toggleCommentLike()', commentId, userId);
     const success = centralDB.toggleCommentLike(commentId, userId);
     
     if (success) {
@@ -159,54 +149,46 @@ class DatabaseServiceClass {
 
   // GET: Comment like status for user
   isCommentLikedByUser(commentId: string, userId: string): boolean {
-    console.log('🔗 DatabaseService: isCommentLikedByUser()', commentId, userId);
     return centralDB.isCommentLikedByUser(commentId, userId);
   }
 
   // GET: Comment like count
   getCommentLikeCount(commentId: string): number {
-    console.log('🔗 DatabaseService: getCommentLikeCount()', commentId);
     return centralDB.getCommentLikeCount(commentId);
   }
 
   // ADD: User Activity hinzufügen (Placeholder)
   addUserActivity(activity: any): boolean {
-    console.log('🔗 DatabaseService: addUserActivity() - Placeholder', activity.type);
     // TODO: Implementiere Activity-System
     return true;
   }
 
   // ADD: Notification hinzufügen (Placeholder)
   addNotification(notification: any): boolean {
-    console.log('🔗 DatabaseService: addNotification() - Placeholder', notification.type);
     // TODO: Implementiere Notification-System
     return true;
   }
 
   // GET: User Activities (Placeholder)
   getUserActivities(userId: string): any[] {
-    console.log('🔗 DatabaseService: getUserActivities() - Placeholder', userId);
     // TODO: Implementiere Activity-Abruf
     return [];
   }
 
   // GET: User Notifications (Placeholder)
   getUserNotifications(userId: string): any[] {
-    console.log('🔗 DatabaseService: getUserNotifications() - Placeholder', userId);
     // TODO: Implementiere Notification-Abruf
     return [];
   }
 
   // MARK: Activity als gelesen markieren (Placeholder)
   markActivityAsRead(activityId: string): boolean {
-    console.log('🔗 DatabaseService: markActivityAsRead() - Placeholder', activityId);
     // TODO: Implementiere Activity-Update
     return true;
   }
 
   // MARK: Notification als gelesen markieren (Placeholder)
   markNotificationAsRead(notificationId: string): boolean {
-    console.log('🔗 DatabaseService: markNotificationAsRead() - Placeholder', notificationId);
     // TODO: Implementiere Notification-Update
     return true;
   }
@@ -217,13 +199,11 @@ class DatabaseServiceClass {
 
   // GET: Alle Reports abrufen
   getReports(): ContentReport[] {
-    console.log('🔗 DatabaseService: getReports()');
     return centralDB.getAllReports();
   }
 
   // ADD: Neuen Report hinzufügen
   addReport(report: ContentReport): boolean {
-    console.log('🔗 DatabaseService: addReport()', { id: report.id, type: report.type });
     const success = centralDB.addReport(report);
     
     if (success) {
@@ -246,7 +226,6 @@ class DatabaseServiceClass {
 
   // DELETE: Report löschen
   deleteReport(reportId: string): boolean {
-    console.log('🔗 DatabaseService: deleteReport()', reportId);
     const success = centralDB.deleteReport(reportId);
     
     if (success) {
@@ -262,7 +241,6 @@ class DatabaseServiceClass {
 
   // Alle Benutzerinhalte löschen
   deleteAllUserContent(): boolean {
-    console.log('🔗 DatabaseService: deleteAllUserContent()');
     const success = (centralDB as any).deleteAllUserContent();
     
     if (success) {
@@ -275,13 +253,11 @@ class DatabaseServiceClass {
 
   // Statistiken abrufen
   getStats() {
-    console.log('🔗 DatabaseService: getStats()');
     return centralDB.getStats();
   }
 
   // GET: Alle Kommentare abrufen (aus Tracks extrahiert)
   getComments(): any[] {
-    console.log('🔗 DatabaseService: getComments()');
     const allComments: any[] = [];
     
     const tracks = centralDB.getAllTracks();
@@ -297,13 +273,11 @@ class DatabaseServiceClass {
       }
     });
     
-    console.log('💬 DatabaseService: Gefundene Kommentare:', allComments.length);
     return allComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   // Datenbank zurücksetzen
   reset(): void {
-    console.log('🔗 DatabaseService: reset()');
     centralDB.reset();
     this.notifyListeners();
   }
@@ -314,19 +288,16 @@ class DatabaseServiceClass {
 
   // Listener hinzufügen (für Komponenten, die bei Änderungen benachrichtigt werden wollen)
   addListener(callback: () => void): () => void {
-    console.log('🔗 DatabaseService: addListener() - Anzahl Listener:', this.listeners.size + 1);
     this.listeners.add(callback);
     
     // Return function to remove listener
     return () => {
       this.listeners.delete(callback);
-      console.log('🔗 DatabaseService: removeListener() - Anzahl Listener:', this.listeners.size);
     };
   }
 
   // Alle Listener benachrichtigen
   notifyListeners(): void {
-    console.log('📢 DatabaseService: notifyListeners() - Benachrichtige', this.listeners.size, 'Listener');
     this.listeners.forEach(callback => {
       try {
         callback();
@@ -342,7 +313,6 @@ class DatabaseServiceClass {
 
   // Tracks nach Kriterien suchen
   searchTracks(query: string): AudioTrack[] {
-    console.log('🔍 DatabaseService: searchTracks()', query);
     const allTracks = this.getTracks();
     const lowerQuery = query.toLowerCase();
     
@@ -356,7 +326,6 @@ class DatabaseServiceClass {
 
   // Tracks sortiert abrufen
   getTracksSorted(sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' | 'fileSize' = 'date', order: 'asc' | 'desc' = 'desc'): AudioTrack[] {
-    console.log('🔗 DatabaseService: getTracksSorted()', sortBy, order);
     const tracks = this.getTracks();
     
     return tracks.sort((a, b) => {

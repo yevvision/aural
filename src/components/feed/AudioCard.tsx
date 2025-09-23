@@ -46,16 +46,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   const safeTrack = sanitizeAudioTrack(currentTrackData);
   const safeUser = sanitizeUser(currentTrackData.user);
 
-  // Debug: Log track data
-  console.log('🎵 AudioCard: Track data:', {
-    id: safeTrack.id,
-    title: safeTrack.title,
-    isLiked: safeTrack.isLiked,
-    isBookmarked: safeTrack.isBookmarked,
-    likes: safeTrack.likes,
-    commentsCount: safeTrack.commentsCount,
-    comments: safeTrack.comments?.length || 0
-  });
+  // Track data available
 
   const isCurrentTrack = currentTrack?.id === safeTrack.id;
   const isTrackPlaying = isCurrentTrack && isPlaying;
@@ -233,9 +224,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('❤️ AudioCard: Like button clicked for track:', safeTrack.id);
-                  const success = toggleLike(safeTrack.id, 'user-1');
-                  console.log('❤️ AudioCard: Like result:', success);
+                  toggleLike(safeTrack.id, 'user-1');
                 }}
                 className="flex items-center gap-1 hover:scale-105 transition-transform cursor-pointer"
                 title={safeTrack.isLiked ? 'Unlike' : 'Like'}
@@ -245,9 +234,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('❤️ AudioCard: Like button clicked for track:', safeTrack.id);
-                    const success = toggleLike(safeTrack.id, 'user-1');
-                    console.log('❤️ AudioCard: Like result:', success);
+                    toggleLike(safeTrack.id, 'user-1');
                   }
                 }}
               >

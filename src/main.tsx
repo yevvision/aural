@@ -56,10 +56,8 @@ if ('serviceWorker' in navigator) {
 }
 
 // Vereinfachte Migration - nur bei Bedarf
-console.log('🚀 Starte Anwendung...');
 
 // Bereinige nur alte, nicht mehr verwendete Datenquellen (nach Migration)
-console.log('🧹 Bereinige alte, veraltete localStorage-Daten...');
 const obsoleteKeys = [
   'simulated-database',
   'aural-feed-store', 
@@ -72,20 +70,14 @@ const obsoleteKeys = [
 let cleanedCount = 0;
 obsoleteKeys.forEach(key => {
   if (localStorage.getItem(key)) {
-    console.log('🗑️ Lösche veralteten localStorage-Schlüssel:', key);
     localStorage.removeItem(key);
     cleanedCount++;
   }
 });
 
-if (cleanedCount > 0) {
-  console.log(`✅ ${cleanedCount} veraltete Datenquellen bereinigt`);
-} else {
-  console.log('✅ Keine veralteten Datenquellen gefunden - System ist sauber');
-}
+// Cleanup completed
 
 // Bereinige veraltete sessionStorage-Einträge mit Blob-URLs
-console.log('🧹 Bereinige veraltete sessionStorage Blob-URLs...');
 const sessionKeys = ['recordingData', 'audioData'];
 let sessionCleanedCount = 0;
 sessionKeys.forEach(key => {
@@ -95,7 +87,6 @@ sessionKeys.forEach(key => {
       const parsed = JSON.parse(data);
       if (parsed.data && parsed.data.startsWith('blob:http://localhost:5173/')) {
         sessionStorage.removeItem(key);
-        console.log(`🗑️ Veraltete sessionStorage Blob-URL entfernt: ${key}`);
         sessionCleanedCount++;
       }
     } catch (e) {
@@ -104,11 +95,7 @@ sessionKeys.forEach(key => {
   }
 });
 
-if (sessionCleanedCount > 0) {
-  console.log(`✅ ${sessionCleanedCount} veraltete sessionStorage Blob-URLs bereinigt`);
-} else {
-  console.log('✅ Keine veralteten sessionStorage Blob-URLs gefunden');
-}
+// Session cleanup completed
 
 // Die zentrale Datenbank (aural-central-database) bleibt erhalten!
 

@@ -24,10 +24,8 @@ class CentralDatabaseSimple {
   };
 
   private constructor() {
-    console.log('🏗️ CentralDB Simple: Konstruktor aufgerufen');
     this.loadFromStorage();
     this.initializeDefaultData();
-    console.log('✅ CentralDB Simple: Initialisierung abgeschlossen');
   }
 
   // Singleton Pattern
@@ -40,8 +38,6 @@ class CentralDatabaseSimple {
 
   // GET: Tracks abrufen (mit User-spezifischen Daten)
   getAllTracks(currentUserId?: string): AudioTrack[] {
-    console.log('📚 CentralDB Simple: getAllTracks() - Anzahl:', this.data.tracks.length, currentUserId ? `für User: ${currentUserId}` : '');
-    console.log('📚 CentralDB Simple: Likes Map:', this.data.likes.size, 'Bookmarks Map:', this.data.bookmarks.size);
     
     const sortedTracks = [...this.data.tracks].sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -50,12 +46,6 @@ class CentralDatabaseSimple {
     // Bereichere Tracks mit User-spezifischen Daten
     if (currentUserId) {
       const enrichedTracks = sortedTracks.map(track => this.enrichTrackWithUserData(track, currentUserId));
-      console.log('📚 CentralDB Simple: Enriched tracks:', enrichedTracks.map(t => ({ 
-        id: t.id, 
-        title: t.title, 
-        isLiked: t.isLiked, 
-        isBookmarked: t.isBookmarked 
-      })));
       return enrichedTracks;
     }
 
@@ -87,7 +77,6 @@ class CentralDatabaseSimple {
 
   // GET: Alle Benutzer abrufen
   getAllUsers(): User[] {
-    console.log('👥 CentralDB Simple: getAllUsers()');
     return [...this.data.users];
   }
 
@@ -141,27 +130,21 @@ class CentralDatabaseSimple {
 
   // UPDATE: Track aktualisieren
   updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Update:', trackId);
       return false;
     }
 
     this.data.tracks[trackIndex] = { ...this.data.tracks[trackIndex], ...updates };
     this.saveToStorage();
     
-    console.log('✅ CentralDB Simple: Track aktualisiert:', trackId);
     return true;
   }
 
   // ADD: Kommentar zu Track hinzufügen
   addCommentToTrack(trackId: string, comment: any): boolean {
-    console.log('💬 CentralDB Simple: addCommentToTrack()', trackId, comment.content?.substring(0, 50));
-    
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Kommentar:', trackId);
       return false;
     }
 
@@ -180,24 +163,19 @@ class CentralDatabaseSimple {
     
     this.saveToStorage();
     
-    console.log('✅ CentralDB Simple: Kommentar hinzugefügt. Gesamt Kommentare für Track:', track.comments.length);
     return true;
   }
 
   // DELETE: Kommentar von Track löschen
   deleteCommentFromTrack(trackId: string, commentId: string): boolean {
-    console.log('🗑️ CentralDB Simple: deleteCommentFromTrack()', trackId, commentId);
-    
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Kommentar-Löschung:', trackId);
       return false;
     }
 
     const track = this.data.tracks[trackIndex];
     
     if (!track.comments) {
-      console.log('⚠️ CentralDB Simple: Keine Kommentare für Track:', trackId);
       return false;
     }
     
@@ -208,10 +186,8 @@ class CentralDatabaseSimple {
       // Aktualisiere commentsCount
       track.commentsCount = track.comments.length;
       this.saveToStorage();
-      console.log('✅ CentralDB Simple: Kommentar gelöscht. Verbleibende Kommentare:', track.comments.length);
       return true;
     } else {
-      console.log('⚠️ CentralDB Simple: Kommentar nicht gefunden:', commentId);
       return false;
     }
   }
@@ -222,11 +198,8 @@ class CentralDatabaseSimple {
 
   // LIKE: Track liken/unliken
   toggleLike(trackId: string, userId: string): boolean {
-    console.log('❤️ CentralDB Simple: toggleLike()', trackId, userId);
-    
     const track = this.data.tracks.find(t => t.id === trackId);
     if (!track) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Like:', trackId);
       return false;
     }
 
@@ -241,11 +214,9 @@ class CentralDatabaseSimple {
     if (wasLiked) {
       // Unlike
       trackLikes.delete(userId);
-      console.log('💔 CentralDB Simple: Like entfernt. Neue Anzahl:', trackLikes.size);
     } else {
       // Like
       trackLikes.add(userId);
-      console.log('❤️ CentralDB Simple: Like hinzugefügt. Neue Anzahl:', trackLikes.size);
     }
     
     this.saveToStorage();
@@ -254,11 +225,8 @@ class CentralDatabaseSimple {
 
   // BOOKMARK: Track bookmarken/unbookmarken
   toggleBookmark(trackId: string, userId: string): boolean {
-    console.log('🔖 CentralDB Simple: toggleBookmark()', trackId, userId);
-    
     const track = this.data.tracks.find(t => t.id === trackId);
     if (!track) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Bookmark:', trackId);
       return false;
     }
 
@@ -273,11 +241,9 @@ class CentralDatabaseSimple {
     if (wasBookmarked) {
       // Unbookmark
       trackBookmarks.delete(userId);
-      console.log('🔓 CentralDB Simple: Bookmark entfernt');
     } else {
       // Bookmark
       trackBookmarks.add(userId);
-      console.log('🔖 CentralDB Simple: Bookmark hinzugefügt');
     }
     
     this.saveToStorage();
@@ -286,11 +252,8 @@ class CentralDatabaseSimple {
 
   // PLAY: Play-Anzahl erhöhen
   incrementPlay(trackId: string): boolean {
-    console.log('▶️ CentralDB Simple: incrementPlay()', trackId);
-    
     const track = this.data.tracks.find(t => t.id === trackId);
     if (!track) {
-      console.log('⚠️ CentralDB Simple: Track nicht gefunden für Play:', trackId);
       return false;
     }
 
@@ -298,16 +261,12 @@ class CentralDatabaseSimple {
     const currentPlays = this.data.plays.get(trackId) || 0;
     this.data.plays.set(trackId, currentPlays + 1);
     
-    console.log('▶️ CentralDB Simple: Play erhöht. Neue Anzahl:', currentPlays + 1);
-    
     this.saveToStorage();
     return true;
   }
 
   // GET: User's liked tracks
   getUserLikedTracks(userId: string): AudioTrack[] {
-    console.log('❤️ CentralDB Simple: getUserLikedTracks()', userId);
-    
     const likedTrackIds: string[] = [];
     this.data.likes.forEach((userIds, trackId) => {
       if (userIds.has(userId)) {
@@ -323,8 +282,6 @@ class CentralDatabaseSimple {
 
   // GET: User's bookmarked tracks
   getUserBookmarkedTracks(userId: string): AudioTrack[] {
-    console.log('🔖 CentralDB Simple: getUserBookmarkedTracks()', userId);
-    
     const bookmarkedTrackIds: string[] = [];
     this.data.bookmarks.forEach((userIds, trackId) => {
       if (userIds.has(userId)) {
@@ -344,8 +301,6 @@ class CentralDatabaseSimple {
 
   // LIKE: Comment liken/unliken
   toggleCommentLike(commentId: string, userId: string): boolean {
-    console.log('❤️ CentralDB Simple: toggleCommentLike()', commentId, userId);
-    
     // Hole oder erstelle Set für diesen Kommentar
     if (!this.data.commentLikes.has(commentId)) {
       this.data.commentLikes.set(commentId, new Set());
@@ -357,11 +312,9 @@ class CentralDatabaseSimple {
     if (wasLiked) {
       // Unlike
       commentLikes.delete(userId);
-      console.log('💔 CentralDB Simple: Comment like entfernt');
     } else {
       // Like
       commentLikes.add(userId);
-      console.log('❤️ CentralDB Simple: Comment like hinzugefügt');
     }
     
     this.saveToStorage();
@@ -386,7 +339,6 @@ class CentralDatabaseSimple {
 
   // GET: Alle Reports abrufen
   getAllReports(): ContentReport[] {
-    console.log('🚨 CentralDB Simple: getAllReports() - Anzahl:', this.data.reports.length);
     return [...this.data.reports].sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -394,28 +346,22 @@ class CentralDatabaseSimple {
 
   // ADD: Neuen Report hinzufügen
   addReport(report: ContentReport): boolean {
-    console.log('🚨 CentralDB Simple: addReport()', { id: report.id, type: report.type, targetId: report.targetId });
-    
     // Prüfe, ob Report bereits existiert
     const exists = this.data.reports.some(r => r.id === report.id);
     if (exists) {
-      console.log('⚠️ CentralDB Simple: Report bereits vorhanden:', report.id);
       return false;
     }
 
     this.data.reports.push(report);
     this.saveToStorage();
     
-    console.log('✅ CentralDB Simple: Report hinzugefügt. Gesamt:', this.data.reports.length);
     return true;
   }
 
   // UPDATE: Report-Status aktualisieren
   updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean {
-    
     const reportIndex = this.data.reports.findIndex(report => report.id === reportId);
     if (reportIndex === -1) {
-      console.log('⚠️ CentralDB Simple: Report nicht gefunden für Update:', reportId);
       return false;
     }
 
@@ -427,23 +373,17 @@ class CentralDatabaseSimple {
     };
     this.saveToStorage();
     
-    console.log('✅ CentralDB Simple: Report-Status aktualisiert:', reportId, status);
     return true;
   }
 
   // DELETE: Report löschen
   deleteReport(reportId: string): boolean {
-    console.log('🗑️ CentralDB Simple: deleteReport()', reportId);
-    
     const initialLength = this.data.reports.length;
     this.data.reports = this.data.reports.filter(report => report.id !== reportId);
     
     const deleted = this.data.reports.length < initialLength;
     if (deleted) {
       this.saveToStorage();
-      console.log('✅ CentralDB Simple: Report gelöscht. Verbleibend:', this.data.reports.length);
-    } else {
-      console.log('⚠️ CentralDB Simple: Report nicht gefunden:', reportId);
     }
     
     return deleted;
@@ -455,7 +395,7 @@ class CentralDatabaseSimple {
       return sum + (track.comments ? track.comments.length : 0);
     }, 0);
     
-    console.log('📊 CentralDB Simple: Statistiken berechnet - Kommentare:', totalComments, 'Reports:', this.data.reports.length);
+    // Statistiken berechnet
     
     return {
       totalUsers: this.data.users.length,
@@ -505,7 +445,7 @@ class CentralDatabaseSimple {
       };
       
       localStorage.setItem('aural-central-database', JSON.stringify(dataToSave));
-      console.log('💾 CentralDB Simple: Daten gespeichert (Tracks:', this.data.tracks.length, 'Likes:', this.data.likes.size, 'Bookmarks:', this.data.bookmarks.size, ')');
+      // Data saved to storage
     } catch (error) {
       console.error('❌ CentralDB Simple: Fehler beim Speichern:', error);
     }
@@ -515,7 +455,6 @@ class CentralDatabaseSimple {
     try {
       const stored = localStorage.getItem('aural-central-database');
       if (!stored) {
-        console.log('📭 CentralDB Simple: Keine gespeicherten Daten gefunden - wird initialisiert');
         return;
       }
 
@@ -569,14 +508,7 @@ class CentralDatabaseSimple {
         plays: playsMap
       };
       
-      console.log('📥 CentralDB Simple: Daten aus localStorage geladen:');
-      console.log('📥 CentralDB Simple: - Tracks:', this.data.tracks.length);
-      console.log('📥 CentralDB Simple: - Users:', this.data.users.length, this.data.users.map(u => u.username));
-      console.log('📥 CentralDB Simple: - Comments:', this.data.comments.length);
-      console.log('📥 CentralDB Simple: - Reports:', this.data.reports.length);
-      console.log('📥 CentralDB Simple: - Likes:', this.data.likes.size);
-      console.log('📥 CentralDB Simple: - Bookmarks:', this.data.bookmarks.size);
-      console.log('📥 CentralDB Simple: - Comment Likes:', this.data.commentLikes.size);
+      // Data loaded from localStorage
     } catch (error) {
       console.error('❌ CentralDB Simple: Fehler beim Laden:', error);
       this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map(), plays: new Map() };
@@ -587,11 +519,8 @@ class CentralDatabaseSimple {
   private initializeDefaultData(): void {
     // Nur einmal initialisieren
     if (this.data.tracks.length > 0) {
-      console.log('📋 CentralDB Simple: Daten bereits vorhanden, keine Initialisierung');
       return;
     }
-
-    console.log('🏗️ CentralDB Simple: Initialisiere Demo-Daten...');
 
     // Holler die Waldfee Benutzer
     const hollaUser: User = {
@@ -730,15 +659,11 @@ class CentralDatabaseSimple {
     this.data.comments = [];
     this.data.reports = [];
     
-    console.log('🏗️ CentralDB Simple: Benutzer initialisiert:', this.data.users.map(u => u.username));
-
     this.saveToStorage();
-    console.log('✅ CentralDB Simple: Demo-Daten initialisiert (3 Holler-Tracks)');
   }
 
   // ADMIN-FUNKTIONEN
   reset(): void {
-    console.log('🔄 CentralDB Simple: Komplette Datenbank zurücksetzen');
     this.data = { tracks: [], users: [], comments: [], reports: [], likes: new Map(), bookmarks: new Map(), commentLikes: new Map(), plays: new Map() };
     localStorage.removeItem('aural-central-database');
     this.initializeDefaultData();

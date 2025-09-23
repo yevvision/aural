@@ -34,7 +34,6 @@ const feedCategories = [
 ];
 
 export const FeedPage = () => {
-  console.log('🎯 FeedPage: Rendering...');
   const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack, loadData } = useDatabase('user-1'); // Verwende aktuellen User
   const { followedUsers, myTracks } = useUserStore();
   const [isInitialized, setIsInitialized] = useState(false);
@@ -43,12 +42,10 @@ export const FeedPage = () => {
 
   // Simplified initialization
   useEffect(() => {
-    console.log('🎯 FeedPage: Component mounted, tracks werden automatisch geladen...');
     setIsInitialized(true);
 
     // Höre auf Track-Approval Events
     const handleTrackApproved = (event: CustomEvent) => {
-      console.log('🎯 FeedPage: Track approved event received:', event.detail);
       loadData(); // Lade Daten neu
     };
 
@@ -59,32 +56,9 @@ export const FeedPage = () => {
     };
   }, [loadData]);
 
-  // Debug: Log tracks to see what's loaded
+  // Track data loaded
   useEffect(() => {
-    console.log('🎯 FeedPage: Tracks aktualisiert:', {
-      count: tracks.length,
-      tracks: tracks.map(t => ({ 
-        id: t.id, 
-        title: t.title, 
-        user: t.user?.username,
-        hasUrl: !!t.url,
-        urlType: t.url ? (t.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL',
-        createdAt: t.createdAt
-      }))
-    });
-    
-    // Debug: Zeige auch localStorage Tracks
-    const localTracks = JSON.parse(localStorage.getItem('aural_tracks') || '[]');
-    console.log('🎯 FeedPage: localStorage Tracks:', {
-      count: localTracks.length,
-      tracks: localTracks.map(t => ({ 
-        id: t.id, 
-        title: t.title, 
-        user: t.user?.username,
-        hasUrl: !!t.url,
-        urlType: t.url ? (t.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'
-      }))
-    });
+    // Tracks are available
   }, [tracks]);
 
   // Create notifications for followed users' new uploads
@@ -112,7 +86,6 @@ export const FeedPage = () => {
   // Add user's own tracks to feed to ensure they show up consistently with preserved state
   useEffect(() => {
     if (isInitialized && myTracks.length > 0) {
-      console.log('🎯 FeedPage: User hat eigene Tracks:', myTracks.length);
       // User tracks are now automatically included via the central database
     }
   }, [myTracks, isInitialized, tracks]);
@@ -131,7 +104,6 @@ export const FeedPage = () => {
 
   const handleGenderFilterChange = (filterType: string) => {
     setSelectedGenderFilter(filterType);
-    console.log('🎯 FeedPage: Gender-Filter geändert zu:', filterType);
   };
 
   // Helper function to safely convert to Date for sorting
@@ -223,14 +195,7 @@ export const FeedPage = () => {
         break;
     }
     
-    // Debug: Log sorted tracks
-    console.log(`Sorted ${categoryId} tracks:`, categoryTracks.slice(0, maxItems).map(t => ({
-      id: t.id,
-      title: t.title,
-      createdAt: t.createdAt,
-      user: t.user?.username,
-      isRecent: categoryId === 'new' ? toSafeDate(t.createdAt) > twoWeeksAgo : 'N/A'
-    })));
+    // Tracks sorted for category
     
     // Category-specific filtering logic
     
@@ -333,9 +298,6 @@ export const FeedPage = () => {
                   })
                   .filter(({ categoryTracks }) => categoryTracks.length > 0) // Only show categories with content
                   .map(({ category, categoryTracks }, filteredIndex) => {
-                    // Debug: Log für jede Kategorie
-                    console.log(`🎯 FeedPage: Kategorie ${category.id} - Tracks: ${categoryTracks.length} (wird angezeigt)`);
-                    
                     return (
                       <RevealOnScroll 
                         key={category.id} 
@@ -397,15 +359,6 @@ export const FeedPage = () => {
                       {getFilteredTracks()
                         .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime())
                         .map((track, index) => {
-                          // Debug: Log jeden Track in "All Recordings"
-                          console.log(`🎵 All Recordings Track ${index + 1}:`, {
-                            id: track.id,
-                            title: track.title,
-                            createdAt: track.createdAt,
-                            user: track.user?.username,
-                            hasUrl: !!track.url,
-                            urlType: track.url ? (track.url.startsWith('data:') ? 'Base64' : 'Blob') : 'No URL'
-                          });
                           return (
                             <StaggerItem key={track.id}>
                               <AudioCard track={track} index={index} />
