@@ -195,9 +195,6 @@ export const useGlobalAudioManager = () => {
     }
     
     // Play/pause effect triggered
-      paused: audio.paused,
-      src: audio.src ? 'set' : 'empty'
-    });
     
     if (isPlaying) {
       // Check if we're currently recording - if so, don't play audio

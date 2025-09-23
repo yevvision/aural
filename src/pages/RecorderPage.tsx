@@ -159,10 +159,6 @@ export const RecorderPage = () => {
     // Preview track useEffect triggered
     if (recordedBlob && !previewTrack) {
       // Creating preview track from recorded blob
-        blobSize: recordedBlob.size,
-        blobType: recordedBlob.type,
-        duration
-      });
       
       // Validate blob before creating preview
       if (recordedBlob.size === 0) {
