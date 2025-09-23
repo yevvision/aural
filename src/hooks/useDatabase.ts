@@ -73,7 +73,7 @@ export const useDatabase = (currentUserId?: string) => {
       setNotifications(allNotifications);
       setReports(allReports);
       
-      console.log('✅ useDatabase: Daten geladen - Tracks:', allTracks.length, 'DB-Tracks:', dbTracks.length, 'Local-Tracks:', localTracks.length, 'Users:', allUsers.length, 'Comments:', allComments.length, 'Activities:', allActivities.length, 'Notifications:', allNotifications.length, 'Reports:', allReports.length);
+      // Data loaded successfully
       
       // Debug: Zeige Track-Details
       allTracks.forEach(track => {
@@ -185,7 +185,6 @@ export const useDatabase = (currentUserId?: string) => {
   const toggleLike = (trackId: string, userId: string): boolean => {
     const success = DatabaseService.toggleLike(trackId, userId);
     if (success) {
-      console.log('✅ useDatabase: Like erfolgreich getoggelt, lade Daten neu...');
       // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
       loadData();
     } else {
@@ -197,7 +196,6 @@ export const useDatabase = (currentUserId?: string) => {
   const toggleBookmark = (trackId: string, userId: string): boolean => {
     const success = DatabaseService.toggleBookmark(trackId, userId);
     if (success) {
-      console.log('✅ useDatabase: Bookmark erfolgreich getoggelt, lade Daten neu...');
       // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
       loadData();
     } else {
@@ -319,7 +317,6 @@ export const useDatabase = (currentUserId?: string) => {
   const incrementPlay = (trackId: string): boolean => {
     const success = DatabaseService.incrementPlay(trackId);
     if (success) {
-      console.log('✅ useDatabase: Play erfolgreich erhöht, lade Daten neu...');
       loadData();
     }
     return success;

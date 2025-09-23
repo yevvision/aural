@@ -119,7 +119,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     
     // Update like in central database
     const success = toggleLike(updatedCurrentTrack.id, 'user-1');
-    console.log('❤️ MiniPlayer: Like result:', success);
+    // Like result processed
     
     // Keep the animation state for a short duration
     setTimeout(() => setLikeClicked(false), 300);
@@ -136,7 +136,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     
     // Update bookmark in central database
     const success = toggleBookmark(updatedCurrentTrack.id, 'user-1');
-    console.log('🔖 MiniPlayer: Bookmark result:', success);
+    // Bookmark result processed
     
     // Keep the animation state for a short duration
     setTimeout(() => setBookmarkClicked(false), 300);

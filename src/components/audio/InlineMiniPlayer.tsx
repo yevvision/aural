@@ -114,7 +114,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     
     // Update like in central database
     const success = toggleLike(updatedTrack.id, 'user-1');
-    console.log('❤️ InlineMiniPlayer: Like result:', success);
+    // Like result processed
     
     // Keep the animation state for a short duration
     setTimeout(() => setLikeClicked(false), 300);
@@ -131,7 +131,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
     
     // Update bookmark in central database
     const success = toggleBookmark(updatedTrack.id, 'user-1');
-    console.log('🔖 InlineMiniPlayer: Bookmark result:', success);
+    // Bookmark result processed
     
     // Keep the animation state for a short duration
     setTimeout(() => setBookmarkClicked(false), 300);

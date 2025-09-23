@@ -25,7 +25,7 @@ class CentralDatabase {
     console.log('🏗️ CentralDB: Konstruktor aufgerufen');
     this.loadFromStorage();
     this.initializeDefaultData();
-    console.log('✅ CentralDB: Initialisierung abgeschlossen');
+    // Initialization completed
   }
 
   // Singleton Pattern - nur eine Instanz
@@ -125,8 +125,7 @@ class CentralDatabase {
     this.data.tracks.push(track);
     this.saveToStorage();
     
-    console.log('✅ CentralDB: Track hinzugefügt. Gesamt:', this.data.tracks.length);
-    console.log('✅ CentralDB: Benutzer gesamt:', this.data.users.length);
+    // Track added successfully
     return true;
   }
 
@@ -140,7 +139,7 @@ class CentralDatabase {
     const deleted = this.data.tracks.length < initialLength;
     if (deleted) {
       this.saveToStorage();
-      console.log('✅ CentralDB: Track gelöscht. Verbleibend:', this.data.tracks.length);
+      // Track deleted successfully
     } else {
       console.log('⚠️ CentralDB: Track nicht gefunden:', trackId);
     }
@@ -172,7 +171,7 @@ class CentralDatabase {
     this.saveToStorage();
     
     const afterCount = this.data.tracks.length;
-    console.log(`✅ CentralDB: Löschung abgeschlossen. Vorher: ${beforeCount}, Nachher: ${afterCount}`);
+    // Deletion completed
     
     return true;
   }
@@ -189,7 +188,7 @@ class CentralDatabase {
     this.data.tracks[trackIndex] = { ...this.data.tracks[trackIndex], ...updates };
     this.saveToStorage();
     
-    console.log('✅ CentralDB: Track aktualisiert:', trackId);
+    // Track updated successfully
     return true;
   }
 
@@ -218,7 +217,7 @@ class CentralDatabase {
     
     this.saveToStorage();
     
-    console.log('✅ CentralDB: Kommentar hinzugefügt. Gesamt Kommentare für Track:', track.comments.length);
+    // Comment added successfully
     return true;
   }
 
@@ -664,7 +663,7 @@ class CentralDatabase {
     console.log('🏗️ CentralDB: Benutzer initialisiert:', this.data.users.map(u => u.username));
 
     this.saveToStorage();
-    console.log('✅ CentralDB: Demo-Daten initialisiert (3 Holler-Tracks)');
+    // Demo data initialized
   }
 
   // =============================================================================
