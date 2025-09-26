@@ -41,11 +41,11 @@ export interface SecurityCheckResult {
 
 // Standard-Limits
 export const DEFAULT_LIMITS: UploadLimits = {
-  maxUploadsPer30Min: 3,
-  maxUploadsPerDay: 5,
-  maxAudioMinutesPerDay: 120,
-  maxDuplicateCount: 5,
-  minAudioDuration: 15, // 15 Sekunden Mindestdauer
+  maxUploadsPer30Min: 1, // Reduziert für mehr Warteschlangen-Uploads
+  maxUploadsPerDay: 2, // Reduziert für mehr Warteschlangen-Uploads
+  maxAudioMinutesPerDay: 60, // Reduziert für mehr Warteschlangen-Uploads
+  maxDuplicateCount: 3, // Reduziert für mehr Warteschlangen-Uploads
+  minAudioDuration: 5, // Reduziert auf 5 Sekunden
   maxAudioDuration: 1200 // 20 Minuten maximale Dauer
 };
 
@@ -152,7 +152,7 @@ export class UploadSecurityManager {
       };
     }
 
-    // 15-Sekunden-Mindestdauer prüfen
+    // 5-Sekunden-Mindestdauer prüfen
     if (duration < this.limits.minAudioDuration) {
       return {
         allowed: true, // Erlauben, aber zur Review
@@ -177,13 +177,17 @@ export class UploadSecurityManager {
     // Duplikat-Check
     const duplicateCheck = this.checkDuplicates(deviceStats, fileHash);
 
+    // TEMPORÄR: Alle Uploads zur Warteschlange für Testing
+    // TODO: Entfernen nach Tests
+    const forceReview = true; // Setze auf false, um normale Logik zu verwenden
+
     // Entscheidung treffen
-    const requiresReview = duplicateCheck.isSuspicious || rateLimitCheck.requiresReview;
-    const allowed = rateLimitCheck.allowed && !duplicateCheck.isSuspicious;
+    const requiresReview = forceReview || duplicateCheck.isSuspicious || rateLimitCheck.requiresReview;
+    const allowed = !forceReview && rateLimitCheck.allowed && !duplicateCheck.isSuspicious;
 
     return {
       allowed,
-      reason: allowed ? undefined : (rateLimitCheck.reason || 'Suspicious duplicate uploads'),
+      reason: allowed ? undefined : (forceReview ? 'Deine Aufnahme wird jetzt geprüft. Das dauert nur einen Moment.' : (rateLimitCheck.reason || 'Suspicious duplicate uploads')),
       requiresReview,
       duplicateCheck,
       deviceStats

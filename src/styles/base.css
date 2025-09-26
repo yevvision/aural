@@ -9,13 +9,16 @@ body {
   margin: 0;
   background-color: #000000;
   color: var(--text-primary);
-  font-family: var(--font-family);
+  font-family: 'Inter', 'Manrope', system-ui, sans-serif;
+  font-weight: 200;
   line-height: 1.6;
   overflow-x: hidden;
 }
 
 * {
   box-sizing: border-box;
+  font-family: 'Inter', 'Manrope', system-ui, sans-serif;
+  font-weight: 200;
 }
 
 /* Scrollbar Styling */
@@ -34,4 +37,20 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Fixed font size for category headers to prevent zoom scaling */
+.category-header-fixed {
+  font-size: 13px !important;
+  font-size: 13px !important;
+  transform: scale(1) !important;
+  transform-origin: left center !important;
+  zoom: 1 !important;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+}
+
+/* Force 13px font size regardless of zoom level */
+.category-header-fixed * {
+  font-size: 13px !important;
 }

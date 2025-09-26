@@ -1,4 +1,4 @@
-import { centralDBV2 } from './centralDatabase_v2';
+import { centralDB } from './centralDatabase_simple';
 
 // Migrations-Script für V1 zu V2
 export class DatabaseMigration {
@@ -26,7 +26,7 @@ export class DatabaseMigration {
       
       // Die Migration wird automatisch in CentralDatabaseV2 durchgeführt
       // beim ersten Laden der Instanz
-      const db = centralDBV2;
+      const db = centralDB;
       
       console.log('✅ Migration: V1 zu V2 Migration erfolgreich abgeschlossen');
       return true;
@@ -44,7 +44,7 @@ export class DatabaseMigration {
     const errors: string[] = [];
     
     try {
-      const stats = centralDBV2.getStats();
+      const stats = centralDB.getStats();
       
       // Prüfe grundlegende Struktur
       if (stats.totalUsers === 0) {
@@ -56,7 +56,7 @@ export class DatabaseMigration {
       }
       
       // Prüfe, ob alle Tracks eine userId haben
-      const tracks = centralDBV2.getAllTracks();
+      const tracks = centralDB.getAllTracks();
       const tracksWithoutUserId = tracks.filter(track => !track.userId);
       if (tracksWithoutUserId.length > 0) {
         errors.push(`${tracksWithoutUserId.length} Tracks ohne userId gefunden`);
@@ -211,7 +211,7 @@ export class DatabaseMigration {
       }
       
       if (hasV2Data) {
-        v2Stats = centralDBV2.getStats();
+        v2Stats = centralDB.getStats();
       }
     } catch (error) {
       console.error('❌ Migration: Fehler beim Lesen der Stats:', error);

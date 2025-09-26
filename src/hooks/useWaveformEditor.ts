@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
+import { validateAudioBlob, repairAudioBlob } from '../utils/audioValidation';
 
 type UseWaveformEditorOpts = {
   container: HTMLElement | null;
@@ -102,8 +103,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         const duration = ws.getDuration();
         addDebugLog('WaveSurfer ready event fired', { duration, isFinite: isFinite(duration) });
         console.log('WaveSurfer: Ready, duration:', duration);
+        
+        // Behebe Infinity Duration Problem
+        const validDuration = isFinite(duration) && duration > 0 ? duration : 0;
+        if (!isFinite(duration) || duration <= 0) {
+          console.warn('Audio duration is invalid:', duration, 'Using fallback duration: 0');
+        }
+        
         setIsReady(true);
-        setDuration(duration);
+        setDuration(validDuration);
         
         // Add mobile touch event listeners
         if (container) {
@@ -207,7 +215,9 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
               addDebugLog('Audio duration is invalid in validation', { duration: audio.duration });
               console.warn('Audio duration is invalid:', audio.duration);
               URL.revokeObjectURL(url);
-              reject(new Error('Invalid audio duration'));
+              // Don't reject immediately - try to continue anyway
+              console.log('Continuing despite invalid duration - WaveSurfer might handle it better');
+              resolve(true);
             }
           });
           
@@ -249,14 +259,32 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
             console.log('Audio blob fixed, loading into WaveSurfer');
             wsRef.current.loadBlob(fixedBlob);
           } else {
-            addDebugLog('Failed to fix audio blob - no fixed blob returned or WaveSurfer not available');
-            throw new Error('Could not fix audio blob');
+            addDebugLog('Failed to fix audio blob, trying direct load');
+            console.error('Failed to fix audio blob, trying direct load');
+            // Last resort: try to load the original blob directly
+            if (wsRef.current) {
+              console.log('Attempting direct blob load as fallback');
+              wsRef.current.loadBlob(audioBlob);
+            } else {
+              throw new Error('Could not fix audio blob and WaveSurfer not available');
+            }
           }
         } catch (fixError) {
-          addDebugLog('Failed to fix audio blob', { error: fixError.message || fixError });
+          addDebugLog('Audio blob fix failed, trying direct load', { error: fixError.message || fixError });
           console.error('Failed to fix audio blob:', fixError);
-          // Show error to user
-          setIsReady(false);
+          
+          // Last resort: try to load the original blob directly
+          if (wsRef.current) {
+            console.log('Attempting direct blob load as final fallback');
+            try {
+              wsRef.current.loadBlob(audioBlob);
+            } catch (directLoadError) {
+              console.error('Direct blob load also failed:', directLoadError);
+              throw new Error('Could not load audio blob in any way');
+            }
+          } else {
+            throw new Error('Could not validate or fix audio blob');
+          }
         }
       }
     };

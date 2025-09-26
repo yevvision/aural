@@ -13,14 +13,8 @@ export {
   FloatingAction
 } from './glassmorphism';
 
-// Button System
-export {
-  Button,
-  VoiceButton,
-  IconButton,
-  FloatingActionButton,
-  ButtonGroup
-} from './Button';
+// Button System - shadcn/ui Button
+export { Button, buttonVariants } from './Button';
 
 // Typography System
 export {
@@ -51,6 +45,14 @@ export {
   BinaryToggle,
   MultiToggle
 } from './Toggle';
+
+// Tabs System - shadcn/ui Tabs
+export {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from './tabs';
 
 // Motion & Animation System
 export {

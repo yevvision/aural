@@ -11,9 +11,12 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
-import { Button, IconButton } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
 import { Heading, Body, Caption } from '../components/ui/Typography';
 import { MultiToggle } from '../components/ui/Toggle';
+import { LiquidGlassHeader } from '../components/ui/LiquidGlassHeader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
 
 // Gender filters for audio content
 const genderFilters = [
@@ -34,13 +37,13 @@ const feedCategories = [
 ];
 
 export const FeedPage = () => {
-  const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack, loadData } = useDatabase('user-1'); // Verwende aktuellen User
+  const { tracks, isLoading, toggleLike, toggleBookmark, addCommentToTrack, loadData, forceAddHollaTracks } = useDatabase('user-1'); // Verwende aktuellen User
   const { followedUsers, myTracks } = useUserStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  // Simplified initialization
+  // Simplified initialization - NUR EINMAL beim Mount
   useEffect(() => {
     setIsInitialized(true);
 
@@ -54,150 +57,62 @@ export const FeedPage = () => {
     return () => {
       window.removeEventListener('trackApproved', handleTrackApproved as EventListener);
     };
-  }, [loadData]);
+  }, []); // Leere Dependency-Array um infinite loop zu vermeiden
 
-  // Track data loaded
+  // Load data when component mounts
   useEffect(() => {
-    // Tracks are available
-  }, [tracks]);
+    if (isInitialized && loadData) {
+      loadData();
+    }
+  }, [isInitialized]); // Entferne loadData aus Dependencies da es jetzt mit useCallback stabilisiert ist
 
-  // Create notifications for followed users' new uploads
-  useEffect(() => {
-    if (tracks.length > 0 && followedUsers.length > 0) {
-      const { addActivity } = useActivityStore.getState();
-      
-      // Find new uploads from followed users (simplified)
-      tracks.forEach(track => {
-        if (followedUsers.includes(track.user.id)) {
-          const isRecentUpload = new Date(track.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000;
-          if (isRecentUpload) {
-            addActivity({
-              type: 'follow',
-              trackId: track.id,
-              user: track.user,
-              isRead: false
-            });
-          }
-        }
+  const handleGenderFilterChange = (value: string) => {
+    setSelectedGenderFilter(value);
+  };
+
+  const getCategoryTracks = (categoryId: string, maxItems: number = 10) => {
+    if (!tracks || tracks.length === 0) return [];
+    
+    let categoryTracks = [...tracks];
+    
+    // Apply gender filter
+    if (selectedGenderFilter !== 'all') {
+      categoryTracks = categoryTracks.filter(track => {
+        if (selectedGenderFilter === 'females') return track.gender === 'female';
+        if (selectedGenderFilter === 'males') return track.gender === 'male';
+        if (selectedGenderFilter === 'couples') return track.gender === 'couple';
+        if (selectedGenderFilter === 'diverse') return track.gender === 'diverse';
+        return true;
       });
     }
-  }, [tracks, followedUsers]);
-
-  // Add user's own tracks to feed to ensure they show up consistently with preserved state
-  useEffect(() => {
-    if (isInitialized && myTracks.length > 0) {
-      // User tracks are now automatically included via the central database
-    }
-  }, [myTracks, isInitialized, tracks]);
-
-  // Fallback: Wenn keine Tracks geladen sind, zeige eine Nachricht
-  if (!isInitialized || isLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-white">Loading content...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleGenderFilterChange = (filterType: string) => {
-    setSelectedGenderFilter(filterType);
-  };
-
-  // Helper function to safely convert to Date for sorting
-  const toSafeDate = (dateValue: any): Date => {
-    if (!dateValue) return new Date();
-    if (dateValue instanceof Date) return dateValue;
-    if (typeof dateValue === 'string') {
-      const parsed = new Date(dateValue);
-      return isNaN(parsed.getTime()) ? new Date() : parsed;
-    }
-    return new Date();
-  };
-
-  // Filter tracks by gender
-  const getFilteredTracks = () => {
-    if (selectedGenderFilter === 'all') {
-      return tracks; // Show all tracks
-    } else if (selectedGenderFilter === 'couples') {
-      return tracks.filter(track => 
-        track.gender === 'Couple' || 
-        (track.tags && track.tags.includes('Couple'))
-      );
-    } else if (selectedGenderFilter === 'females') {
-      return tracks.filter(track => 
-        track.gender === 'Female' || 
-        (track.tags && track.tags.includes('Female'))
-      );
-    } else if (selectedGenderFilter === 'males') {
-      return tracks.filter(track => 
-        track.gender === 'Male' || 
-        (track.tags && track.tags.includes('Male'))
-      );
-    } else if (selectedGenderFilter === 'diverse') {
-      return tracks.filter(track => 
-        track.gender === 'Diverse' || 
-        (track.tags && track.tags.includes('Diverse'))
-      );
-    }
-    return tracks; // Show all if no filter
-  };
-
-  // German spec: Get tracks for each category (preview) - using current tracks to preserve bookmarks
-  const getCategoryTracks = (categoryId: string, maxItems = 3) => {
-    const filteredTracks = getFilteredTracks();
-    let categoryTracks = [...filteredTracks]; // Use filtered tracks with preserved state
-    
-    // Track filtering and sorting logic
-    
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    
-    switch (categoryId) {
-      case 'new':
-        // Show tracks from the last 2 weeks, sorted by date (newest first)
-        categoryTracks = filteredTracks
-          .filter(track => toSafeDate(track.createdAt) > twoWeeksAgo)
-          .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
-        break;
-      case 'bookmarked':
-        // Show bookmarked tracks, sorted by bookmark date (newest first)
-        categoryTracks = [...filteredTracks]
-          .filter(track => track.isBookmarked)
-          .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
-        break;
-      case 'subscribs':
-        // Show tracks from followed users, sorted by date (newest first)
-        categoryTracks = [...filteredTracks]
-          .filter(track => track.user && followedUsers.includes(track.user.id))
-          .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime());
-        break;
-      case 'top_rated':
-        // Sort by date first (newest first), then by likes for ties
-        categoryTracks = [...filteredTracks].sort((a, b) => {
-          const dateDiff = toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime();
-          if (dateDiff !== 0) return dateDiff;
-          return b.likes - a.likes;
-        });
-        break;
-      case 'most_commented':
-        // Sort by date first (newest first), then by comments for ties
-        categoryTracks = [...filteredTracks].sort((a, b) => {
-          const dateDiff = toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime();
-          if (dateDiff !== 0) return dateDiff;
-          const aComments = a.commentsCount || 0;
-          const bComments = b.commentsCount || 0;
-          return bComments - aComments;
-        });
-        break;
-    }
-    
-    // Tracks sorted for category
     
     // Category-specific filtering logic
+    switch (categoryId) {
+      case 'new':
+        // Sort by creation date (newest first)
+        categoryTracks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'bookmarked':
+        // Filter bookmarked tracks
+        categoryTracks = categoryTracks.filter(track => track.isBookmarked);
+        break;
+      case 'subscribs':
+        // Filter tracks from followed users
+        categoryTracks = categoryTracks.filter(track => 
+          followedUsers.some(user => user.id === track.userId)
+        );
+        break;
+      case 'top_rated':
+        // Sort by likes (highest first)
+        categoryTracks.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        break;
+      case 'most_commented':
+        // Sort by comment count (highest first)
+        categoryTracks.sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
+        break;
+      default:
+        break;
+    }
     
     return categoryTracks.slice(0, maxItems);
   };
@@ -205,38 +120,58 @@ export const FeedPage = () => {
   return (
     <div className="w-full">
       <div className="max-w-md mx-auto px-4 py-6 pb-24">
-        {/* Concept Explanation Box */}
+        {/* Concept Explanation Box with Liquid Glass Effect */}
         <RevealOnScroll direction="up" className="mb-6">
-          <motion.div 
-            className="glass-surface rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="text-center">
-              <Heading level={1} className="mb-2">
+              <LiquidGlassEffect
+                intensity={0.0}
+                chromaticDispersion={0.015}
+                borderRadius={16}
+                backgroundBlur={30}
+                mouseTracking={false}
+                className="w-full"
+              >
+            <div className="rounded-2xl p-6 border-0 text-center">
+              <Heading level={1} className="mb-4 text-white font-semibold">
                 Hear desire, live fantasy
               </Heading>
-              <Body color="secondary" className="text-sm leading-relaxed">
+              <p className="text-[13px] font-normal leading-relaxed text-white/80">
                 Aural is the platform for erotic audio. Listen, explore, and publish recordings — 
                 anonymous, sensual, and free from images.
-              </Body>
+              </p>
             </div>
-          </motion.div>
+          </LiquidGlassEffect>
         </RevealOnScroll>
 
-        {/* Gender Filter as Segment Control */}
+        {/* Gender Filter as Tabs */}
         <RevealOnScroll direction="up" className="mb-6">
-          <MultiToggle
-            options={genderFilters.map(filter => ({
-              value: filter.type,
-              label: filter.label
-            }))}
-            value={selectedGenderFilter}
-            onChange={handleGenderFilterChange}
-            variant="segmented"
-            size="sm"
-          />
+          <div className="tabs-container">
+            <Tabs value={selectedGenderFilter} onValueChange={handleGenderFilterChange} className="w-full">
+              <LiquidGlassEffect
+                intensity={0.0}
+                chromaticDispersion={0.015}
+                borderRadius={26}
+                backgroundBlur={30}
+                mouseTracking={false}
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-5 bg-transparent border-0 rounded-full p-1 h-[53px] items-center justify-center">
+                  {genderFilters.map((filter) => (
+                      <TabsTrigger
+                        key={filter.type}
+                        value={filter.type}
+                        className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                      >
+                        {filter.label}
+                      </TabsTrigger>
+                  ))}
+                </TabsList>
+              </LiquidGlassEffect>
+              {genderFilters.map((filter) => (
+                <TabsContent key={filter.type} value={filter.type} className="mt-4">
+                </TabsContent>
+              ))}
+            </Tabs>
+          </div>
         </RevealOnScroll>
 
         {/* Enhanced Loading State */}
@@ -257,119 +192,80 @@ export const FeedPage = () => {
 
         {/* Enhanced Feed Content with Motion */}
         {!isLoading && (
-          <motion.div 
-            className="space-y-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            {tracks.length === 0 ? (
-              <RevealOnScroll direction="up" delay={0.2}>
-                <div className="text-center py-12">
-                  <motion.div 
-                    className="text-6xl mb-4"
-                    animate={{ 
-                      scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0]
-                    }}
-                    transition={{ 
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    🎙️
-                  </motion.div>
-                  <Heading level={3} className="mb-2">
-                    No audio content found
-                  </Heading>
-                  <Body color="secondary">
-                    Be the first to share your voice!
-                  </Body>
-                </div>
-              </RevealOnScroll>
-            ) : (
-              <>
-                {/* Enhanced Category Sections with Motion - Only show categories with content */}
-                {feedCategories
-                  .map((category, categoryIndex) => {
-                    const categoryTracks = getCategoryTracks(category.id);
-                    return { category, categoryTracks, originalIndex: categoryIndex };
-                  })
-                  .filter(({ categoryTracks }) => categoryTracks.length > 0) // Only show categories with content
-                  .map(({ category, categoryTracks }, filteredIndex) => {
-                    return (
-                      <RevealOnScroll 
-                        key={category.id} 
-                        direction="up" 
-                        delay={filteredIndex * 0.1}
-                        className="space-y-3"
+          <StaggerWrapper>
+            {feedCategories.map((category, categoryIndex) => {
+              const categoryTracks = getCategoryTracks(category.id, 6);
+              
+              if (categoryTracks.length === 0) return null;
+              
+              return (
+                <StaggerItem key={category.id} index={categoryIndex}>
+                  <div className="mb-8">
+                    {/* Category Header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full bg-${category.color}`}></div>
+                        <span className="category-header-fixed font-normal text-white">
+                          {category.name}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/category/${category.id}`)}
+                        className="text-text-secondary"
                       >
-                        <motion.div 
-                          className="flex items-center justify-between"
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: filteredIndex * 0.1 }}
-                        >
-                          <Body className="text-lg font-medium">
-                            {category.name}
-                          </Body>
-                          <Button
-                            onClick={() => navigate(`/category/${category.id}`)}
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center text-lg hover:text-gradient-strong"
-                            whileHover={{ x: 5 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            View all
-                            <ChevronRight className="w-4 h-4 ml-1" />
-                          </Button>
-                        </motion.div>
-                        
-                        <StaggerWrapper className="space-y-3">
-                          {categoryTracks.map((track, index) => (
-                            <StaggerItem key={track.id}>
-                              <AudioCard track={track} index={index} />
-                            </StaggerItem>
-                          ))}
-                        </StaggerWrapper>
-                      </RevealOnScroll>
-                    );
-                  })}
-
-                {/* Enhanced Show All Tracks Section */}
-                <RevealOnScroll direction="up" delay={0.3}>
-                  <motion.div 
-                    className="border-t border-border-light pt-6 mt-8"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <Body className="text-lg font-medium">
-                        All Recordings
-                      </Body>
-                      <Caption color="secondary">
-                        {getFilteredTracks().length} recordings
-                      </Caption>
+                        <ChevronRight size={14} />
+                      </Button>
                     </div>
-                    
-                    <StaggerWrapper className="space-y-3">
-                      {getFilteredTracks()
-                        .sort((a, b) => toSafeDate(b.createdAt).getTime() - toSafeDate(a.createdAt).getTime())
-                        .map((track, index) => {
-                          return (
-                            <StaggerItem key={track.id}>
-                              <AudioCard track={track} index={index} />
-                            </StaggerItem>
-                          );
-                        })}
-                    </StaggerWrapper>
-                  </motion.div>
-                </RevealOnScroll>
-              </>
-            )}
+
+                    {/* Audio Cards Grid */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {categoryTracks.map((track, trackIndex) => (
+                        <StaggerItem key={track.id} index={trackIndex}>
+                          <AudioCard
+                            track={track}
+                            onLike={() => toggleLike(track.id)}
+                            onBookmark={() => toggleBookmark(track.id)}
+                            onComment={(comment) => addCommentToTrack(track.id, comment)}
+                            onPlay={() => navigate(`/player/${track.id}`)}
+                          />
+                        </StaggerItem>
+                      ))}
+                    </div>
+                  </div>
+                </StaggerItem>
+              );
+            })}
+          </StaggerWrapper>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && tracks && tracks.length === 0 && (
+          <motion.div 
+            className="text-center py-12"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="mb-4">
+              <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
+                <span className="text-2xl">🎵</span>
+              </div>
+            </div>
+            <Heading level={2} className="mb-2 text-white text-[11px]">
+              No tracks yet
+            </Heading>
+            <Body color="secondary" className="mb-6 text-[11px]">
+              Be the first to share your voice and start the conversation.
+            </Body>
+            <Button
+              variant="primary"
+              onClick={() => navigate('/record')}
+              className="mx-auto"
+            >
+              Start Recording
+            </Button>
           </motion.div>
         )}
       </div>

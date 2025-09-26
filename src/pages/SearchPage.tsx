@@ -9,6 +9,9 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
+import { MultiToggle } from '../components/ui/Toggle';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
 
 // Gender filters for audio content
 const genderFilters = [
@@ -61,30 +64,33 @@ export const SearchPage = () => {
 
   // Filter tracks by gender
   const getFilteredTracks = () => {
+    // Filtere nur aktive Tracks (nicht in Warteschlange)
+    const activeTracks = tracks.filter(track => !track.status || track.status === 'active');
+    
     if (selectedGenderFilter === 'all') {
-      return tracks; // Show all tracks
+      return activeTracks; // Show all active tracks
     } else if (selectedGenderFilter === 'couples') {
-      return tracks.filter(track => 
+      return activeTracks.filter(track => 
         track.gender === 'Couple' || 
         (track.tags && track.tags.includes('Couple'))
       );
     } else if (selectedGenderFilter === 'females') {
-      return tracks.filter(track => 
+      return activeTracks.filter(track => 
         track.gender === 'Female' || 
         (track.tags && track.tags.includes('Female'))
       );
     } else if (selectedGenderFilter === 'males') {
-      return tracks.filter(track => 
+      return activeTracks.filter(track => 
         track.gender === 'Male' || 
         (track.tags && track.tags.includes('Male'))
       );
     } else if (selectedGenderFilter === 'diverse') {
-      return tracks.filter(track => 
+      return activeTracks.filter(track => 
         track.gender === 'Diverse' || 
         (track.tags && track.tags.includes('Diverse'))
       );
     }
-    return tracks; // Show all if no filter
+    return activeTracks; // Show all active tracks if no filter
   };
 
   const debouncedSearch = debounce((searchQuery: string) => {
@@ -182,25 +188,35 @@ export const SearchPage = () => {
             </div>
           </RevealOnScroll>
 
-          {/* Gender Filter Toggles */}
-          <RevealOnScroll direction="up" delay={0.2}>
-            <div className="grid grid-cols-5 gap-2">
-              {genderFilters.map((filterOption) => (
-                <motion.button
-                  key={filterOption.type}
-                  onClick={() => handleGenderFilterChange(filterOption.type)}
-                  className={`w-full px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all duration-300 ${
-                    selectedGenderFilter === filterOption.type
-                      ? 'bg-gradient-primary text-white'
-                      : 'glass-surface text-text-secondary hover:text-text-primary hover:bg-white/15'
-                  }`}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
+          {/* Gender Filter as Tabbar */}
+          <RevealOnScroll direction="up" delay={0.2} className="mb-6">
+            <div className="tabs-container">
+              <Tabs value={selectedGenderFilter} onValueChange={handleGenderFilterChange} className="w-full">
+                <LiquidGlassEffect
+                  intensity={0.0}
+                  chromaticDispersion={0.015}
+                  borderRadius={26}
+                  backgroundBlur={30}
+                  mouseTracking={false}
+                  className="w-full"
                 >
-                  <span>{filterOption.label}</span>
-                </motion.button>
-              ))}
+                  <TabsList className="grid w-full grid-cols-5 bg-transparent border-0 rounded-full p-1 h-[53px] items-center justify-center">
+                    {genderFilters.map((filter) => (
+                      <TabsTrigger
+                        key={filter.type}
+                        value={filter.type}
+                        className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                      >
+                        {filter.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </LiquidGlassEffect>
+                {genderFilters.map((filter) => (
+                  <TabsContent key={filter.type} value={filter.type} className="mt-4">
+                  </TabsContent>
+                ))}
+              </Tabs>
             </div>
           </RevealOnScroll>
           

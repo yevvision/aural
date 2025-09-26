@@ -28,14 +28,14 @@ export const Text: React.FC<TextProps> = ({
 }) => {
   // Variant styles based on design system
   const variantClasses = {
-    headline: 'text-headline', // 28px, bold, tight spacing
-    title: 'text-2xl font-bold leading-tight tracking-tight',
-    subtitle: 'text-xl font-semibold leading-relaxed',
-    body: 'text-body', // 16px, medium weight
-    'body-lg': 'text-lg font-medium leading-relaxed',
-    'body-sm': 'text-sm font-medium leading-relaxed',
+    headline: 'text-headline', // 28px, normal weight, tight spacing
+    title: 'text-2xl font-normal leading-tight tracking-tight',
+    subtitle: 'text-xl font-normal leading-relaxed',
+    body: 'text-body', // 16px, normal weight
+    'body-lg': 'text-lg font-normal leading-relaxed',
+    'body-sm': 'text-sm font-normal leading-relaxed',
     label: 'text-label', // 12px, uppercase, wide tracking
-    caption: 'text-xs font-medium leading-relaxed tracking-wide'
+    caption: 'text-xs font-normal leading-relaxed tracking-wide'
   };
 
   // Weight classes
@@ -92,12 +92,12 @@ export const Heading: React.FC<HeadingProps> = ({
   ...props
 }) => {
   const levelClasses = {
-    1: 'text-3xl md:text-4xl font-bold leading-tight tracking-tight',
-    2: 'text-2xl md:text-3xl font-bold leading-tight tracking-tight',
-    3: 'text-xl md:text-2xl font-bold leading-snug',
-    4: 'text-lg md:text-xl font-semibold leading-snug',
-    5: 'text-base md:text-lg font-semibold leading-normal',
-    6: 'text-sm md:text-base font-semibold leading-normal'
+    1: 'text-3xl md:text-4xl font-normal leading-tight tracking-tight',
+    2: 'text-2xl md:text-3xl font-normal leading-tight tracking-tight',
+    3: 'text-xl md:text-2xl font-normal leading-snug',
+    4: 'text-lg md:text-xl font-normal leading-snug',
+    5: 'text-base md:text-lg font-normal leading-normal',
+    6: 'text-sm md:text-base font-normal leading-normal'
   };
 
   const classes = cn(

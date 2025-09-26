@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Snapshot Tests > creates consistent user profile 1`] = `
+{
+  "age": 25,
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "email": "max@example.com",
+  "id": "fixed-id-123",
+  "name": "Max Mustermann",
+  "preferences": {
+    "language": "de",
+    "notifications": true,
+    "theme": "dark",
+  },
+}
+`;
+
+exports[`Snapshot Tests > formats track data consistently 1`] = `
+{
+  "artist": "Test Artist",
+  "duration": "3:00",
+  "genre": "Electronic",
+  "id": "track-123",
+  "title": "Test Song",
+  "year": 2025,
+}
+`;
+
+exports[`Snapshot Tests > handles missing track data 1`] = `
+{
+  "artist": "Unknown Artist",
+  "duration": "2:00",
+  "genre": "Unknown",
+  "id": "track-456",
+  "title": "Minimal Track",
+  "year": 2025,
+}
+`;

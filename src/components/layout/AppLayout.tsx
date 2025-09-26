@@ -9,6 +9,8 @@ import UnicornBackgroundSimple from '../UnicornBackgroundSimple';
 import { motion } from 'framer-motion';
 import { useScrollBlur } from '../../hooks/useScrollBlur';
 import { createContext, useContext } from 'react';
+import { audioPersistenceManager } from '../../services/audioPersistenceManager';
+// AudioDebugConsole removed
 import type { PlayerVisibilityContext } from '../../types';
 
 // Create context for back navigation
@@ -39,13 +41,26 @@ export const AppLayout = () => {
     setVisibleAudioCardIdsState(update);
   }, []);
   const [showBackButton, setShowBackButton] = useState(false);
+  // Debug console removed
   
   // Add scroll blur effect
   const isScrolled = useScrollBlur(10);
   
-  // Initialize the global audio manager once at the app level
+  // Initialize the global audio manager and persistence manager once at the app level
   useEffect(() => {
     initializeGlobalAudioManager();
+    
+    // Initialisiere den AudioPersistenceManager
+    console.log('🎵 AppLayout: Initializing audio persistence manager...');
+    
+    // Starte automatische Reparatur nach kurzer Verzögerung
+    setTimeout(() => {
+      audioPersistenceManager.autoRepairAllAudioUrls().then(repairedCount => {
+        if (repairedCount > 0) {
+          console.log(`✅ AppLayout: ${repairedCount} audio URLs repaired automatically`);
+        }
+      });
+    }, 2000);
   }, []);
 
   // Load content after background is ready
@@ -75,7 +90,9 @@ export const AppLayout = () => {
   }, [location.pathname]);
 
   // Check if the current track is visible (any instance of it)
-  const isCurrentTrackVisible = currentTrack && visibleAudioCardIds.has(currentTrack.id);
+  const isCurrentTrackVisible = currentTrack && Array.from(visibleAudioCardIds).some(cardInstanceId => 
+    cardInstanceId.startsWith(currentTrack.id + '-')
+  );
 
   // Reset visibility tracking when changing routes
   useEffect(() => {
@@ -83,14 +100,16 @@ export const AppLayout = () => {
     setVisibleAudioCardIdsState(new Set());
   }, [location.pathname]);
 
-  // Check if we're on the record page or player page for mobile layout
+  // Check if we're on the record page, player page, upload page, or audio editor page for mobile layout
   const isRecordPage = location.pathname === '/record' || location.pathname === '/aural/record';
   const isPlayerPage = location.pathname.startsWith('/player/');
-  const isBlackBackgroundPage = isRecordPage || isPlayerPage;
+  const isUploadPage = location.pathname === '/upload' || location.pathname === '/aural/upload';
+  const isAudioEditorPage = location.pathname === '/audio-editor' || location.pathname === '/aural/audio-editor';
+  const isBlackBackgroundPage = isRecordPage || isPlayerPage || isUploadPage || isAudioEditorPage;
   
   return (
     <BackNavigationContext.Provider value={{ showBackButton, setShowBackButton }}>
-      <UnicornBackgroundSimple className={`min-h-screen ${isBlackBackgroundPage ? `mobile-record-layout record-page-background ${isPlayerPage ? 'player-page-background' : ''}` : ''}`}>
+      <UnicornBackgroundSimple className={`min-h-screen ${isBlackBackgroundPage ? `mobile-record-layout record-page-background ${isPlayerPage ? 'player-page-background' : ''} ${isUploadPage ? 'upload-page-background' : ''} ${isAudioEditorPage ? 'audio-editor-page-background' : ''}` : ''}`}>
         {/* Content loads after background is ready */}
         {isContentReady && (
           <div className="min-h-screen flex flex-col text-text-primary relative">
@@ -98,14 +117,14 @@ export const AppLayout = () => {
             <TopNavigation />
             
             {/* Main Content with reduced top padding for category/subpages */}
-            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
+            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
               <div style={{ minHeight: '100%' }}>
                 <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
               </div>
             </main>
             
-            {/* Mini Player - fixed at bottom of screen when there's a current track and no visible audio card */}
-            {currentTrack && !isCurrentTrackVisible && !location.pathname.startsWith('/player/') && (
+            {/* Mini Player - fixed at bottom of screen when there's a current track and it's not visible */}
+            {currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && (
               <div className="fixed bottom-0 left-0 right-0 z-50">
                 <MiniPlayer displayMode="fixed" />
               </div>
@@ -116,6 +135,8 @@ export const AppLayout = () => {
           </div>
         )}
       </UnicornBackgroundSimple>
+      
+      {/* Audio Debug Console removed */}
     </BackNavigationContext.Provider>
   );
 };

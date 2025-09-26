@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '../../utils';
+import { LiquidGlassEffect } from './LiquidGlassEffect';
 
 // Toggle Variants
 type ToggleVariant = 'default' | 'pill' | 'segmented';
@@ -13,6 +14,9 @@ interface ToggleProps extends Omit<HTMLMotionProps<'button'>, 'size'> {
   active?: boolean;
   onToggle?: (active: boolean) => void;
   disabled?: boolean;
+  useLiquidGlass?: boolean;
+  liquidGlassIntensity?: number;
+  liquidGlassDispersion?: number;
 }
 
 /**
@@ -28,11 +32,14 @@ export const Toggle: React.FC<ToggleProps> = ({
   active = false,
   onToggle,
   disabled = false,
+  useLiquidGlass = false,
+  liquidGlassIntensity = 0.02,
+  liquidGlassDispersion = 0.008,
   ...props
 }) => {
   // Base toggle classes - different from buttons and tags
   const baseClasses = cn(
-    'inline-flex items-center justify-center font-medium',
+    'inline-flex items-center justify-center font-normal',
     'transition-all duration-300 ease-smooth',
     'focus:outline-none focus:ring-2 focus:ring-gradient-strong focus:ring-offset-1',
     'cursor-pointer relative overflow-hidden',
@@ -50,9 +57,9 @@ export const Toggle: React.FC<ToggleProps> = ({
   const variantClasses = {
     default: active
       ? cn(
-          'bg-gradient-primary text-white font-semibold',
-          'shadow-primary border-0',
-          'glow-primary'
+          'bg-white/20 backdrop-blur-md text-white font-normal',
+          'shadow-lg border border-white/30',
+          'hover:bg-white/30'
         )
       : cn(
           'bg-white/5 text-text-secondary border border-white/10',
@@ -60,8 +67,8 @@ export const Toggle: React.FC<ToggleProps> = ({
         ),
     pill: active
       ? cn(
-          'bg-gradient-primary text-white font-semibold',
-          'shadow-md border-0'
+          'bg-white/20 backdrop-blur-md text-white font-normal',
+          'shadow-md border border-white/30'
         )
       : cn(
           'bg-surface-secondary text-text-secondary border border-white/10',
@@ -69,8 +76,8 @@ export const Toggle: React.FC<ToggleProps> = ({
         ),
     segmented: active
       ? cn(
-          'bg-gradient-primary text-white font-semibold z-10',
-          'shadow-lg'
+          'bg-white/20 backdrop-blur-md text-white font-semibold z-10',
+          'shadow-lg border border-white/30'
         )
       : cn(
           'bg-transparent text-text-secondary',
@@ -84,7 +91,7 @@ export const Toggle: React.FC<ToggleProps> = ({
     }
   };
 
-  return (
+  const buttonContent = (
     <motion.button
       className={cn(
         baseClasses,
@@ -102,7 +109,7 @@ export const Toggle: React.FC<ToggleProps> = ({
       {/* Background animation for active state */}
       {active && variant === 'default' && (
         <motion.div
-          className="absolute inset-0 bg-gradient-primary rounded-full opacity-20"
+          className="absolute inset-0 bg-white/30 backdrop-blur-sm rounded-full opacity-20"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.2 }}
           transition={{ duration: 0.3 }}
@@ -112,6 +119,24 @@ export const Toggle: React.FC<ToggleProps> = ({
       <span className="relative z-10">{children}</span>
     </motion.button>
   );
+
+  // Wrap with Liquid Glass Effect if enabled
+  if (useLiquidGlass) {
+    return (
+      <LiquidGlassEffect
+        intensity={0.0}
+        chromaticDispersion={liquidGlassDispersion}
+        mouseTracking={false}
+        borderRadius={size === 'sm' ? 18 : size === 'lg' ? 26 : 22}
+        backgroundBlur={15}
+        className="inline-block"
+      >
+        {buttonContent}
+      </LiquidGlassEffect>
+    );
+  }
+
+  return buttonContent;
 };
 
 
@@ -142,14 +167,14 @@ export const BinaryToggle: React.FC<BinaryToggleProps> = ({
   return (
     <div className={cn('flex items-center gap-3', className)}>
       {label && (
-        <span className="text-sm font-medium text-text-primary">{label}</span>
+        <span className="text-sm font-normal text-text-primary">{label}</span>
       )}
       <motion.button
         className={cn(
-          'relative rounded-full border-2 transition-colors duration-200',
+          'relative rounded-full border-2 transition-colors duration-200 backdrop-blur-md',
           sizeMap[size].track,
           active
-            ? 'bg-gradient-primary border-gradient-strong'
+            ? 'bg-white/20 border-white/40'
             : 'bg-surface-secondary border-white/20',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
@@ -158,7 +183,7 @@ export const BinaryToggle: React.FC<BinaryToggleProps> = ({
       >
         <motion.div
           className={cn(
-            'absolute top-0.5 rounded-full bg-white shadow-sm',
+            'absolute top-0.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm',
             sizeMap[size].thumb
           )}
           animate={{
@@ -179,6 +204,9 @@ interface MultiToggleProps {
   variant?: ToggleVariant;
   size?: ToggleSize;
   className?: string;
+  useLiquidGlass?: boolean;
+  liquidGlassIntensity?: number;
+  liquidGlassDispersion?: number;
 }
 
 export const MultiToggle: React.FC<MultiToggleProps> = ({
@@ -187,24 +215,39 @@ export const MultiToggle: React.FC<MultiToggleProps> = ({
   onChange,
   variant = 'segmented',
   size = 'md',
-  className
+  className,
+  useLiquidGlass = false,
+  liquidGlassIntensity = 0.02,
+  liquidGlassDispersion = 0.008
 }) => {
   const activeIndex = options.findIndex(option => option.value === value);
   const widthPercentage = 100 / options.length;
 
-  return (
+  const toggleContent = (
     <div
       className={cn(
-        'relative flex bg-surface-secondary/20 rounded-full p-1 backdrop-blur-sm border border-white/10',
+        'relative flex rounded-full p-1',
+        'w-full max-w-full overflow-hidden', // Ensure proper width constraints
         className
       )}
+      style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+      }}
     >
-      {/* Sliding orange indicator - perfectly centered */}
+      {/* Sliding glassmorphism indicator - perfectly centered */}
       <motion.div
-        className="absolute top-1 bottom-1 bg-gradient-primary rounded-full shadow-md"
+        className="absolute top-1 bottom-1 rounded-full"
         style={{
           width: `calc(${widthPercentage}% - 2px)`,
-          left: '1px'
+          left: '1px',
+          background: 'rgba(255, 255, 255, 0.15)',
+          backdropFilter: 'blur(15px)',
+          WebkitBackdropFilter: 'blur(15px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         }}
         animate={{
           x: `calc(${activeIndex * 100}% + ${activeIndex * 2}px)`
@@ -223,16 +266,35 @@ export const MultiToggle: React.FC<MultiToggleProps> = ({
           onClick={() => !option.disabled && onChange(option.value)}
           disabled={option.disabled}
           className={cn(
-            'flex-1 relative z-10 py-2 px-4 text-sm font-medium transition-all duration-200 rounded-full',
+            'flex-1 relative z-10 py-2 px-2 sm:px-4 text-xs sm:text-sm font-normal transition-all duration-200 rounded-full',
+            'min-w-0 flex-shrink-0', // Prevent text overflow and ensure equal distribution
             value === option.value
               ? 'text-white'
               : 'text-text-secondary hover:text-text-primary',
             option.disabled && 'opacity-50 cursor-not-allowed'
           )}
         >
-          {option.label}
+          <span className="truncate">{option.label}</span>
         </button>
       ))}
     </div>
   );
+
+  // Wrap with Liquid Glass Effect if enabled
+  if (useLiquidGlass) {
+    return (
+      <LiquidGlassEffect
+        intensity={0.0}
+        chromaticDispersion={liquidGlassDispersion}
+        mouseTracking={false}
+        borderRadius={size === 'sm' ? 20 : size === 'lg' ? 28 : 24}
+        backgroundBlur={20}
+        className="w-full"
+      >
+        {toggleContent}
+      </LiquidGlassEffect>
+    );
+  }
+
+  return toggleContent;
 };

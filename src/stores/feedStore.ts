@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AudioTrack, FeedFilter, SearchFilters, AudioCategory } from '../types';
 import { useActivityStore } from './activityStore';
 import { useUserStore } from './userStore';
-import { database } from '../database/simulatedDatabase';
+import { centralDB } from '../database/centralDatabase_simple';
 
 // German spec: Enhanced feed store with categories, search, and German filters
 interface FeedStore {
@@ -41,7 +41,7 @@ interface FeedStore {
   setLoading: (loading: boolean) => void;
   loadMoreTracks: () => void;
   reset: () => void;
-  loadTracksFromDatabase: () => void; // Load tracks from database
+  loadTracksFromDatabase: () => void; // Load tracks from centralDB
   
   // German spec: Advanced actions
   refreshFeed: () => void;
@@ -505,11 +505,11 @@ export const useFeedStore = create<FeedStore>()(
         }));
       },
 
-      // Load tracks from database
+      // Load tracks from centralDB
       loadTracksFromDatabase: () => {
         try {
           console.log('FeedStore: Lade Tracks aus Datenbank...');
-          const dbTracks = database.getAllTracks();
+          const dbTracks = centralDB.getAllTracks();
           console.log('FeedStore: Geladene Tracks:', dbTracks.length, dbTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
           
           // Process tracks to ensure base64 URLs are preserved
@@ -540,19 +540,19 @@ export const useFeedStore = create<FeedStore>()(
       name: 'aural-feed-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Persist minimal data - let the database be the source of truth
+        // Persist minimal data - let the centralDB be the source of truth
         filter: state.filter,
         recentSearches: state.recentSearches,
         searchFilters: state.searchFilters,
-        // Don't persist tracks - they should always be loaded from database
+        // Don't persist tracks - they should always be loaded from centralDB
         // Don't persist loading states
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
           if (!error && state) {
-            // Load tracks from database after rehydration
+            // Load tracks from centralDB after rehydration
             setTimeout(() => {
-              const dbTracks = database.getAllTracks();
+              const dbTracks = centralDB.getAllTracks();
               state.setTracks(dbTracks);
               state.syncWithUserStore();
             }, 0);

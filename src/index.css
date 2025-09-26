@@ -1,8 +1,13 @@
 @import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
 @import './styles/variables.css';
 @import './styles/base.css';
 @import './styles/glassmorphism.css';
 @import './styles/animations.css';
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* Additional styles for specific components */
 
@@ -437,28 +442,28 @@
   input, textarea, select {
     font-size: 16px;
   }
-  
+
   /* Better touch targets */
   button, .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Prevent horizontal scroll */
   body {
     overflow-x: hidden;
   }
-  
+
   /* Optimize tap highlighting */
   * {
     -webkit-tap-highlight-color: rgba(255, 106, 58, 0.3);
   }
-  
+
   /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
   }
-  
+
   /* Better select styling on mobile */
   select {
     -webkit-appearance: none;
@@ -469,7 +474,32 @@
     background-position: right 12px center;
     background-size: 16px;
   }
-  
+
+  /* Mobile Toggle Component Optimizations */
+  .multi-toggle-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0 4px; /* Slight padding to prevent edge touching */
+  }
+
+  /* Ensure toggle buttons fit properly on small screens */
+  .multi-toggle-container button {
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    font-size: 11px !important;
+    line-height: 1.2;
+  }
+
+  /* Very small screens - further reduce padding */
+  @media (max-width: 375px) {
+    .multi-toggle-container button {
+      padding-left: 4px !important;
+      padding-right: 4px !important;
+      font-size: 10px !important;
+    }
+  }
+
   /* Mobile-specific: Footer bei Record-Seite im ersten Viewport verstecken */
   .mobile-record-layout footer {
     position: absolute;
@@ -478,7 +508,7 @@
     right: 0;
     z-index: 10;
   }
-  
+
   /* Mobile-specific: Record-Seite Layout */
   .mobile-record-layout {
     min-height: 100vh;
@@ -486,7 +516,7 @@
     flex-direction: column;
     background-color: #000000; /* Schwarzer Hintergrund für Record-Seite */
   }
-  
+
   .mobile-record-layout main {
     flex: 1;
     display: flex;
@@ -494,7 +524,7 @@
     justify-content: center; /* Zentriert den Inhalt vertikal */
     padding-bottom: 0 !important; /* Entfernt Standard-Padding */
   }
-  
+
   /* Mobile-specific: Record-Button zentrieren */
   .mobile-record-layout .record-button-container {
     display: flex;
@@ -504,7 +534,7 @@
     flex: 1;
     min-height: 50vh; /* Reduzierte Höhe für Upload-Div Platz */
   }
-  
+
   /* Mobile-specific: Upload Div - absolute position, transparent, unten positioniert */
   .mobile-record-layout .upload-hint-container {
     position: absolute;
@@ -517,12 +547,12 @@
     /* Kein Border, kein Backdrop-Filter */
     z-index: 10; /* Über anderen Inhalten */
   }
-  
+
   /* Mobile-specific: Upload Button Abstand */
   .mobile-record-layout .upload-hint-container button {
     margin-bottom: 15px; /* 15px Abstand zum unteren Rand */
   }
-  
+
   /* Mobile-specific: Recording Controls - 15px über unteren Viewport-Rand */
   .mobile-record-layout .recording-controls-container {
     position: fixed;
@@ -534,7 +564,7 @@
     padding: 1rem;
     z-index: 10;
   }
-  
+
   /* Mobile-specific: Footer Position anpassen */
   .mobile-record-layout footer {
     position: relative;
@@ -542,7 +572,7 @@
     margin-top: 15px; /* 15px Abstand nach oben zum ersten Viewport */
     z-index: 10; /* Unter der Upload-Div */
   }
-  
+
   /* Mobile-specific: Main Content für Record-Seite anpassen */
   .mobile-record-layout main {
     padding-bottom: 0 !important; /* Entfernt Standard-Padding für Record-Seite */
@@ -561,6 +591,66 @@
 
 .record-page-background .unicorn-background-container {
   display: none !important;
+}
+
+/* Upload, Audio Editor, Upload Success, Security Check, and News pages also hide background animation */
+.record-page-background .unicorn-background-container,
+.upload-page-background .unicorn-background-container,
+.audio-editor-page-background .unicorn-background-container,
+.upload-success-page-background .unicorn-background-container,
+.security-check-page-background .unicorn-background-container,
+.news-page-background .unicorn-background-container {
+  display: none !important;
+}
+
+/* Upload Page specific styles */
+.upload-page-background {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+.upload-page-background * {
+  background-color: transparent !important;
+}
+
+/* Audio Editor Page specific styles */
+.audio-editor-page-background {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+.audio-editor-page-background * {
+  background-color: transparent !important;
+}
+
+/* Upload Success Page specific styles */
+.upload-success-page-background {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+.upload-success-page-background * {
+  background-color: transparent !important;
+}
+
+/* Security Check Page specific styles */
+.security-check-page-background {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+.security-check-page-background * {
+  background-color: transparent !important;
+}
+
+/* News Page specific styles */
+.news-page-background {
+  background-color: #000000 !important;
+  min-height: 100vh;
+}
+
+.news-page-background * {
+  background-color: transparent !important;
 }
 
 /* Player Page specific styles */
@@ -613,7 +703,7 @@
     bottom: auto;
     margin-top: 0; /* Kein zusätzlicher Abstand */
   }
-  
+
   /* Desktop: Upload-Div normal zentriert */
   .mobile-record-layout .upload-hint-container {
     position: static; /* Normale Position, nicht absolute */
@@ -624,24 +714,24 @@
     max-width: 400px; /* Begrenzte Breite */
     text-align: center; /* Text zentriert */
   }
-  
+
   /* Desktop: Upload-Button zentriert */
   .mobile-record-layout .upload-hint-container button {
     display: block;
     margin: 0.5rem auto 0 auto; /* Button zentriert */
   }
-  
+
   /* Desktop: Record-Button Container mit Abständen */
   .mobile-record-layout .record-button-container {
     min-height: auto; /* Keine Mindesthöhe */
     margin-bottom: 200px; /* 200px Abstand zum Upload-Text */
   }
-  
+
   /* Desktop: Upload-Div Abstand zum Footer */
   .mobile-record-layout .upload-hint-container {
     margin-bottom: 2rem; /* Normaler Abstand zum Footer */
   }
-  
+
   /* Desktop: Recording Controls - gleiche Position wie Upload-Text */
   .mobile-record-layout .recording-controls-container {
     position: static; /* Normale Position, nicht absolute */
@@ -653,12 +743,12 @@
     text-align: center; /* Text zentriert */
     margin-bottom: 2rem; /* Normaler Abstand zum Footer */
   }
-  
+
   /* Desktop: Title-Abstand zum Button */
   .mobile-record-layout .desktop-title-spacing {
     margin-bottom: 100px; /* 100px Abstand zwischen "Ready" und Button */
   }
-  
+
   /* Desktop: Main Content normal */
   .mobile-record-layout main {
     padding-bottom: 0 !important;
@@ -670,7 +760,7 @@
   .min-h-screen {
     min-height: 100vh;
   }
-  
+
   /* Reduce padding in landscape */
   .py-6 {
     padding-top: 1rem;
@@ -684,7 +774,7 @@
     border-width: 2px;
     border-color: rgba(255, 255, 255, 0.3);
   }
-  
+
   .glass-button {
     border-width: 2px;
     border-color: rgba(255, 255, 255, 0.4);
@@ -697,11 +787,11 @@
   .gradient-primary {
     background-image: linear-gradient(135deg, var(--gradient-strong) 0%, var(--gradient-deep) 100%);
   }
-  
+
   .bg-gradient-pink {
     background-image: linear-gradient(135deg, #FF006E 0%, #8338EC 100%);
   }
-  
+
   .bg-gradient-violet {
     background-image: linear-gradient(135deg, #8338EC 0%, #FF006E 100%);
   }
@@ -714,15 +804,15 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .animate-pulse {
     animation: none;
   }
-  
+
   .animate-spin {
     animation: none;
   }
-  
+
   .animate-voice-pulse {
     animation: none;
   }
@@ -916,8 +1006,124 @@
   .content-blur::before {
     background: linear-gradient(rgba(0, 0, 0, 0.25) 30%, rgba(0, 0, 0, 0.08) 60%, rgba(0, 0, 0, 0) 100%);
   }
-  
+
   .content-blur-bottom::after {
     background: linear-gradient(rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.08) 40%, rgba(0, 0, 0, 0.25) 70%);
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

@@ -7,6 +7,9 @@ import { RecordPage } from './pages/RecordPage';
 import { RecorderPage } from './pages/RecorderPage';
 import { AudioEditorPage } from './pages/AudioEditorPage';
 import { UploadPage } from './pages/UploadPage';
+import { UploadSuccessPage } from './pages/UploadSuccessPage';
+import { SecurityCheckPage } from './pages/SecurityCheckPage';
+import { TestNewsPage } from './pages/TestNewsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SearchPage } from './pages/SearchPage';
 import { CommentsPage } from './pages/CommentsPage';
@@ -14,12 +17,14 @@ import { CommentTrackPage } from './pages/CommentTrackPage';
 import { RegistrationPage } from './pages/RegistrationPage';
 import { AdminPage } from './pages/AdminPage';
 import { TestPage } from './pages/TestPage';
-import { DebugPage } from './pages/DebugPage';
+// Debug pages removed
 import { DatenschutzPage } from './pages/DatenschutzPage';
 import { AGBPage } from './pages/AGBPage';
 import { ImpressumPage } from './pages/ImpressumPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import UnicornStudioPage from './pages/UnicornStudioPage';
+import { UnicornVisualizerDemoPage } from './pages/UnicornVisualizerDemoPage';
+import { audioPersistenceManager } from './services/audioPersistenceManager';
 import './App.css';
 
 // German spec: Enhanced routing structure for Aural mobile web app
@@ -32,6 +37,8 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="upload-success" element={<UploadSuccessPage />} />
+          <Route path="security-check" element={<SecurityCheckPage />} />
           <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
@@ -42,8 +49,8 @@ function App() {
           <Route path="news" element={<CommentsPage />} />
           <Route path="comment-track" element={<CommentTrackPage />} />
           <Route path="test" element={<TestPage />} />
-          <Route path="debug" element={<DebugPage />} />
           <Route path="unicorn" element={<UnicornStudioPage />} />
+          <Route path="unicorn-visualizer-demo" element={<UnicornVisualizerDemoPage />} />
         </Route>
         
         {/* AURAL ROOT ROUTES */}
@@ -51,6 +58,9 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="upload-success" element={<UploadSuccessPage />} />
+          <Route path="security-check" element={<SecurityCheckPage />} />
+          <Route path="test-news" element={<TestNewsPage />} />
           <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
@@ -68,6 +78,9 @@ function App() {
           <Route index element={<FeedPage />} />
           <Route path="record" element={<RecordPage />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="upload-success" element={<UploadSuccessPage />} />
+          <Route path="security-check" element={<SecurityCheckPage />} />
+          <Route path="test-news" element={<TestNewsPage />} />
           <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />

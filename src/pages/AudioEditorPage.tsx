@@ -170,8 +170,8 @@ export const AudioEditorPage = () => {
     // Erstelle eine temporäre Track-ID für den AudioUrlManager
     const tempTrackId = `temp_${Date.now()}`;
     
-    // Speichere den verarbeiteten Blob im AudioUrlManager
-    const audioUrl = AudioUrlManager.storeAudioUrl(tempTrackId, processedBlob, 'base64');
+    // Speichere den verarbeiteten Blob im AudioUrlManager mit einzigartiger URL
+    const audioUrl = AudioUrlManager.storeAudioUrl(tempTrackId, processedBlob, 'unique');
     
     // Store the processed blob for upload
     const processedData = {
@@ -221,7 +221,7 @@ export const AudioEditorPage = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+    <div className="max-w-md mx-auto min-h-screen relative">
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
 

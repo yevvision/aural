@@ -8,6 +8,8 @@ import { useRecordingStore } from '../stores/userStore';
 import { PageTransition } from '../components/ui';
 import { Heading, Body } from '../components/ui/Typography';
 import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
+import { UnicornAudioVisualizerAdvanced } from '../components/audio/UnicornAudioVisualizerAdvanced';
+import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
 
 // German spec: RecordPage with audio visualizer and record button
 export const RecordPage = () => {
@@ -215,41 +217,42 @@ export const RecordPage = () => {
           className="h-full relative"
         >
           {/* Title - oben positioniert */}
-          <div className="text-center pt-8 pb-4 desktop-title-spacing">
+          <div className="text-center pt-8 pb-4 desktop-title-spacing" style={{ zIndex: 30 }}>
             <Heading level={1} className="text-3xl font-bold text-white mb-2">
               {isRecording ? 'Have fun!' : 'Ready?'}
             </Heading>
           </div>
 
-          {/* Mobile-optimized Record Button Container */}
-          <div className="record-button-container">
-            {/* Audio Visualizer with Record Button positioned over it */}
-            <div className="flex justify-center items-center relative">
-              <div className="relative w-[100px] h-[100px]">
-                {/* Enhanced Audio Visualizer positioned exactly behind the button */}
-                <div className="absolute inset-0 z-0">
-                  <EnhancedAudioVisualizer
-                    frequencies={visualizerData.frequencies}
-                    volume={visualizerData.volume}
-                    isActive={isRecording}
-                  />
-                </div>
-                
-                {/* Record Button - styled like the Play button from detail page */}
-                <button
-                  onClick={handleRecordClick}
-                  className="absolute inset-0 rounded-full bg-transparent backdrop-blur-sm flex items-center justify-center shadow-voice overflow-visible z-10"
-                  aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-                >
-                  {isRecording ? (
-                    <Square size={28} strokeWidth={1.5} className="text-white" />
-                  ) : (
-                    <Mic size={28} strokeWidth={1.5} className="text-white" />
-                  )}
-                </button>
-              </div>
-            </div>
-
+          {/* Audio Visualizer with Record Button - centered and scrollable */}
+          <div className="flex flex-col items-center justify-center py-8 relative">
+            {/* Audio Visualizer */}
+            <UnicornBeamAudioVisualizer
+              frequencies={visualizerData.frequencies}
+              volume={visualizerData.volume}
+              isActive={isRecording}
+              size="large"
+              className="relative"
+            />
+            
+            {/* Record Button - positioned over the visualizer */}
+            <button
+              onClick={handleRecordClick}
+              className="absolute z-10 rounded-full bg-transparent backdrop-blur-sm flex items-center justify-center shadow-voice overflow-visible"
+              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+              style={{
+                width: '100px',
+                height: '100px',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              {isRecording ? (
+                <Square size={28} strokeWidth={1.5} className="text-white" />
+              ) : (
+                <Mic size={28} strokeWidth={1.5} className="text-white" />
+              )}
+            </button>
           </div>
 
           {/* Hidden file input */}

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useFeedStore } from '../stores/feedStore';
 import { useUserStore } from '../stores/userStore';
-import { database } from '../database/simulatedDatabase';
+import { centralDB } from '../database/centralDatabase_simple';
 import type { AudioTrack } from '../types';
 
 export const useDatabaseSync = () => {
@@ -12,7 +12,7 @@ export const useDatabaseSync = () => {
   useEffect(() => {
     const syncData = () => {
       // WICHTIG: Verwende nur Datenbank-Tracks für Konsistenz
-      const allTracks = database.getAllTracks();
+      const allTracks = centralDB.getAllTracks();
       
       console.log('useDatabaseSync: Lade Tracks aus Datenbank:', allTracks.length);
       console.log('useDatabaseSync: Tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
@@ -27,12 +27,12 @@ export const useDatabaseSync = () => {
   // Funktionen für Admin-Operationen
   const deleteTrack = (trackId: string) => {
     console.log('=== HOOK: deleteTrack aufgerufen für:', trackId);
-    const success = database.deleteTrack(trackId);
+    const success = centralDB.deleteTrack(trackId);
     if (success) {
       console.log('Track erfolgreich gelöscht, synchronisiere...');
       
       // Synchronisiere nach dem Löschen
-      const allTracks = database.getAllTracks();
+      const allTracks = centralDB.getAllTracks();
       
       console.log('Hook: Setze Tracks nach Löschung:', allTracks.length);
       setTracks(allTracks);
@@ -54,43 +54,43 @@ export const useDatabaseSync = () => {
   };
 
   const deleteUser = (userId: string) => {
-    const success = database.deleteUser(userId);
+    const success = centralDB.deleteUser ? centralDB.deleteUser(userId) : false;
     if (success) {
       // Synchronisiere nach dem Löschen
-      const allTracks = database.getAllTracks();
+      const allTracks = centralDB.getAllTracks();
       setTracks(allTracks);
     }
     return success;
   };
 
   const updateTrack = (trackId: string, updates: any) => {
-    const success = database.updateTrack(trackId, updates);
+    const success = centralDB.updateTrack(trackId, updates);
     if (success) {
       // Synchronisiere nach dem Update
-      const allTracks = database.getAllTracks();
+      const allTracks = centralDB.getAllTracks();
       setTracks(allTracks);
     }
     return success;
   };
 
   const getAllUsers = () => {
-    return database.getAllUsers();
+    return centralDB.getAllUsers();
   };
 
   const getAllTracks = () => {
-    return database.getAllTracks();
+    return centralDB.getAllTracks();
   };
 
   const getTracksSorted = (sortBy: 'title' | 'user' | 'date' | 'likes' | 'duration' | 'fileSize', order: 'asc' | 'desc' = 'desc') => {
-    return database.getTracksSorted(sortBy, order);
+    return centralDB.getTracksSorted ? centralDB.getTracksSorted(sortBy, order) : [];
   };
 
   const searchTracks = (query: string) => {
-    return database.searchTracks(query);
+    return centralDB.searchTracks ? centralDB.searchTracks(query) : [];
   };
 
   const getStats = () => {
-    return database.getStats();
+    return centralDB.getStats();
   };
 
   const addTrackToDatabase = (track: AudioTrack) => {
@@ -114,10 +114,10 @@ export const useDatabaseSync = () => {
     };
     
     // Füge Track zur Datenbank hinzu
-    database.addTrack(track, file);
+    centralDB.addTrack(track);
     
     // WICHTIG: Prüfe, ob Track wirklich in der Datenbank ist
-    const allTracks = database.getAllTracks();
+    const allTracks = centralDB.getAllTracks();
     const addedTrack = allTracks.find(t => t.id === track.id);
     console.log('useDatabaseSync: Track in Datenbank gefunden:', !!addedTrack);
     console.log('useDatabaseSync: Alle Tracks in Datenbank:', allTracks.length);
@@ -133,7 +133,7 @@ export const useDatabaseSync = () => {
     console.log('=== HOOK: deleteAllUserContent aufgerufen ===');
     
     // Lösche alle Inhalte aus der Datenbank
-    database.deleteAllUserContent();
+    centralDB.deleteAllUserContent();
     
     // WICHTIG: Lösche ALLE myTracks (auch yevvo's Tracks)
     // Nur Holler die Waldfee Tracks bleiben erhalten
@@ -162,10 +162,10 @@ export const useDatabaseSync = () => {
     
     // WICHTIG: Lösche auch alle Tracks von anderen Benutzern aus der Datenbank
     // (außer den ersten 3 von Holler, die bereits von deleteAllUserContent behandelt wurden)
-    const allDbTracks = database.getAllTracks();
+    const allDbTracks = centralDB.getAllTracks();
     const nonHollaDbTracks = allDbTracks.filter(track => track.user.id !== hollaUserId);
     nonHollaDbTracks.forEach(track => {
-      database.deleteTrack(track.id);
+      centralDB.deleteTrack(track.id);
       console.log(`Datenbank: Track ${track.id} von Benutzer ${track.user.id} gelöscht`);
     });
     
@@ -173,7 +173,7 @@ export const useDatabaseSync = () => {
     console.log('FeedStore bereinigt, alle anderen Benutzer-Tracks (inkl. yevvo) wurden gelöscht');
     
     // Synchronisiere nach dem Löschen
-    const allTracks = database.getAllTracks();
+    const allTracks = centralDB.getAllTracks();
     console.log('Hook: Tracks nach Löschung:', allTracks.length);
     
     // Verwende nur Datenbank-Tracks
@@ -194,7 +194,7 @@ export const useDatabaseSync = () => {
       setTimeout(() => {
         console.log('Hook: Erzwinge vollständige Neuinitialisierung...');
         const { setTracks } = useFeedStore.getState();
-        const freshDbTracks = database.getAllTracks();
+        const freshDbTracks = centralDB.getAllTracks();
         console.log('Hook: Frische DB-Tracks:', freshDbTracks.length);
         setTracks(freshDbTracks);
         

@@ -20,10 +20,15 @@ interface UnicornBackgroundProps {
 const UnicornBackgroundSimple: React.FC<UnicornBackgroundProps> = ({ children, className = '' }) => {
   const location = useLocation();
   
-  // Check if we're on the record page or player page
+  // Check if we're on the record page, player page, upload page, audio editor page, upload success page, security check page, or news page
   const isRecordPage = location.pathname === '/record' || location.pathname === '/aural/record';
   const isPlayerPage = location.pathname.startsWith('/player/');
-  const isBlackBackgroundPage = isRecordPage || isPlayerPage;
+  const isUploadPage = location.pathname === '/upload' || location.pathname === '/aural/upload';
+  const isAudioEditorPage = location.pathname === '/audio-editor' || location.pathname === '/aural/audio-editor';
+  const isUploadSuccessPage = location.pathname === '/upload-success' || location.pathname === '/aural/upload-success';
+  const isSecurityCheckPage = location.pathname === '/security-check' || location.pathname === '/aural/security-check';
+  const isNewsPage = location.pathname === '/news' || location.pathname === '/aural/news';
+  const isBlackBackgroundPage = isRecordPage || isPlayerPage || isUploadPage || isAudioEditorPage || isUploadSuccessPage || isSecurityCheckPage || isNewsPage;
 
   useEffect(() => {
     // Only load Unicorn Studio for non-black background pages

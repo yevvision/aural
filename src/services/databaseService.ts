@@ -25,6 +25,23 @@ class DatabaseServiceClass {
     return centralDB.getAllUsers();
   }
 
+  // GET: User by ID
+  getUserById(id: string): any | undefined {
+    return centralDB.getUserById(id);
+  }
+
+  // UPDATE: User aktualisieren
+  updateUser(userId: string, updates: any): boolean {
+    const success = centralDB.updateUser(userId, updates);
+    
+    if (success) {
+      // Notifiziere alle Listener über Änderung
+      this.notifyListeners();
+    }
+    
+    return success;
+  }
+
   // ADD: Neuen Track hinzufügen
   addTrack(track: AudioTrack): boolean {
     const success = centralDB.addTrack(track);
@@ -157,40 +174,78 @@ class DatabaseServiceClass {
     return centralDB.getCommentLikeCount(commentId);
   }
 
-  // ADD: User Activity hinzufügen (Placeholder)
+  // =============================================================================
+  // FOLLOW OPERATIONS
+  // =============================================================================
+
+  // FOLLOW: User folgen/entfolgen
+  toggleFollow(followerId: string, targetUserId: string): boolean {
+    return centralDB.toggleFollow(followerId, targetUserId);
+  }
+
+  // =============================================================================
+  // ACTIVITY & NOTIFICATIONS
+  // =============================================================================
+
+  // ADD: User Activity hinzufügen
   addUserActivity(activity: any): boolean {
-    // TODO: Implementiere Activity-System
-    return true;
+    return centralDB.addUserActivity(activity);
   }
 
-  // ADD: Notification hinzufügen (Placeholder)
+  // ADD: Notification hinzufügen
   addNotification(notification: any): boolean {
-    // TODO: Implementiere Notification-System
-    return true;
+    return centralDB.addNotification(notification);
   }
 
-  // GET: User Activities (Placeholder)
+  // GET: User Activities
   getUserActivities(userId: string): any[] {
-    // TODO: Implementiere Activity-Abruf
-    return [];
+    return centralDB.getUserActivities(userId);
   }
 
-  // GET: User Notifications (Placeholder)
+  // GET: User Notifications
   getUserNotifications(userId: string): any[] {
-    // TODO: Implementiere Notification-Abruf
-    return [];
+    return centralDB.getUserNotifications(userId);
   }
 
-  // MARK: Activity als gelesen markieren (Placeholder)
+  // MARK: Activity als gelesen markieren
   markActivityAsRead(activityId: string): boolean {
-    // TODO: Implementiere Activity-Update
-    return true;
+    return centralDB.markActivityAsRead(activityId);
   }
 
-  // MARK: Notification als gelesen markieren (Placeholder)
+  // MARK: Notification als gelesen markieren
   markNotificationAsRead(notificationId: string): boolean {
-    // TODO: Implementiere Notification-Update
-    return true;
+    return centralDB.markNotificationAsRead(notificationId);
+  }
+
+  // Demo-Daten für Aktivitäten und Benachrichtigungen hinzufügen
+  addDemoActivitiesAndNotifications(): void {
+    centralDB.addDemoActivitiesAndNotifications();
+  }
+
+  // FORCE: Demo-Daten erstellen (für Testing)
+  forceCreateDemoData(): void {
+    centralDB.forceCreateDemoData();
+  }
+
+  // FORCE: Holla-Tracks hinzufügen (auch wenn bereits Daten vorhanden sind)
+  forceAddHollaTracks(): void {
+    centralDB.forceAddHollaTracks();
+    this.notifyListeners();
+  }
+
+  // DEBUG: Zeige alle Daten
+  debugShowAllData(): void {
+    centralDB.debugShowAllData();
+  }
+
+  // RESET: Datenbank komplett zurücksetzen
+  resetDatabase(): void {
+    centralDB.resetDatabase();
+  }
+
+  // TEST: Teste Persistierung
+  testPersistence(): void {
+    centralDB.testPersistence();
   }
 
   // =============================================================================
@@ -242,6 +297,18 @@ class DatabaseServiceClass {
   // Alle Benutzerinhalte löschen
   deleteAllUserContent(): boolean {
     const success = (centralDB as any).deleteAllUserContent();
+    
+    if (success) {
+      // Notifiziere alle Listener über Änderung
+      this.notifyListeners();
+    }
+    
+    return success;
+  }
+
+  // Spezifischen Track löschen (für problematische Tracks)
+  forceDeleteTrack(trackTitle: string, username: string): boolean {
+    const success = (centralDB as any).forceDeleteTrack(trackTitle, username);
     
     if (success) {
       // Notifiziere alle Listener über Änderung

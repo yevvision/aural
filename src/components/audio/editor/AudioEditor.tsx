@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Scissors, AlertCircle, Trash2, Play, Download, ArrowRight } from 'lucide-react';
 import WaveformVisualizer from './WaveformVisualizer';
 import { concatenateSegments, encodeWithFfmpegWorker, trimToWav } from '../../../hooks/useTrimExport';
-import { Button, IconButton } from '../../ui/Button';
+import { Button } from '../../ui/Button';
 import { Body } from '../../ui/Typography';
 
 type EncodeFormat = 'mp3' | 'aac';
@@ -353,14 +353,15 @@ export default function AudioEditor({
                 <span className="text-sm text-gray-300">
                   {Math.round(segment.start)}s - {Math.round(segment.end)}s
                 </span>
-                <IconButton
+                <Button
+                  size="sm"
                   onClick={() => handleRemoveSegment(index)}
                   variant="ghost"
-                  size="sm"
-                  icon={<Trash2 size={16} />}
                   aria-label="Segment entfernen"
                   className="text-red-400 hover:text-red-300"
-                />
+                >
+                  <Trash2 size={16} />
+                </Button>
           </div>
             ))}
           </div>

@@ -225,7 +225,6 @@ export const ImportExamples: Story = {
               {`import { 
   Button, 
   VoiceButton, 
-  IconButton,
   Heading, 
   Text, 
   Panel, 

@@ -1,8 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Home, MessageCircle, User, Mic, Search, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useActivityStore } from '../../stores/activityStore';
 import { useUserStore } from '../../stores/userStore';
+import { useDatabase } from '../../hooks/useDatabase';
 import { useBackNavigation } from './AppLayout';
 import { Logo } from '../ui/Logo';
 
@@ -19,18 +21,81 @@ const navItems: NavItem[] = [
   { to: '/', icon: Home, label: 'Home', color: 'accent-pink' },
   { to: '/news', icon: MessageCircle, label: 'News', color: 'accent-violet', badge: true },
   { to: '/profile', icon: User, label: 'Profile', color: 'accent-turquoise' },
-  { to: '/record', icon: Mic, label: 'Record', color: 'accent-red' },
   { to: '/search', icon: Search, label: 'Search', color: 'accent-blue' },
 ];
+
+const recordItem: NavItem = { to: '/record', icon: Mic, label: 'Record', color: 'accent-red' };
 
 export const TopNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { activities } = useActivityStore();
   const { currentUser } = useUserStore();
-  // Only show notification dots for activities from others (notifications), not for user's own activities
-  const unreadCount = activities.filter(a => !a.isRead).length;
+  const { notifications: dbNotifications, isLoading, loadData } = useDatabase(currentUser?.id);
+  
+  // Verwende Daten aus der zentralen Datenbank
+  const userNotifications = dbNotifications || [];
+  const unreadCount = userNotifications.filter(a => !a.isRead).length;
+  
+  // Debug-Log für Navigation
+  console.log('🔔 TopNavigation - DB notifications:', userNotifications.length);
+  console.log('🔔 TopNavigation - unreadCount:', unreadCount);
+  console.log('🔔 TopNavigation - isLoading:', isLoading);
   const { showBackButton } = useBackNavigation();
+
+  // Listen for track approval events and notification read events to refresh notifications
+  useEffect(() => {
+    const handleTrackApproved = (event: CustomEvent) => {
+      console.log('📢 TopNavigation: Track approved event received:', event.detail);
+      // The useActivityStore will automatically provide the updated activities
+    };
+
+    const handleNotificationsMarkedAsRead = (event: CustomEvent) => {
+      console.log('📢 TopNavigation: Notifications marked as read:', event.detail);
+      // Lade Daten neu, um die aktualisierten Notifications zu bekommen
+      if (loadData) {
+        loadData();
+      }
+    };
+
+    const handleUserActivitiesMarkedAsRead = (event: CustomEvent) => {
+      console.log('📢 TopNavigation: User activities marked as read:', event.detail);
+      // Lade Daten neu, um die aktualisierten Activities zu bekommen
+      if (loadData) {
+        loadData();
+      }
+    };
+
+    const handleReloadDatabaseData = (event: CustomEvent) => {
+      console.log('📢 TopNavigation: Reload database data requested:', event.detail);
+      // Lade alle Daten neu
+      if (loadData) {
+        loadData();
+      }
+    };
+
+    const handleNewNotification = (event: CustomEvent) => {
+      console.log('📢 TopNavigation: New notification received:', event.detail);
+      // Reload data to show the new notification
+      if (loadData) {
+        loadData();
+      }
+    };
+
+    window.addEventListener('trackApproved', handleTrackApproved as EventListener);
+    window.addEventListener('notificationsMarkedAsRead', handleNotificationsMarkedAsRead as EventListener);
+    window.addEventListener('userActivitiesMarkedAsRead', handleUserActivitiesMarkedAsRead as EventListener);
+    window.addEventListener('reloadDatabaseData', handleReloadDatabaseData as EventListener);
+    window.addEventListener('newNotification', handleNewNotification as EventListener);
+    
+    return () => {
+      window.removeEventListener('trackApproved', handleTrackApproved as EventListener);
+      window.removeEventListener('notificationsMarkedAsRead', handleNotificationsMarkedAsRead as EventListener);
+      window.removeEventListener('userActivitiesMarkedAsRead', handleUserActivitiesMarkedAsRead as EventListener);
+      window.removeEventListener('reloadDatabaseData', handleReloadDatabaseData as EventListener);
+      window.removeEventListener('newNotification', handleNewNotification as EventListener);
+    };
+  }, [loadData]); // Füge loadData als Dependency hinzu
   
 
   const isActive = (path: string) => {
@@ -99,65 +164,89 @@ export const TopNavigation = () => {
               )}
             </div>
             
-            {/* Navigation icons with individual background states - hide for recorder only */}
-            {!location.pathname.startsWith('/record/recorder') && (
-              <div className="flex items-center justify-end space-x-0 relative h-12 w-full pr-3">
-                {navItems.map(({ to, icon: Icon, label, badge }) => {
-                  const active = isActive(to);
-                  const showBadge = badge && to === '/news' && unreadCount > 0;
-                  
-                  return (
-                    <motion.div
-                      key={to}
-                      className="flex items-center justify-center w-9 h-9 relative z-10 mx-0.5"
-                      whileHover={{ scale: active ? 1 : 1.1 }}
-                      whileTap={{ scale: active ? 1 : 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {/* Active background for each icon */}
-                      {active && (
-                        <motion.div 
-                          className="nav-gradient-background absolute inset-0 glass-surface"
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{
-                            type: "spring",
-                            stiffness: 300,
-                            damping: 30
-                          }}
-                        />
-                      )}
-                      
-                      <Link
-                        to={to}
-                        className={`flex items-center justify-center w-full h-full transition-all duration-300 relative z-10 ${
-                          active 
-                            ? 'text-white' 
-                            : 'text-text-secondary hover:text-text-primary'
-                        }`}
-                        aria-label={label}
+            {/* Navigation icons with individual background states */}
+            <div className="flex items-center justify-end space-x-0 relative h-12 w-full pr-3">
+              {/* Regular navigation items - right aligned - hide for recorder only */}
+              {!location.pathname.startsWith('/record/recorder') && (
+                <>
+                  {navItems.map(({ to, icon: Icon, label, badge }) => {
+                    const active = isActive(to);
+                    const showBadge = badge && to === '/news' && unreadCount > 0;
+                    
+                    return (
+                      <motion.div
+                        key={to}
+                        className="flex items-center justify-center w-9 h-9 relative z-10 mx-0.5"
+                        whileHover={{ scale: active ? 1 : 1.1 }}
+                        whileTap={{ scale: active ? 1 : 0.95 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        <Icon 
-                          size={20} 
-                          className="transition-all duration-300"
-                        />
-                        
-                        {/* Notification badge - small red circle without number */}
-                        {showBadge && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"
+                        {/* Active background for each icon */}
+                        {active && (
+                          <motion.div 
+                            className="nav-gradient-background absolute inset-0 glass-surface"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 300,
+                              damping: 30
+                            }}
                           />
                         )}
-                      </Link>
-                    </motion.div>
-                  );
-                })}
+                        
+                        <Link
+                          to={to}
+                          className={`flex items-center justify-center w-full h-full transition-all duration-300 relative z-10 ${
+                            active 
+                              ? 'text-white' 
+                              : 'text-text-secondary hover:text-text-primary'
+                          }`}
+                          aria-label={label}
+                        >
+                          <Icon 
+                            size={20} 
+                            className="transition-all duration-300"
+                          />
+                          
+                          {/* Notification badge - small red circle without number */}
+                          {showBadge && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"
+                            />
+                          )}
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Record icon with red circle - always visible, positioned at far right */}
+              <motion.div
+                className="flex items-center justify-center w-9 h-9 relative z-10 ml-1"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+              >
+                {/* Red circle background - always visible */}
+                <div className="absolute inset-0 bg-red-500 rounded-full opacity-80"></div>
                 
-              </div>
-            )}
+                <Link
+                  to={recordItem.to}
+                  className="flex items-center justify-center w-full h-full transition-all duration-300 relative z-10 text-white hover:text-gray-200"
+                  aria-label={recordItem.label}
+                >
+                  <recordItem.icon 
+                    size={20} 
+                    className="transition-all duration-300"
+                  />
+                </Link>
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>

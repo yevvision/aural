@@ -205,8 +205,10 @@ export const useUserStore = create<UserStore>()(
         });
         
         // Track upload activity
+        const sanitizedUser = sanitizeUser(track.user);
         useActivityStore.getState().addUserActivityAsNotification({
           type: 'my_upload',
+          userId: sanitizedUser.id,
           trackId: sanitizedTrack.id,
           trackTitle: sanitizedTrack.title
         });

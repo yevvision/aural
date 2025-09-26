@@ -13,9 +13,12 @@ import {
   Calendar,
   FileText,
   HardDrive,
-  Pause
+  Pause,
+  PlayCircle
 } from 'lucide-react';
 import DatabaseService from '../../services/databaseService';
+import { useActivityStore } from '../../stores/activityStore';
+import { useDatabase } from '../../hooks/useDatabase';
 
 export interface PendingUpload {
   uploadId: string;
@@ -49,11 +52,93 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
   const [showDetails, setShowDetails] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+  const [isAutoApproveActive, setIsAutoApproveActive] = useState<boolean>(false);
+  const { addActivity } = useActivityStore();
+  const { addUserActivity, addNotification } = useDatabase();
 
-  // Lade pending Uploads
+  // Hilfsfunktion: Lade Audio aus allen verfügbaren Managern
+  const loadAudioFromManagers = async (trackId: string): Promise<string | null> => {
+    try {
+      // 1. Versuche UnifiedAudioManager
+      const { unifiedAudioManager } = await import('../../services/unifiedAudioManager');
+      const unifiedResult = await unifiedAudioManager.loadAudioForPlayback({ id: trackId } as any);
+      if (unifiedResult.success && unifiedResult.url) {
+        console.log('✅ Fallback: Audio aus UnifiedAudioManager geladen');
+        return unifiedResult.url;
+      }
+    } catch (error) {
+      console.log('❌ UnifiedAudioManager Fallback fehlgeschlagen:', error);
+    }
+
+    try {
+      // 2. Versuche CentralAudioManager
+      const { centralAudioManager } = await import('../../services/centralAudioManager');
+      const centralUrl = await centralAudioManager.loadAudioForPlayback({ id: trackId } as any);
+      if (centralUrl) {
+        console.log('✅ Fallback: Audio aus CentralAudioManager geladen');
+        return centralUrl;
+      }
+    } catch (error) {
+      console.log('❌ CentralAudioManager Fallback fehlgeschlagen:', error);
+    }
+
+    try {
+      // 3. Versuche AudioUrlManager
+      const { AudioUrlManager } = await import('../../services/audioUrlManager');
+      const urlManagerUrl = AudioUrlManager.getAudioUrl(trackId);
+      if (urlManagerUrl) {
+        console.log('✅ Fallback: Audio aus AudioUrlManager geladen');
+        return urlManagerUrl;
+      }
+    } catch (error) {
+      console.log('❌ AudioUrlManager Fallback fehlgeschlagen:', error);
+    }
+
+    console.log('❌ Alle Fallback-Versuche fehlgeschlagen');
+    return null;
+  };
+
+  // Lade pending Uploads und Auto-Approve-Status
   useEffect(() => {
     loadPendingUploads();
+    loadAutoApproveStatus();
   }, []);
+
+  // Lade Auto-Approve-Status aus localStorage
+  const loadAutoApproveStatus = () => {
+    try {
+      const savedStatus = localStorage.getItem('aural_queue_paused');
+      if (savedStatus !== null) {
+        setIsAutoApproveActive(JSON.parse(savedStatus));
+      }
+    } catch (error) {
+      console.error('Failed to load auto approve status:', error);
+    }
+  };
+
+  // Speichere Auto-Approve-Status in localStorage
+  const saveAutoApproveStatus = (active: boolean) => {
+    try {
+      localStorage.setItem('aural_queue_paused', JSON.stringify(active));
+      console.log('✅ Auto approve status saved:', active);
+    } catch (error) {
+      console.error('Failed to save auto approve status:', error);
+    }
+  };
+
+  // Toggle Auto-Approve-Status
+  const toggleAutoApprove = () => {
+    const newAutoApproveStatus = !isAutoApproveActive;
+    setIsAutoApproveActive(newAutoApproveStatus);
+    saveAutoApproveStatus(newAutoApproveStatus);
+    
+    // Trigger global event für andere Komponenten
+    window.dispatchEvent(new CustomEvent('queuePauseStatusChanged', { 
+      detail: { isPaused: newAutoApproveStatus } 
+    }));
+    
+    console.log(`🔄 Auto-Approve ${newAutoApproveStatus ? 'aktiviert' : 'deaktiviert'}`);
+  };
 
   const loadPendingUploads = async () => {
     try {
@@ -61,15 +146,21 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
       
       // Lade echte pending Uploads aus localStorage
       const pendingUploadsData = localStorage.getItem('aural_pending_uploads');
+      console.log('🔍 DEBUG: Raw localStorage data:', pendingUploadsData);
+      
       if (pendingUploadsData) {
         const uploads = JSON.parse(pendingUploadsData);
+        console.log('🔍 DEBUG: Parsed uploads object:', uploads);
+        
         const pendingList = Object.values(uploads).filter((upload: any) => 
           upload.status === 'pending_review'
         ) as PendingUpload[];
         
+        console.log('🔍 DEBUG: Filtered pending list:', pendingList);
         setPendingUploads(pendingList);
         console.log('📋 Loaded pending uploads:', pendingList.length);
       } else {
+        console.log('🔍 DEBUG: No pending uploads data found in localStorage');
         setPendingUploads([]);
       }
     } catch (error) {
@@ -93,40 +184,32 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
 
       // Konvertiere Blob-URL zu Base64 für persistente Speicherung
       let audioDataUrl = uploadToApprove.url;
-      if (uploadToApprove.url && uploadToApprove.url.startsWith('blob:')) {
+      let audioBlob: Blob | null = null;
+      
+      // Lade Audio-Daten für persistente Speicherung (Server-URL oder Blob-URL)
+      if (uploadToApprove.url && !uploadToApprove.url.startsWith('data:')) {
         try {
-          console.log('🔄 Konvertiere Blob-URL zu Base64...', uploadToApprove.url);
+          console.log('🔄 Lade Audio-Daten für Manager-Speicherung...', uploadToApprove.url);
           
-          // Prüfe ob Blob-URL noch gültig ist
-          try {
-            const testResponse = await fetch(uploadToApprove.url, { method: 'HEAD' });
-            if (!testResponse.ok) {
-              throw new Error(`Blob-URL nicht mehr gültig: ${testResponse.status}`);
-            }
-            console.log('✅ Blob-URL ist noch gültig');
-          } catch (testError) {
-            console.error('❌ Blob-URL ist nicht mehr gültig:', testError);
-            throw new Error('Blob-URL ist nicht mehr gültig. Möglicherweise wurde die Seite neu geladen.');
-          }
-          
-          // Lade Audio-Daten aus Blob-URL
+          // Lade Audio-Daten aus der URL (Server-URL oder Blob-URL)
           const response = await fetch(uploadToApprove.url);
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           
-          const blob = await response.blob();
-          console.log('📦 Blob erhalten:', {
-            size: blob.size,
-            type: blob.type,
-            isBlob: blob instanceof Blob
+          audioBlob = await response.blob();
+          console.log('📦 Audio-Blob erhalten:', {
+            size: audioBlob.size,
+            type: audioBlob.type,
+            isBlob: audioBlob instanceof Blob
           });
           
           // Prüfe ob Blob echte Audio-Daten enthält
-          if (blob.size < 1000) {
+          if (audioBlob.size < 1000) {
             console.warn('⚠️ Blob ist sehr klein, möglicherweise keine echten Audio-Daten');
           }
           
+          // Konvertiere zu Base64 für persistente Speicherung
           audioDataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
@@ -149,17 +232,32 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
               console.error('❌ FileReader Fehler:', error);
               reject(error);
             };
-            reader.readAsDataURL(blob);
+            reader.readAsDataURL(audioBlob);
           });
           
-          console.log('✅ Audio-Daten zu Base64 konvertiert');
+          console.log('✅ Audio-Daten erfolgreich geladen und konvertiert');
         } catch (error) {
-          console.error('❌ Fehler beim Konvertieren der Audio-Daten:', error);
-          // Fallback: Verwende die ursprüngliche URL
-          console.log('⚠️ Verwende ursprüngliche URL als Fallback');
+          console.error('❌ Fehler beim Laden der Audio-Daten:', error);
+          // Fallback: Versuche Audio aus anderen Quellen zu laden
+          console.log('⚠️ Versuche Fallback-Loading aus anderen Quellen...');
+          
+          try {
+            // Versuche Audio aus localStorage oder anderen Speichern zu laden
+            const fallbackUrl = await loadAudioFromManagers(uploadId);
+            if (fallbackUrl) {
+              console.log('✅ Fallback-URL gefunden:', fallbackUrl.substring(0, 100));
+              audioDataUrl = fallbackUrl;
+            } else {
+              console.log('⚠️ Keine Fallback-URL gefunden, verwende ursprüngliche URL');
+            }
+          } catch (fallbackError) {
+            console.error('❌ Fallback-Loading fehlgeschlagen:', fallbackError);
+            console.log('⚠️ Verwende ursprüngliche URL als letzten Fallback');
+          }
         }
       } else {
-        console.log('ℹ️ URL ist bereits Base64 oder kein Blob:', uploadToApprove.url?.substring(0, 50));
+        console.log('ℹ️ URL ist bereits Base64:', uploadToApprove.url?.substring(0, 50));
+        audioDataUrl = uploadToApprove.url;
       }
 
       // Konvertiere PendingUpload zu AudioTrack
@@ -187,8 +285,86 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
         gender: uploadToApprove.gender as 'Female' | 'Male' | 'Mixed' | 'Couple' | 'Diverse',
         filename: uploadToApprove.filename,
         fileSize: uploadToApprove.size,
-        format: uploadToApprove.mimeType
+        format: uploadToApprove.mimeType,
+        status: 'active' as const // Setze Status auf 'active' nach der Freigabe
       };
+
+      // WICHTIG: Speichere Audio in allen Audio-Managern für persistente Wiedergabe
+      if (audioBlob) {
+        console.log('🎵 Speichere Audio in allen Audio-Managern...');
+        
+        try {
+          // 1. Speichere in UnifiedAudioManager (empfohlen)
+          const { unifiedAudioManager } = await import('../../services/unifiedAudioManager');
+          const unifiedResult = await unifiedAudioManager.storeNewAudio(uploadId, audioBlob, {
+            title: uploadToApprove.title,
+            duration: uploadToApprove.duration
+          });
+          
+          if (unifiedResult.success) {
+            console.log('✅ UnifiedAudioManager: Audio gespeichert');
+            // Verwende die URL vom UnifiedAudioManager
+            approvedTrack.url = unifiedResult.url!;
+          } else {
+            console.warn('⚠️ UnifiedAudioManager: Fehler beim Speichern:', unifiedResult.error);
+          }
+        } catch (error) {
+          console.error('❌ UnifiedAudioManager: Fehler:', error);
+        }
+        
+        try {
+          // 2. Speichere auch in CentralAudioManager als Backup
+          const { centralAudioManager } = await import('../../services/centralAudioManager');
+          await centralAudioManager.storeNewAudio(uploadId, audioBlob);
+          console.log('✅ CentralAudioManager: Audio gespeichert');
+        } catch (error) {
+          console.error('❌ CentralAudioManager: Fehler:', error);
+        }
+        
+        try {
+          // 3. Speichere auch in AudioUrlManager für Kompatibilität
+          const { AudioUrlManager } = await import('../../services/audioUrlManager');
+          await AudioUrlManager.storeAudioUrl(uploadId, audioBlob, 'base64');
+          console.log('✅ AudioUrlManager: Audio gespeichert');
+        } catch (error) {
+          console.error('❌ AudioUrlManager: Fehler:', error);
+        }
+        
+        console.log('🎵 Audio-Manager-Speicherung abgeschlossen');
+      } else {
+        console.warn('⚠️ Kein Audio-Blob verfügbar für Manager-Speicherung');
+        
+        // Versuche trotzdem, Audio aus anderen Quellen zu laden und zu speichern
+        console.log('🔄 Versuche Audio aus anderen Quellen zu laden...');
+        try {
+          const fallbackUrl = await loadAudioFromManagers(uploadId);
+          if (fallbackUrl) {
+            console.log('✅ Fallback-URL gefunden, speichere in Managern...');
+            
+            // Konvertiere Fallback-URL zu Blob für Manager-Speicherung
+            if (fallbackUrl.startsWith('data:')) {
+              // Base64-URL zu Blob konvertieren
+              const { AudioUrlManager } = await import('../../services/audioUrlManager');
+              const fallbackBlob = AudioUrlManager.base64ToBlob(fallbackUrl);
+              if (fallbackBlob) {
+                // Speichere in UnifiedAudioManager
+                const { unifiedAudioManager } = await import('../../services/unifiedAudioManager');
+                const unifiedResult = await unifiedAudioManager.storeNewAudio(uploadId, fallbackBlob, {
+                  title: uploadToApprove.title,
+                  duration: uploadToApprove.duration
+                });
+                
+                if (unifiedResult.success) {
+                  console.log('✅ Fallback-Audio in UnifiedAudioManager gespeichert');
+                  approvedTrack.url = unifiedResult.url!;
+                }
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error('❌ Fallback-Loading fehlgeschlagen:', fallbackError);
+        }
+      }
 
       // Speichere als normalen Track in der zentralen Datenbank
       const success = DatabaseService.addTrack(approvedTrack);
@@ -236,6 +412,17 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
           });
           testAudio.addEventListener('error', (e) => {
             console.error('❌ Test-Audio Fehler:', e, 'Error Code:', testAudio.error?.code);
+            
+            // Fallback: Versuche Audio aus den Managern zu laden
+            console.log('🔄 Versuche Fallback-Loading aus Audio-Managern...');
+            loadAudioFromManagers(uploadId).then(fallbackUrl => {
+              if (fallbackUrl) {
+                console.log('✅ Fallback-URL gefunden:', fallbackUrl.substring(0, 100));
+                // Aktualisiere den Track mit der Fallback-URL
+                const updatedTrack = { ...savedTrack, url: fallbackUrl };
+                DatabaseService.updateTrack(uploadId, updatedTrack);
+              }
+            });
           });
           testAudio.load();
         } catch (error) {
@@ -258,6 +445,43 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
         detail: { trackId: approvedTrack.id, track: approvedTrack } 
       }));
 
+        // Erstelle Upload-Aktivität für den User (My Activities)
+        console.log('🔔 Creating upload activity for user:', uploadToApprove.userId);
+        
+        const uploadActivitySuccess = addUserActivity({
+          type: 'my_upload',
+          userId: uploadToApprove.userId,
+          trackId: approvedTrack.id,
+          trackTitle: approvedTrack.title,
+          trackUser: approvedTrack.user,
+          createdAt: new Date(),
+          isRead: false
+        });
+        
+        console.log('🔔 Upload activity created successfully:', uploadActivitySuccess);
+        
+        // Erstelle Benachrichtigung für den User (Notifications)
+        console.log('🔔 Creating notification for user:', uploadToApprove.userId);
+        
+        const notificationSuccess = addNotification({
+          type: 'upload_approved',
+          user: {
+            id: 'admin',
+            username: 'Admin',
+            email: '',
+            avatar: '',
+            totalLikes: 0,
+            totalUploads: 0,
+            createdAt: new Date(),
+            isAdmin: true
+          },
+          trackId: approvedTrack.id,
+          trackTitle: approvedTrack.title,
+          targetUserId: uploadToApprove.userId
+        });
+        
+        console.log('🔔 Notification created successfully:', notificationSuccess);
+
       console.log('✅ Upload approved and converted to track:', approvedTrack.title);
       
       onUploadProcessed(uploadId, 'approve');
@@ -272,6 +496,13 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
     try {
       console.log('Rejecting upload:', uploadId);
       
+      // Finde den Upload in der Liste
+      const uploadToReject = pendingUploads.find(upload => upload.uploadId === uploadId);
+      if (!uploadToReject) {
+        console.error('Upload not found:', uploadId);
+        return;
+      }
+      
       // Entferne aus Pending-Liste
       setPendingUploads(prev => prev.filter(upload => upload.uploadId !== uploadId));
       
@@ -279,6 +510,52 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
       const pendingUploadsData = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
       delete pendingUploadsData[uploadId];
       localStorage.setItem('aural_pending_uploads', JSON.stringify(pendingUploadsData));
+
+      // Erstelle Upload-Rejection-Aktivität für den User (My Activities)
+      console.log('🔔 Creating upload rejection activity for user:', uploadToReject.userId);
+      
+      const uploadRejectionActivitySuccess = addUserActivity({
+        type: 'my_upload_rejected',
+        userId: uploadToReject.userId,
+        trackId: uploadId,
+        trackTitle: uploadToReject.title,
+        trackUser: {
+          id: uploadToReject.userId,
+          username: uploadToReject.username,
+          email: '',
+          avatar: '',
+          totalLikes: 0,
+          totalUploads: 0,
+          createdAt: new Date(),
+          isAdmin: false
+        },
+        createdAt: new Date(),
+        isRead: false
+      });
+      
+      console.log('🔔 Upload rejection activity created successfully:', uploadRejectionActivitySuccess);
+      
+      // Erstelle Benachrichtigung für den User (Notifications)
+      console.log('🔔 Creating rejection notification for user:', uploadToReject.userId);
+      
+      const rejectionNotificationSuccess = addNotification({
+        type: 'upload_rejected',
+        user: {
+          id: 'admin',
+          username: 'Admin',
+          email: '',
+          avatar: '',
+          totalLikes: 0,
+          totalUploads: 0,
+          createdAt: new Date(),
+          isAdmin: true
+        },
+        trackId: uploadId,
+        trackTitle: uploadToReject.title,
+        targetUserId: uploadToReject.userId
+      });
+      
+      console.log('🔔 Rejection notification created successfully:', rejectionNotificationSuccess);
 
       console.log('❌ Upload rejected and removed:', uploadId);
       
@@ -383,14 +660,48 @@ export const PendingUploadsQueue = ({ onUploadProcessed }: PendingUploadsQueuePr
           </p>
         </div>
         
-        {pendingUploads.length > 0 && (
+        <div className="flex items-center space-x-4">
+          {/* Auto Approve Toggle */}
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-red-400 text-sm font-medium">
-              {pendingUploads.length} wartet{pendingUploads.length === 1 ? '' : 'en'}
-            </span>
+            <button
+              onClick={toggleAutoApprove}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 border ${
+                isAutoApproveActive
+                  ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30'
+                  : 'bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30'
+              }`}
+              title={isAutoApproveActive ? 'Auto-Freigabe deaktivieren' : 'Auto-Freigabe aktivieren'}
+            >
+              {isAutoApproveActive ? (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">Auto-Freigabe</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm font-medium">Manuelle Freigabe</span>
+                </>
+              )}
+            </button>
+            
+            {isAutoApproveActive && (
+              <div className="flex items-center space-x-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-xs font-medium">Aktiv</span>
+              </div>
+            )}
           </div>
-        )}
+          
+          {pendingUploads.length > 0 && !isAutoApproveActive && (
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-red-400 text-sm font-medium">
+                {pendingUploads.length} wartet{pendingUploads.length === 1 ? '' : 'en'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Uploads List */}

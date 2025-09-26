@@ -41,22 +41,32 @@ describe('AppLayout', () => {
     Object.defineProperty(window, 'scrollY', { value: 0, writable: true });
   });
 
-  it('renders without crashing', () => {
+  it('renders without crashing', async () => {
     render(
       <BrowserRouter>
         <AppLayout />
       </BrowserRouter>
     );
     
+    // Wait for content to be ready (isContentReady state)
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+    
     expect(screen.getByRole('main')).toBeInTheDocument();
   });
 
-  it('applies content-blur class when scrolled', () => {
+  it('applies content-blur class when scrolled', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <AppLayout />
       </MemoryRouter>
     );
+    
+    // Wait for content to be ready
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
     
     const mainElement = screen.getByRole('main');
     
@@ -73,12 +83,17 @@ describe('AppLayout', () => {
     expect(mainElement).toHaveClass('content-blur');
   });
 
-  it('does not apply content-blur class when not scrolled', () => {
+  it('does not apply content-blur class when not scrolled', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <AppLayout />
       </MemoryRouter>
     );
+    
+    // Wait for content to be ready
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
     
     const mainElement = screen.getByRole('main');
     

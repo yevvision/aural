@@ -6,7 +6,7 @@ import type { AudioTrack, User } from '../types';
 import { MiniPlayer } from '../components/audio/MiniPlayer';
 import { useGlobalAudioManager } from '../hooks/useGlobalAudioManager';
 import { useDatabase } from '../hooks/useDatabase';
-import { Button, IconButton } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
 import { Heading, Body, Caption } from '../components/ui/Typography';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminFilters } from '../components/admin/AdminFilters';
@@ -42,6 +42,7 @@ export const AdminPage: React.FC = () => {
     isLoading,
     deleteTrack, 
     deleteAllUserContent,
+    forceDeleteTrack,
     getStats,
     getTracksSorted,
     searchTracks,
@@ -101,10 +102,11 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  // Alle Tracks mit Filter und Sortierung
+  // Alle Tracks mit Filter und Sortierung (Admin sieht alle Tracks, auch inaktive)
   const getAllTracks = (): AudioTrack[] => {
     console.log('🎯 AdminPage: getAllTracks() mit Filtern...');
     
+    // Admin sieht alle Tracks (auch die in der Warteschlange)
     let filteredTracks = tracks;
     
     // Benutzer-Filter anwenden
@@ -223,6 +225,25 @@ export const AdminPage: React.FC = () => {
       }
     } else {
       console.log('🎯 AdminPage: Löschung abgebrochen');
+    }
+  };
+
+  const handleForceDeleteTrack = () => {
+    console.log('🎯 AdminPage: === FORCE DELETE TRACK BUTTON GEDRÜCKT ===');
+    if (confirm('Sind Sie sicher, dass Sie den Track "naaa" von "yev_cloud" löschen möchten?')) {
+      console.log('🎯 AdminPage: Bestätigung erhalten, lösche Track...');
+      
+      const success = forceDeleteTrack('naaa', 'yev_cloud');
+      
+      if (success) {
+        console.log('✅ AdminPage: Track erfolgreich gelöscht');
+        alert('Track "naaa" von "yev_cloud" wurde erfolgreich gelöscht!');
+      } else {
+        console.error('❌ AdminPage: Fehler beim Löschen des Tracks');
+        alert('Fehler beim Löschen des Tracks. Möglicherweise existiert er nicht in der aktuellen Datenbank.');
+      }
+    } else {
+      console.log('🎯 AdminPage: Track-Löschung abgebrochen');
     }
   };
 
@@ -446,6 +467,16 @@ export const AdminPage: React.FC = () => {
           >
             <Trash2 className="w-4 h-4" />
             Alle Benutzerinhalte löschen
+          </Button>
+          
+          <Button
+            onClick={handleForceDeleteTrack}
+            variant="glass"
+            size="md"
+            className="flex items-center gap-2 hover:text-orange-400"
+          >
+            <Trash2 className="w-4 h-4" />
+            "naaa" von yev_cloud löschen
           </Button>
         </motion.div>
 

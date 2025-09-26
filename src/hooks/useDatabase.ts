@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import DatabaseService from '../services/databaseService';
 import type { AudioTrack, ContentReport } from '../types';
 
@@ -12,9 +12,12 @@ export const useDatabase = (currentUserId?: string) => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [reports, setReports] = useState<ContentReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Ref um den aktuellen tracks.length Wert zu tracken ohne infinite loops
+  const tracksLengthRef = useRef(0);
 
   // Tracks und Benutzer von der Datenbank laden
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setIsLoading(true);
     
     try {
@@ -63,18 +66,45 @@ export const useDatabase = (currentUserId?: string) => {
       const allComments = DatabaseService.getComments();
       const allActivities = currentUserId ? DatabaseService.getUserActivities(currentUserId) : [];
       const allNotifications = currentUserId ? DatabaseService.getUserNotifications(currentUserId) : [];
+      
+      console.log('🔔 useDatabase - currentUserId:', currentUserId);
+      console.log('🔔 useDatabase - allActivities:', allActivities.length);
+      console.log('🔔 useDatabase - allNotifications:', allNotifications.length);
+      
+      // Füge Demo-Daten hinzu, wenn keine vorhanden sind
+      let finalActivities = allActivities;
+      let finalNotifications = allNotifications;
+      
+      console.log('🔔 useDatabase - Vor Demo-Check:', {
+        allActivities: allActivities.length,
+        allNotifications: allNotifications.length,
+        currentUserId
+      });
+      
+      // WICHTIG: Nur Demo-Daten hinzufügen, wenn wirklich KEINE Aktivitäten vorhanden sind
+      // Das verhindert, dass Demo-Daten echte Aktivitäten überschreiben
+      if (allActivities.length === 0 && allNotifications.length === 0) {
+        console.log('🔔 useDatabase - Keine Aktivitäten gefunden, füge Demo-Daten hinzu...');
+        DatabaseService.addDemoActivitiesAndNotifications();
+        // Lade Daten neu
+        finalActivities = currentUserId ? DatabaseService.getUserActivities(currentUserId) : [];
+        finalNotifications = currentUserId ? DatabaseService.getUserNotifications(currentUserId) : [];
+        console.log('🔔 useDatabase - Nach Demo-Daten: Activities:', finalActivities.length, 'Notifications:', finalNotifications.length);
+      } else {
+        console.log('🔔 useDatabase - Aktivitäten bereits vorhanden, verwende bestehende');
+      }
       const allReports = DatabaseService.getReports();
       
       setTracks(allTracks);
       setUsers(allUsers);
       setComments(allComments);
-      setActivities(allActivities);
-      setNotifications(allNotifications);
+      setActivities(finalActivities);
+      setNotifications(finalNotifications);
       setReports(allReports);
       
-      // Data loaded successfully
+      // Update ref mit der aktuellen tracks.length
+      tracksLengthRef.current = allTracks.length;
       
-      // Data loaded successfully
     } catch (error) {
       console.error('❌ useDatabase: Fehler beim Laden der Daten:', error);
       setTracks([]);
@@ -86,7 +116,7 @@ export const useDatabase = (currentUserId?: string) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUserId]); // currentUserId als Dependency
 
   // Beim ersten Laden und bei Änderungen
   useEffect(() => {
@@ -96,18 +126,6 @@ export const useDatabase = (currentUserId?: string) => {
     const removeListener = DatabaseService.addListener(() => {
       loadData();
     });
-
-    // Zusätzlicher Polling für localStorage-Änderungen
-    const interval = setInterval(() => {
-      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
-      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
-      const dbTracks = DatabaseService.getTracks(currentUserId);
-      
-      // Prüfe auf neue Tracks in localStorage oder DB
-      if (localTracks.length > tracks.length || dbTracks.length > tracks.length) {
-        loadData();
-      }
-    }, 1000); // Reduziere Intervall auf 1 Sekunde für schnellere Reaktion
 
     // Event Listener für Track Approval
     const handleTrackApproved = () => {
@@ -119,10 +137,28 @@ export const useDatabase = (currentUserId?: string) => {
     // Cleanup
     return () => {
       removeListener();
-      clearInterval(interval);
       window.removeEventListener('trackApproved', handleTrackApproved);
     };
-  }, [currentUserId]);
+  }, [currentUserId]); // Nur currentUserId als dependency
+
+  // Separater useEffect für Polling - ohne tracks.length dependency
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      const dbTracks = DatabaseService.getTracks(currentUserId);
+      
+      // Prüfe auf neue Tracks in localStorage oder DB
+      // Verwende ref um den aktuellen Wert zu bekommen ohne infinite loops
+      const currentTracksLength = tracksLengthRef.current;
+      if (localTracks.length > currentTracksLength || dbTracks.length > currentTracksLength) {
+        console.log('🔄 useDatabase: Neue Tracks erkannt, lade Daten neu...');
+        loadData();
+      }
+    }, 10000); // Erhöhe Intervall auf 10 Sekunden um infinite loops zu vermeiden
+
+    return () => clearInterval(interval);
+  }, [currentUserId]); // Nur currentUserId als dependency
 
   // =============================================================================
   // TRACK OPERATIONEN
@@ -143,9 +179,8 @@ export const useDatabase = (currentUserId?: string) => {
   const addCommentToTrack = (trackId: string, comment: any): boolean => {
     const success = DatabaseService.addCommentToTrack(trackId, comment);
     if (success) {
-      // Nur die Kommentare aktualisieren, nicht alle Daten neu laden
-      const updatedComments = DatabaseService.getComments();
-      setComments(updatedComments);
+      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
+      loadData();
     }
     return success;
   };
@@ -207,23 +242,55 @@ export const useDatabase = (currentUserId?: string) => {
   };
 
   // =============================================================================
+  // FOLLOW OPERATIONS
+  // =============================================================================
+
+  const toggleFollow = (followerId: string, targetUserId: string): boolean => {
+    const success = DatabaseService.toggleFollow(followerId, targetUserId);
+    if (success) {
+      loadData();
+    }
+    return success;
+  };
+
+  // =============================================================================
   // ACTIVITY & NOTIFICATIONS
   // =============================================================================
 
   const addUserActivity = (activity: any): boolean => {
-    return DatabaseService.addUserActivity(activity);
+    const success = DatabaseService.addUserActivity(activity);
+    if (success) {
+      // Lade Daten neu, um sicherzustellen, dass die neue Aktivität verfügbar ist
+      loadData();
+    }
+    return success;
   };
 
   const addNotification = (notification: any): boolean => {
-    return DatabaseService.addNotification(notification);
+    const success = DatabaseService.addNotification(notification);
+    if (success) {
+      // Lade Daten neu, um sicherzustellen, dass die neue Benachrichtigung verfügbar ist
+      loadData();
+    }
+    return success;
   };
 
   const markActivityAsRead = (activityId: string): boolean => {
-    return DatabaseService.markActivityAsRead(activityId);
+    const success = DatabaseService.markActivityAsRead(activityId);
+    if (success) {
+      // Lade Daten neu, um sicherzustellen, dass die Navigation aktualisiert wird
+      loadData();
+    }
+    return success;
   };
 
   const markNotificationAsRead = (notificationId: string): boolean => {
-    return DatabaseService.markNotificationAsRead(notificationId);
+    const success = DatabaseService.markNotificationAsRead(notificationId);
+    if (success) {
+      // Lade Daten neu, um sicherzustellen, dass die Navigation aktualisiert wird
+      loadData();
+    }
+    return success;
   };
 
   // =============================================================================
@@ -248,6 +315,10 @@ export const useDatabase = (currentUserId?: string) => {
 
   const deleteAllUserContent = (): boolean => {
     return DatabaseService.deleteAllUserContent();
+  };
+
+  const forceDeleteTrack = (trackTitle: string, username: string): boolean => {
+    return DatabaseService.forceDeleteTrack(trackTitle, username);
   };
 
   const getStats = () => {
@@ -316,11 +387,19 @@ export const useDatabase = (currentUserId?: string) => {
     isCommentLikedByUser,
     getCommentLikeCount,
     
+    // Follow Operations
+    toggleFollow,
+    
     // Activity & Notifications
     addUserActivity,
     addNotification,
     markActivityAsRead,
     markNotificationAsRead,
+    addDemoActivitiesAndNotifications: DatabaseService.addDemoActivitiesAndNotifications,
+    forceCreateDemoData: DatabaseService.forceCreateDemoData,
+    debugShowAllData: DatabaseService.debugShowAllData,
+    resetDatabase: DatabaseService.resetDatabase,
+    testPersistence: DatabaseService.testPersistence,
     
     // Report Operations
     addReport,
@@ -329,6 +408,7 @@ export const useDatabase = (currentUserId?: string) => {
     
     // Admin Operations
     deleteAllUserContent,
+    forceDeleteTrack,
     getStats,
     
     // Search & Filter
@@ -337,7 +417,12 @@ export const useDatabase = (currentUserId?: string) => {
     
     // Utility
     loadData,
-    debug
+    debug,
+    
+    // Additional utility functions
+    getUserActivities: (userId: string) => DatabaseService.getUserActivities(userId),
+    getUserNotifications: (userId: string) => DatabaseService.getUserNotifications(userId),
+    forceAddHollaTracks: () => DatabaseService.forceAddHollaTracks()
   };
 };
 

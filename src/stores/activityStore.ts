@@ -46,9 +46,24 @@ export const useActivityStore = create<ActivityStore>()(
           isRead: false
         };
         
+        // Speichere auch in der zentralen Datenbank
+        try {
+          import('../services/databaseService').then(({ default: DatabaseService }) => {
+            DatabaseService.addNotification(newActivity);
+            console.log('🔔 ActivityStore: Benachrichtigung in zentrale DB gespeichert:', newActivity.type);
+          });
+        } catch (error) {
+          console.error('🔔 ActivityStore: Fehler beim Speichern in zentrale DB:', error);
+        }
+        
         set((state) => ({
           activities: [newActivity, ...state.activities].slice(0, 100), // Keep only last 100 activities
           unreadCount: state.unreadCount + 1
+        }));
+        
+        // Dispatch event to notify navigation about new notification
+        window.dispatchEvent(new CustomEvent('newNotification', {
+          detail: { type: newActivity.type, id: newActivity.id }
         }));
       },
       
@@ -64,10 +79,34 @@ export const useActivityStore = create<ActivityStore>()(
       },
       
       markAllAsRead: () => {
-        set((state) => ({
-          activities: state.activities.map(activity => ({ ...activity, isRead: true })),
-          unreadCount: 0
-        }));
+        set((state) => {
+          const updatedActivities = state.activities.map(activity => ({ ...activity, isRead: true }));
+          
+          // Speichere auch in der zentralen Datenbank
+          try {
+            import('../services/databaseService').then(({ default: DatabaseService }) => {
+              updatedActivities.forEach(activity => {
+                DatabaseService.markNotificationAsRead(activity.id);
+              });
+              console.log('🔔 ActivityStore: Alle Notifications in zentrale DB als gelesen markiert');
+              
+              // Trigger a global event to reload data
+              window.dispatchEvent(new CustomEvent('reloadDatabaseData'));
+            });
+          } catch (error) {
+            console.error('🔔 ActivityStore: Fehler beim Markieren in zentrale DB:', error);
+          }
+          
+          // Benachrichtige die Navigation über die Änderung
+          window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead', { 
+            detail: { count: updatedActivities.length } 
+          }));
+          
+          return {
+            activities: updatedActivities,
+            unreadCount: 0
+          };
+        });
       },
       
       clearActivities: () => {
@@ -118,6 +157,16 @@ export const useActivityStore = create<ActivityStore>()(
           isRead: false
         };
         
+        // Speichere auch in der zentralen Datenbank
+        try {
+          import('../services/databaseService').then(({ default: DatabaseService }) => {
+            DatabaseService.addUserActivity(newActivity);
+            console.log('🔔 ActivityStore: User-Aktivität in zentrale DB gespeichert:', newActivity.type);
+          });
+        } catch (error) {
+          console.error('🔔 ActivityStore: Fehler beim Speichern in zentrale DB:', error);
+        }
+        
         set((state) => ({
           userActivities: [newActivity, ...state.userActivities].slice(0, 100), // Keep only last 100 activities
           userUnreadCount: state.userUnreadCount + 1
@@ -133,6 +182,16 @@ export const useActivityStore = create<ActivityStore>()(
           createdAt: new Date(),
           isRead: false
         };
+        
+        // Speichere auch in der zentralen Datenbank
+        try {
+          import('../services/databaseService').then(({ default: DatabaseService }) => {
+            DatabaseService.addUserActivity(newActivity);
+            console.log('🔔 ActivityStore: User-Aktivität (Notification) in zentrale DB gespeichert:', newActivity.type);
+          });
+        } catch (error) {
+          console.error('🔔 ActivityStore: Fehler beim Speichern in zentrale DB:', error);
+        }
         
         set((state) => ({
           userActivities: [newActivity, ...state.userActivities].slice(0, 100),
@@ -153,10 +212,34 @@ export const useActivityStore = create<ActivityStore>()(
       },
       
       markAllUserActivitiesAsRead: () => {
-        set((state) => ({
-          userActivities: state.userActivities.map(activity => ({ ...activity, isRead: true })),
-          userUnreadCount: 0
-        }));
+        set((state) => {
+          const updatedUserActivities = state.userActivities.map(activity => ({ ...activity, isRead: true }));
+          
+          // Speichere auch in der zentralen Datenbank
+          try {
+            import('../services/databaseService').then(({ default: DatabaseService }) => {
+              updatedUserActivities.forEach(activity => {
+                DatabaseService.markActivityAsRead(activity.id);
+              });
+              console.log('🔔 ActivityStore: Alle User Activities in zentrale DB als gelesen markiert');
+              
+              // Trigger a global event to reload data
+              window.dispatchEvent(new CustomEvent('reloadDatabaseData'));
+            });
+          } catch (error) {
+            console.error('🔔 ActivityStore: Fehler beim Markieren in zentrale DB:', error);
+          }
+          
+          // Benachrichtige die Navigation über die Änderung
+          window.dispatchEvent(new CustomEvent('userActivitiesMarkedAsRead', { 
+            detail: { count: updatedUserActivities.length } 
+          }));
+          
+          return {
+            userActivities: updatedUserActivities,
+            userUnreadCount: 0
+          };
+        });
       },
       
       clearUserActivities: () => {

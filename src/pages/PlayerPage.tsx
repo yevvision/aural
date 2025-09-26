@@ -290,12 +290,12 @@ export const PlayerPage = () => {
         </div>
         
         {/* Comment input and action buttons at the bottom of content */}
-        <div className="mt-8 py-6 px-6 flex items-center space-x-4 bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '40px' }}>
+        <div className="mt-8 py-4 px-6 flex items-center space-x-4 bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '40px' }}>
           <div className="relative flex-1">
             <input
               type="text"
               placeholder="..."
-              className="w-full h-[56px] bg-transparent border border-gray-500 rounded-full px-4 pr-16 text-white text-sm focus:outline-none focus:border-white"
+              className="w-full h-9 bg-transparent border-2 border-gray-500 rounded-full px-4 pr-12 text-white text-sm focus:outline-none focus:border-white"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               onKeyPress={(e) => {
@@ -309,13 +309,13 @@ export const PlayerPage = () => {
               disabled={!commentText.trim()}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
             >
-              <Send size={20} strokeWidth={1.5} />
+              <Send size={20} strokeWidth={2} />
             </button>
           </div>
           
           <button
             onClick={handleLike}
-            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+            className={`w-9 h-9 rounded-full border-2 border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
               track.isLiked 
                 ? "border-red-500 bg-red-500/20" 
                 : "hover:border-red-400"
@@ -323,19 +323,19 @@ export const PlayerPage = () => {
             title={track.isLiked ? 'Unlike' : 'Like'}
           >
             <Heart 
-              size={24} 
+              size={20} 
+              strokeWidth={2}
               className={`transition-all duration-200 ${
                 track.isLiked 
                   ? "fill-red-500 text-red-500" 
                   : "text-gray-400 hover:text-red-400"
               }`}
-              strokeWidth={1.5}
             />
           </button>
           
           <button
             onClick={handleBookmark}
-            className={`w-[56px] h-[56px] rounded-full border border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+            className={`w-9 h-9 rounded-full border-2 border-gray-500 flex items-center justify-center transition-all duration-200 hover:scale-105 ${
               track.isBookmarked 
                 ? "border-yellow-500 bg-yellow-500/20" 
                 : "hover:border-yellow-400"
@@ -343,13 +343,13 @@ export const PlayerPage = () => {
             title={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
           >
             <Bookmark 
-              size={24} 
+              size={20} 
+              strokeWidth={2}
               className={`transition-all duration-200 ${
                 track.isBookmarked 
                   ? "fill-yellow-500 text-yellow-500" 
                   : "text-gray-400 hover:text-yellow-400"
               }`}
-              strokeWidth={1.5}
             />
           </button>
         </div>

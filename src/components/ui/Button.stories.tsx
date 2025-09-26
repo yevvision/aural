@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Button, VoiceButton, IconButton, FloatingActionButton, ButtonGroup } from './Button';
+import { Button } from './Button';
 import { Play, Heart, Share, Download, Mic } from 'lucide-react';
 
 const meta: Meta<typeof Button> = {
@@ -191,26 +191,34 @@ export const IconButtons: Story = {
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-white mb-4">Icon Buttons</h3>
       <div className="flex items-center space-x-4">
-        <IconButton 
-          icon={<Play className="w-4 h-4" />}
+        <Button 
+          size="icon"
           aria-label="Play"
-          variant="primary"
-        />
-        <IconButton 
-          icon={<Heart className="w-4 h-4" />}
+          variant="default"
+        >
+          <Play className="w-4 h-4" />
+        </Button>
+        <Button 
+          size="icon"
           aria-label="Like"
-          variant="glass"
-        />
-        <IconButton 
-          icon={<Share className="w-4 h-4" />}
-          aria-label="Share"
           variant="secondary"
-        />
-        <IconButton 
-          icon={<Download className="w-4 h-4" />}
+        >
+          <Heart className="w-4 h-4" />
+        </Button>
+        <Button 
+          size="icon"
+          aria-label="Share"
+          variant="outline"
+        >
+          <Share className="w-4 h-4" />
+        </Button>
+        <Button 
+          size="icon"
           aria-label="Download"
           variant="outline"
-        />
+        >
+          <Download className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   ),

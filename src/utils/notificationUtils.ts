@@ -80,33 +80,33 @@ export const getTimePeriod = (createdAt: Date): TimePeriod => {
 export const getTimePeriodLabel = (period: TimePeriod): string => {
   switch (period) {
     case 'this_week':
-      return 'Diese Woche';
+      return 'This Week';
     case 'last_week':
-      return 'Letzte Woche';
+      return 'Last Week';
     case 'week_2':
-      return 'Vor 2 Wochen';
+      return '2 Weeks Ago';
     case 'week_3':
-      return 'Vor 3 Wochen';
+      return '3 Weeks Ago';
     case 'week_4':
-      return 'Vor 4 Wochen';
+      return '4 Weeks Ago';
     case 'week_5':
-      return 'Vor 5 Wochen';
+      return '5 Weeks Ago';
     case 'month_1':
-      return 'Vor 1 Monat';
+      return '1 Month Ago';
     case 'month_2':
-      return 'Vor 2 Monaten';
+      return '2 Months Ago';
     case 'month_3':
-      return 'Vor 3 Monaten';
+      return '3 Months Ago';
     case 'month_4':
-      return 'Vor 4 Monaten';
+      return '4 Months Ago';
     case 'month_5':
-      return 'Vor 5 Monaten';
+      return '5 Months Ago';
     case 'month_6':
-      return 'Vor 6 Monaten';
+      return '6 Months Ago';
     case 'older':
-      return 'Älter';
+      return 'Older';
     default:
-      return 'Unbekannt';
+      return 'Unknown';
   }
 };
 

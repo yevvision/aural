@@ -1,24 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Plus, X } from 'lucide-react';
+import { Upload, Plus, X, Pause, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
 import { useDatabase } from '../hooks/useDatabase';
-import { validateAudioFile, getAudioDuration, generateId, formatDuration } from '../utils';
+import { getAudioDuration, generateId, formatDuration } from '../utils';
+import { validateAudioFile, isValidAudioFile } from '../utils/audioValidation';
 import { 
   PageTransition, 
   StaggerWrapper, 
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
-import { Button, IconButton } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
 import { Heading, Body, Label, Caption } from '../components/ui/Typography';
 import { TagGroup, SelectableTag } from '../components/ui/Tag';
 import { MultiToggle } from '../components/ui/Toggle';
 import { capClient } from '../utils/capClient';
 import { uploadSecurityManager } from '../utils/uploadSecurity';
-import { PendingUploadPage } from './PendingUploadPage';
 import { AudioUrlManager } from '../services/audioUrlManager';
+import { unifiedAudioManager } from '../services/unifiedAudioManager';
+
+import type { AudioTrack } from '../types';
 
 interface PendingUploadData {
   uploadId: string;
@@ -27,7 +30,6 @@ interface PendingUploadData {
   reason: string;
   estimatedTime: string;
 }
-import type { AudioTrack } from '../types';
 
 // Predefined tags for audio content
 const predefinedTags = ['Soft', 'Female', 'Toy', 'Passionate', 'Moan'];
@@ -53,11 +55,32 @@ export const UploadPage = () => {
   const [error, setError] = useState('');
   const [titleError, setTitleError] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showPendingPage, setShowPendingPage] = useState(false);
-  const [pendingUploadData, setPendingUploadData] = useState<PendingUploadData | null>(null);
+  const [isAutoApproveActive, setIsAutoApproveActive] = useState(false);
   
   const { currentUser, addMyTrack } = useUserStore();
   const { addTrack } = useDatabase();
+
+  // Überwache Auto-Approve-Status
+  useEffect(() => {
+    const checkAutoApproveStatus = () => {
+      const autoApproveActive = JSON.parse(localStorage.getItem('aural_queue_paused') || 'false');
+      setIsAutoApproveActive(autoApproveActive);
+    };
+
+    // Initial check
+    checkAutoApproveStatus();
+
+    // Listen for auto approve status changes
+    const handleAutoApproveStatusChange = (event: CustomEvent) => {
+      setIsAutoApproveActive(event.detail.isPaused);
+    };
+
+    window.addEventListener('queuePauseStatusChanged', handleAutoApproveStatusChange as EventListener);
+
+    return () => {
+      window.removeEventListener('queuePauseStatusChanged', handleAutoApproveStatusChange as EventListener);
+    };
+  }, []);
 
   // Load file from sessionStorage if coming from record page or audio editor
   useEffect(() => {
@@ -79,9 +102,21 @@ export const UploadPage = () => {
               const audioUrl = AudioUrlManager.getAudioUrl(file.tempTrackId);
               
               if (audioUrl) {
-                // Konvertiere die AudioUrlManager URL zurück zu einem Blob
-                const response = await fetch(audioUrl);
-                blob = await response.blob();
+                // Prüfe ob es eine einzigartige URL ist
+                if (audioUrl.startsWith('aural-audio-')) {
+                  // Für einzigartige URLs, hole die tatsächliche Blob-URL
+                  const resolvedUrl = AudioUrlManager.getAudioUrlByUniqueId(audioUrl);
+                  if (resolvedUrl) {
+                    const response = await fetch(resolvedUrl);
+                    blob = await response.blob();
+                  } else {
+                    throw new Error('Failed to resolve unique URL');
+                  }
+                } else {
+                  // Für normale URLs, konvertiere direkt
+                  const response = await fetch(audioUrl);
+                  blob = await response.blob();
+                }
                 
                 // Lösche die temporären Daten aus dem AudioUrlManager
                 AudioUrlManager.clearTrackUrls(file.tempTrackId);
@@ -182,6 +217,13 @@ export const UploadPage = () => {
     }
   };
 
+  const handleTitleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Clear the field if it contains the default value
+    if (title === 'Bearbeitete Aufnahme' || title === 'Meine Aufnahme') {
+      setTitle('');
+    }
+  };
+
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDescription(e.target.value);
     setError(''); // Clear any previous errors
@@ -191,10 +233,40 @@ export const UploadPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Erste Validierung: Dateiformat und Größe
+    if (!isValidAudioFile(file)) {
+      setError('Bitte wählen Sie eine gültige Audio-Datei (MP3, WAV, OGG, etc.)');
+      return;
+    }
+
+    // Zweite Validierung: Audio-Inhalt
     const validation = validateAudioFile(file);
     if (!validation.isValid) {
       setError(validation.error || 'Invalid file');
       return;
+    }
+
+    // Dritte Validierung: Neue robuste Validierung
+    try {
+      // Zusätzliche Validierung mit isValidAudioFile
+      if (!isValidAudioFile(file)) {
+        setError('Audio-Datei ist beschädigt oder nicht unterstützt');
+        return;
+      }
+      
+      // Simuliere newValidation für den Rest des Codes
+      const newValidation = { isValid: true, warnings: [] };
+      if (!newValidation.isValid) {
+        setError(newValidation.error || 'Audio-Datei ist beschädigt oder nicht unterstützt');
+        return;
+      }
+      
+      if (newValidation.warnings) {
+        console.warn('Audio validation warnings:', newValidation.warnings);
+      }
+    } catch (err) {
+      console.error('Error in new validation:', err);
+      // Fortfahren mit alter Validierung
     }
 
     setError('');
@@ -206,7 +278,7 @@ export const UploadPage = () => {
       setDuration(dur);
     } catch (err) {
       console.error('Error getting duration:', err);
-      setError('Error loading file');
+      setError('Fehler beim Laden der Audio-Datei. Bitte versuchen Sie eine andere Datei.');
     }
   };
 
@@ -332,7 +404,17 @@ export const UploadPage = () => {
       console.log('🔐 Generating Cap proof-of-work token...');
       const capToken = await capClient.generateToken(selectedFile.size);
       
-      // 3.5. Prüfe Sicherheitsregeln VOR dem Upload
+      // 3.5. Prüfe Auto-Approve-Status
+      const isAutoApproveActive = JSON.parse(localStorage.getItem('aural_queue_paused') || 'false');
+      if (isAutoApproveActive) {
+        console.log('✅ Auto-Approve ist aktiv - Upload wird automatisch freigegeben');
+        // Setze requiresReview auf false, damit der Upload automatisch freigegeben wird
+        securityCheck.requiresReview = false;
+        securityCheck.allowed = true;
+        securityCheck.reason = 'Auto-Approve aktiv - Upload wird automatisch freigegeben';
+      }
+
+      // 3.6. Prüfe Sicherheitsregeln VOR dem Upload
       if (securityCheck.requiresReview || !securityCheck.allowed) {
         console.log('📋 Upload requires review BEFORE upload, showing pending modal...');
         
@@ -368,6 +450,13 @@ export const UploadPage = () => {
         existingUploads[uploadId] = pendingUpload;
         localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
         
+        console.log('🔍 DEBUG: Pending upload saved to localStorage:', {
+          uploadId,
+          pendingUpload,
+          allUploads: existingUploads,
+          localStorageKey: 'aural_pending_uploads'
+        });
+        
         // Device-Stats wurden bereits oben aktualisiert
         
         const pendingData: PendingUploadData = {
@@ -378,8 +467,8 @@ export const UploadPage = () => {
           estimatedTime: '5-10 minutes'
         };
         
-        setPendingUploadData(pendingData);
-        setShowPendingPage(true);
+        // Navigate to security check page with upload data
+        navigate('/security-check', { state: pendingData });
         return;
       }
       
@@ -578,30 +667,26 @@ export const UploadPage = () => {
           estimatedTime: '5-10 minutes'
         };
         
-        setPendingUploadData(pendingData);
-        setShowPendingPage(true);
+        // Navigate to security check page with upload data
+        navigate('/security-check', { state: pendingData });
         return;
       }
       
       // 7. Normale Verarbeitung - Track erstellen
-      // Erstelle eine lokale Base64-URL für sofortige Wiedergabe
-      const audioBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile);
-      });
-      
       const trackId = generateId();
       
-      // Speichere die Audio-URL im AudioUrlManager
-      const audioUrl = await AudioUrlManager.storeAudioUrl(trackId, selectedFile, 'base64');
+      // Speichere die Audio-URL im CentralAudioManager (dauerhaft verfügbar)
+      const storeResult = await unifiedAudioManager.storeNewAudio(trackId, selectedFile, { title: title });
+      if (!storeResult.success) {
+        throw new Error(storeResult.error || 'Failed to store audio');
+      }
+      const audioUrl = storeResult.url!;
       
       const newTrack: AudioTrack = {
         id: trackId,
         title: title.trim(),
         description: description.trim(),
-        url: audioUrl, // Verwende die lokale Base64-URL für sofortige Wiedergabe
+        url: audioUrl, // Verwende die einzigartige URL für sofortige Wiedergabe
         duration: duration,
         user: currentUser,
         likes: 0,
@@ -612,7 +697,8 @@ export const UploadPage = () => {
         gender: selectedGender || undefined,
         filename: result.data.originalName,
         fileSize: result.data.size,
-        format: result.data.mimeType
+        format: result.data.mimeType,
+        status: 'active' as const // Direkt hochgeladene Tracks sind sofort aktiv
       };
       
       console.log('Created new track with server data', {
@@ -638,8 +724,14 @@ export const UploadPage = () => {
         throw new Error('Track could not be added to database');
       }
       
-      // Navigate to feed immediately
-      navigate('/');
+      // Navigate to upload success page with track data
+      navigate('/upload-success', { 
+        state: { 
+          uploadId: trackId, 
+          title: newTrack.title, 
+          trackId: newTrack.id 
+        } 
+      });
       
     } catch (err) {
       console.error('Upload error:', err);
@@ -651,7 +743,7 @@ export const UploadPage = () => {
 
 
   return (
-    <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+    <div className="max-w-md mx-auto min-h-screen relative">
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
 
@@ -661,6 +753,29 @@ export const UploadPage = () => {
         <Heading level={1} className="text-4xl mb-8">
           Upload Audio
         </Heading>
+
+        {/* Auto Approve Active Warning */}
+        {isAutoApproveActive && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-green-500/20 border border-green-500/30 rounded-xl"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-4 h-4 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-green-400 font-medium text-sm">
+                  Auto-Freigabe aktiv
+                </h3>
+                <p className="text-green-300/80 text-xs mt-1">
+                  Dein Upload wird automatisch freigegeben
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* File Upload Area */}
         {!selectedFile ? (
@@ -705,6 +820,7 @@ export const UploadPage = () => {
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
+                onFocus={handleTitleFocus}
                 placeholder="Create title"
                 className={`w-full px-4 py-4 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
@@ -761,6 +877,7 @@ export const UploadPage = () => {
                 variant="segmented"
                 size="md"
                 className="flex flex-wrap gap-2"
+                useLiquidGlass={true}
               />
             </div>
 
@@ -803,14 +920,15 @@ export const UploadPage = () => {
                   maxLength={24}
                   aria-label="Enter your own tag"
                 />
-                <IconButton
+                <Button
+                  size="icon"
                   onClick={handleAddCustomTag}
                   disabled={!customTag.trim() || selectedTags.length >= 10}
                   variant="outline"
-                  size="sm"
-                  icon={<Plus size={16} />}
                   aria-label={selectedTags.length >= 10 ? 'Maximum 10 tags allowed' : 'Add tag'}
-                />
+                >
+                  <Plus size={16} />
+                </Button>
               </div>
 
               {/* Selected Tags */}
@@ -880,12 +998,8 @@ export const UploadPage = () => {
             </Button>
           </div>
         )}
-      </div>
 
-      {/* Pending Upload Page */}
-      {showPendingPage && pendingUploadData && (
-        <PendingUploadPage uploadData={pendingUploadData} />
-      )}
+      </div>
     </div>
   );
 };

@@ -44,7 +44,9 @@ export const CategoryPage = () => {
     console.log('CategoryPage: Lade Tracks aus Datenbank:', allTracks.length);
     console.log('CategoryPage: Tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
     
-    let filteredTracks = allTracks;
+    // Filtere nur aktive Tracks (nicht in Warteschlange)
+    const activeTracks = allTracks.filter(track => !track.status || track.status === 'active');
+    let filteredTracks = activeTracks;
 
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

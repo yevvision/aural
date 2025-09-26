@@ -888,7 +888,8 @@ export const sanitizeAudioTrack = (track: any): AudioTrack => {
     createdAt: track.createdAt || new Date(),
     waveformData: Array.isArray(track.waveformData) ? track.waveformData : undefined,
     tags: Array.isArray(track.tags) ? track.tags : undefined,
-    gender: track.gender && ['Female', 'Male', 'Mixed'].includes(track.gender) ? track.gender : undefined
+    gender: track.gender && ['Female', 'Male', 'Mixed', 'Couple', 'Diverse'].includes(track.gender) ? track.gender : undefined,
+    status: track.status && ['active', 'pending', 'inactive', 'approved', 'rejected'].includes(track.status) ? track.status : 'active'
   };
 };
 

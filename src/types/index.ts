@@ -39,6 +39,8 @@ export interface AudioTrack {
   fileSize?: number;
   format?: string;
   isPublic?: boolean;
+  // Status für Warteschlange und Freigabe
+  status?: 'active' | 'pending' | 'inactive' | 'approved' | 'rejected';
 }
 
 export interface Comment {
@@ -117,11 +119,12 @@ export interface RegistrationStep {
 // German spec: Notification types for Comments/Likes page
 export interface NotificationActivity {
   id: string;
-  type: 'like' | 'comment' | 'follow' | 'bookmark' | 'followed_user_upload' | 'upload';
+  type: 'like' | 'comment' | 'follow' | 'bookmark' | 'followed_user_upload' | 'upload' | 'upload_approved' | 'upload_rejected';
   user: User;
   trackId?: string;
   trackTitle?: string;
   commentText?: string;
+  targetUserId?: string; // Für Benachrichtigungen, die an einen bestimmten User gerichtet sind
   createdAt: Date;
   isRead: boolean;
 }
@@ -129,7 +132,7 @@ export interface NotificationActivity {
 // German spec: User's own activity tracking
 export interface UserActivity {
   id: string;
-  type: 'my_like' | 'my_comment' | 'my_upload' | 'my_bookmark' | 'my_follow';
+  type: 'my_like' | 'my_comment' | 'my_upload' | 'my_bookmark' | 'my_follow' | 'my_upload_rejected' | 'my_delete';
   trackId: string;
   trackTitle: string;
   trackUser?: User; // The owner of the track (for likes/comments/bookmarks)

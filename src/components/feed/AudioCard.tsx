@@ -5,6 +5,11 @@ import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useUserStore } from '../../stores/userStore';
 import { useDatabase } from '../../hooks/useDatabase';
 import { formatDuration, sanitizeAudioTrack, sanitizeUser } from '../../utils';
+import { debugAudioPlayback } from '../../utils/audioDebug';
+import { audioPlaybackFixer } from '../../utils/audioPlaybackFix';
+import { AudioUrlManager } from '../../services/audioUrlManager';
+import { unifiedAudioManager } from '../../services/unifiedAudioManager';
+import { fixAudioUrl, needsUrlFix } from '../../utils/audioUrlFix';
 import { Body } from '../ui/Typography';
 import { ConfirmationDialog } from '../ui';
 import { InlineMiniPlayer } from '../audio/InlineMiniPlayer';
@@ -20,10 +25,32 @@ interface AudioCardProps {
 }
 
 // Enhanced AudioCard with glassmorphism design and animations
+// Hilfsfunktion zum Erstellen einer neuen Blob-URL für einen Track
+const createNewBlobUrlForTrack = async (track: any): Promise<string | null> => {
+  try {
+    console.log('🔄 Creating new blob URL for track:', track.id);
+    
+    // Versuche den ursprünglichen Blob zu finden
+    const urlInfo = AudioUrlManager.getUrlInfo(track.id);
+    if (urlInfo && urlInfo.originalBlob) {
+      console.log('🔍 Found original blob, creating new URL...');
+      const newBlobUrl = URL.createObjectURL(urlInfo.originalBlob);
+      console.log('✅ New blob URL created:', newBlobUrl);
+      return newBlobUrl;
+    } else {
+      console.log('❌ No original blob found for track:', track.id);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error creating new blob URL:', error);
+    return null;
+  }
+};
+
 export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete }: AudioCardProps) => {
   const { currentTrack, isPlaying, play, pause } = useAudioPlayer();
-  const { reset } = usePlayerStore(); // Add reset function from player store
-  const { myTracks } = useUserStore();
+  const { reset, setCurrentTrack } = usePlayerStore(); // Add reset and setCurrentTrack functions from player store
+  const { currentUser } = useUserStore();
   const { tracks, toggleLike } = useDatabase('user-1'); // Verwende aktuellen User
   
   // Hole den aktuellen Track aus der Datenbank, um sicherzustellen, dass Like/Bookmark-Status aktuell ist
@@ -50,7 +77,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
 
   const isCurrentTrack = currentTrack?.id === safeTrack.id;
   const isTrackPlaying = isCurrentTrack && isPlaying;
-  const isOwnTrack = myTracks.some(t => t.id === safeTrack.id);
+  const isOwnTrack = currentUser?.id === safeTrack.userId || currentUser?.id === safeTrack.user?.id;
 
   // Initialize Intersection Observer and handle visibility
   useEffect(() => {
@@ -59,9 +86,11 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
         setVisibleAudioCardIdsRef.current(prev => {
           const newSet = new Set(prev);
           if (entry.isIntersecting && isCurrentTrack) {
-            newSet.add(safeTrack.id);
+            // Add this card instance to the visible set
+            newSet.add(cardInstanceId);
           } else if (!entry.isIntersecting && isCurrentTrack) {
-            newSet.delete(safeTrack.id);
+            // Remove this card instance from the visible set
+            newSet.delete(cardInstanceId);
           }
           return newSet;
         });
@@ -76,49 +105,54 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
     // Cleanup function to remove this card from visibility tracking when unmounted
     return () => {
       observer.disconnect();
-    };
-  }, [safeTrack.id, isCurrentTrack]);
-
-  // Separate effect for handling current track visibility
-  useEffect(() => {
-    if (isCurrentTrack) {
+      // Remove this card instance from visibility tracking when unmounted
       setVisibleAudioCardIdsRef.current(prev => {
         const newSet = new Set(prev);
-        newSet.add(safeTrack.id);
+        newSet.delete(cardInstanceId);
         return newSet;
       });
-    } else {
+    };
+  }, [cardInstanceId, isCurrentTrack]);
+
+  // Remove this card instance from visibility tracking when it's no longer the current track
+  useEffect(() => {
+    if (!isCurrentTrack) {
       setVisibleAudioCardIdsRef.current(prev => {
         const newSet = new Set(prev);
-        newSet.delete(safeTrack.id);
+        newSet.delete(cardInstanceId);
         return newSet;
       });
     }
-  }, [isCurrentTrack, safeTrack.id]);
+  }, [isCurrentTrack, cardInstanceId]);
 
-  const handleCardClick = () => {
+  const handleCardClick = async () => {
+    // Debug: Zeige Audio-Informationen
+    console.log('🎵 AudioCard: Play button clicked for track:', safeTrack.title);
+    debugAudioPlayback(safeTrack);
+    
     // First click: play and open player
     // Second click: close player (regardless of play state)
     if (isCurrentTrack) {
       // If this is the current track, collapse the player
       reset(); // Clear the current track to collapse the player
     } else {
-      // If not the current track, play the track
+      // Verwende vereinfachte Audio-Wiedergabe
+      console.log('🎵 AudioCard: Starting audio playback...');
+      
+      // Setze den Track als aktuellen Track
+      setCurrentTrack(safeTrack);
+      
+      // Starte die Wiedergabe über den normalen Play-Mechanismus
       play(safeTrack);
       
-      // When starting a new track, immediately set it as visible
-      setVisibleAudioCardIdsRef.current(prev => {
-        const newSet = new Set(prev);
-        newSet.add(safeTrack.id);
-        return newSet;
-      });
+      // Don't immediately set as visible - let the Intersection Observer handle it
     }
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isOwnTrack) {
+    if (showDeleteButton) {
       setIsDeleteDialogOpen(true);
     }
   };
@@ -148,7 +182,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
         }}
       >
         {/* Delete button for own tracks - positioned at top right corner, dark gray */}
-        {showDeleteButton && isOwnTrack && (
+        {showDeleteButton && (
           <button
             onClick={handleDeleteClick}
             className="absolute top-4 right-4 text-gray-500 hover:text-gray-300 transition-colors z-30"
@@ -196,12 +230,12 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
           <div className="flex-1 min-w-0">
             
             {/* Title in white with unified font size */}
-            <div className="text-white text-sm mb-1.5 line-clamp-2 leading-tight">
+            <div className="text-white text-[13px] font-normal mb-1.5 line-clamp-2 leading-tight">
               {safeTrack.title}
             </div>
             
             {/* Metadata in gray with unified font size */}
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] font-normal text-gray-400">
               <Link 
                 to={`/profile/${safeUser.id}`}
                 className="text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"

@@ -1,29 +1,31 @@
-import { defineConfig } from 'vite'
+import path from "path"
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   base: '/',
   server: {
     host: 'localhost',
     port: 5173,
-    strictPort: false, // Erlaube andere Ports wenn 5173 belegt ist
+    strictPort: true,
     hmr: {
-      overlay: false, // Deaktiviere Error-Overlay um Extension-Fehler zu vermeiden
+      overlay: false,
+      port: 5173,
+      host: 'localhost',
       clientPort: 5173
     },
-    cors: true, // Aktiviere CORS für bessere Kompatibilität
-        headers: {
-          'Cross-Origin-Embedder-Policy': 'unsafe-none',
-          'Cross-Origin-Opener-Policy': 'unsafe-none',
-          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://assets.unicorn.studio; media-src 'self' data: blob:; connect-src 'self' ws: wss: blob: data: http://localhost:* https://assets.unicorn.studio; font-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self';"
-        }
+    cors: true
   },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    // Stelle sicher dass alle Asset-Pfade korrekt sind
     rollupOptions: {
       output: {
         assetFileNames: 'assets/[name]-[hash][extname]',
@@ -33,6 +35,6 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    exclude: ['cap'] // Cap-Bibliothek von Optimierung ausschließen
+    exclude: ['cap']
   }
 })

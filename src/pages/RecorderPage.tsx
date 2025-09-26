@@ -8,6 +8,8 @@ import { useUserStore, useRecordingStore } from '../stores/userStore';
 import { useFeedStore } from '../stores/feedStore';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
+import { UnicornAudioVisualizerAdvanced } from '../components/audio/UnicornAudioVisualizerAdvanced';
+import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
 import { generateId, formatSafeDate } from '../utils';
 import { 
   PageTransition, 
@@ -15,7 +17,7 @@ import {
   StaggerItem, 
   RevealOnScroll
 } from '../components/ui';
-import { Button, IconButton } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
 import { Heading, Body } from '../components/ui/Typography';
 import type { AudioTrack } from '../types';
 
@@ -409,70 +411,80 @@ export const RecorderPage = () => {
 
       <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
-        {/* Title - "Aufnahme läuft" - zentriert */}
-        <div className="text-center mb-8">
-          <Heading level={1} className="text-4xl mb-4">
-            {isRecording && !isPaused ? 'Aufnahme läuft' : 
-             isRecording && isPaused ? 'Aufnahme pausiert' :
-             !isRecording && !recordedBlob ? 'Bereit zur Aufnahme' :
-             'Aufnahme abgeschlossen'}
-          </Heading>
-          
-          {/* Duration Display - direkt unter dem Titel */}
-          <div className="text-6xl font-mono text-white mb-8 tabular-nums">
-            {formatDuration(duration)}
-          </div>
-        </div>
+         {/* Title - "Aufnahme läuft" - zentriert */}
+         <div className="text-center mb-8" style={{ zIndex: 30 }}>
+           <Heading level={1} className="text-4xl mb-4">
+             {isRecording && !isPaused ? 'Aufnahme läuft' : 
+              isRecording && isPaused ? 'Aufnahme pausiert' :
+              !isRecording && !recordedBlob ? 'Bereit zur Aufnahme' :
+              'Aufnahme abgeschlossen'}
+           </Heading>
+           
+           {/* Duration Display - direkt unter dem Titel */}
+           <div className="text-6xl font-mono text-white mb-8 tabular-nums">
+             {formatDuration(duration)}
+           </div>
+         </div>
 
-        {/* Central Visualizer - ohne Stop-Button */}
-        <div className="flex justify-center items-center my-16">
-          <div className="relative w-[100px] h-[100px]">
+        {/* Full viewport Audio Visualizer with Controls */}
+        <div className="fixed inset-0 w-full h-full">
+          {/* Full viewport Unicorn Beam Audio Visualizer */}
+          <UnicornBeamAudioVisualizer
+            frequencies={visualizerData.frequencies}
+            volume={visualizerData.volume}
+            isActive={isRecording && !isPaused}
+            size="large"
+            className="w-full h-full"
+          />
+          
+           {/* Visual State Indicator - centered over the visualizer */}
+           <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
             {isRecording ? (
-              /* Recording Animation with Visualizer */
-              <div className="absolute inset-0 z-0">
-                <EnhancedAudioVisualizer
-                  frequencies={visualizerData.frequencies}
-                  volume={visualizerData.volume}
-                  isActive={visualizerData.isActive && !isPaused}
-                />
+              /* Recording Animation */
+              <div className="relative w-[200px] h-[200px] flex items-center justify-center">
+                <div className="text-4xl text-white animate-pulse">🎵</div>
               </div>
             ) : recordedBlob ? (
               /* Success State */
-              <div className="absolute inset-0 rounded-full bg-green-500/20 flex items-center justify-center">
+              <div className="relative w-[200px] h-[200px] rounded-full bg-green-500/20 flex items-center justify-center">
                 <div className="text-4xl text-green-400">✓</div>
               </div>
             ) : (
               /* Ready State */
-              <div className="absolute inset-0 rounded-full bg-white/10 flex items-center justify-center">
+              <div className="relative w-[200px] h-[200px] rounded-full bg-white/10 flex items-center justify-center">
                 <Mic size={32} className="text-white/60" />
               </div>
             )}
           </div>
         </div>
 
-        {/* Recording Controls - zentriert unter dem Visualizer */}
-        {isRecording && (
-          <div className="flex justify-center items-center space-x-6">
-            <IconButton
-              onClick={handlePauseResume}
-              variant="glass"
-              size="lg"
-              icon={isPaused ? 
-                <Play size={24} className="text-orange-500" strokeWidth={1.5} /> :
-                <Pause size={24} className="text-gray-400" strokeWidth={1.5} />
-              }
-              aria-label={isPaused ? "Resume recording" : "Pause recording"}
-              className={isPaused ? "border-orange-500 bg-orange-500/20" : ""}
-            />
-            
-            <IconButton
-              onClick={handleStopRecording}
-              variant="glass"
-              size="lg"
-              icon={<Square size={24} className="text-red-400" strokeWidth={1.5} />}
-              aria-label="Stop recording"
-              className="border-red-500 bg-red-500/20"
-            />
+         {/* Recording Controls - positioned over the visualizer */}
+         {isRecording && (
+           <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2" style={{ zIndex: 40 }}>
+            <div className="flex justify-center items-center space-x-6">
+              <Button
+                size="lg"
+                onClick={handlePauseResume}
+                variant="outline"
+                className={isPaused ? "border-orange-500 bg-orange-500/20" : ""}
+                aria-label={isPaused ? "Resume recording" : "Pause recording"}
+              >
+                {isPaused ? 
+                  <Play size={24} className="text-orange-500" strokeWidth={1.5} /> :
+                  <Pause size={24} className="text-gray-400" strokeWidth={1.5} />
+                }
+              </Button>
+              
+              <Button
+                size="lg"
+                onClick={handleStopRecording}
+                variant="outline"
+                aria-label="Stop recording"
+                className="border-red-500 bg-red-500/20"
+              >
+                <Square size={24} className="text-red-400" strokeWidth={1.5} />
+              </Button>
+            </div>
           </div>
         )}
 
@@ -508,18 +520,19 @@ export const RecorderPage = () => {
             
             {/* Playback Control */}
             {!autoProceed && (
-              <IconButton
-                onClick={handlePlayPause}
-                variant="glass"
+              <Button
                 size="lg"
-                icon={currentTrack?.id === previewTrack?.id && isPlaying ? 
-                  <Pause size={24} className="text-orange-500" strokeWidth={1.5} /> :
-                  <Play size={24} className="text-gray-400" strokeWidth={1.5} />
-                }
+                onClick={handlePlayPause}
+                variant="outline"
                 aria-label={currentTrack?.id === previewTrack?.id && isPlaying ? "Pause" : "Play"}
                 disabled={autoProceed}
                 className={currentTrack?.id === previewTrack?.id && isPlaying ? "border-orange-500 bg-orange-500/20" : ""}
-              />
+              >
+                {currentTrack?.id === previewTrack?.id && isPlaying ? 
+                  <Pause size={24} className="text-orange-500" strokeWidth={1.5} /> :
+                  <Play size={24} className="text-gray-400" strokeWidth={1.5} />
+                }
+              </Button>
             )}
 
             {/* Error Message */}
@@ -532,27 +545,29 @@ export const RecorderPage = () => {
             {/* Action Buttons - only show if not auto-proceeding */}
             {!autoProceed && (
               <>
-                <IconButton
-                  onClick={handleDiscard}
-                  variant="glass"
+                <Button
                   size="lg"
-                  icon={<Trash2 size={24} className="text-gray-400 hover:text-red-400" strokeWidth={1.5} />}
+                  onClick={handleDiscard}
+                  variant="outline"
                   aria-label="Discard recording"
                   className="hover:border-red-500 hover:bg-red-500/20"
-                />
+                >
+                  <Trash2 size={24} className="text-gray-400 hover:text-red-400" strokeWidth={1.5} />
+                </Button>
                 
-                <IconButton
+                <Button
+                  size="lg"
                   onClick={handleSave}
                   disabled={!recordedBlob || isSaving}
-                  variant="glass"
-                  size="lg"
-                  icon={isSaving ? 
+                  variant="outline"
+                  aria-label="Save recording"
+                  className="border-orange-500 bg-orange-500/20"
+                >
+                  {isSaving ? 
                     <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> :
                     <Save size={24} className="text-orange-500" strokeWidth={1.5} />
                   }
-                  aria-label="Save recording"
-                  className="border-orange-500 bg-orange-500/20"
-                />
+                </Button>
               </>
             )}
           </div>
