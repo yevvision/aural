@@ -1,0 +1,38 @@
+/* Aural Design System - CSS Variables */
+:root {
+  font-family: 'Inter', 'Manrope', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Primary Background Gradient Colors */
+  --gradient-start: #FFE7C2;    /* Light apricot */
+  --gradient-warm: #FFB27A;     /* Warm orange */
+  --gradient-strong: #fa835d;   /* Strong orange */
+  --gradient-deep: #E6452F;     /* Deep red */
+  --gradient-fade: #0A0A0B;     /* Fade to black */
+  
+  /* Surface Colors */
+  --surface-primary: rgba(15, 15, 20, 0.85);     /* Semi-opaque black panels */
+  --surface-secondary: rgba(15, 15, 20, 0.75);   /* Lighter black containers */
+  --surface-glass: rgba(255, 255, 255, 0.1);     /* Glass surface base */
+  --surface-glass-border: rgba(255, 255, 255, 0.2); /* Glass borders */
+  
+  /* Text Colors */
+  --text-primary: #FFFFFF;       /* Primary white text */
+  --text-secondary: #B0B0C0;     /* Darker gray secondary */
+  --text-tertiary: #707080;      /* Darker gray labels */
+  
+  /* Interactive States */
+  --button-glass: rgba(0, 0, 0, 0.3);
+  --button-glass-border: rgba(255, 255, 255, 0.2);
+  
+  /* Legacy support for existing components */
+  --bg-primary: #0A0A0B;
+  --bg-secondary: #1A1A1A;
+  --accent-pink: #FF006E;
+  --accent-red: #FF1744;
+  --accent-violet: #8338EC;
+  --accent-turquoise: #06FFA5;
+  --active-glow: 0 0 20px rgba(230, 69, 47, 0.4);
+  --hover-glow: 0 0 15px rgba(255, 106, 58, 0.3);
+}

@@ -1,0 +1,412 @@
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag, User } from 'lucide-react';
+import { usePlayerStore } from '../stores/playerStore';
+import { useUserStore } from '../stores/userStore';
+import { useDatabase } from '../hooks/useDatabase';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { getGlobalAudio } from '../hooks/useGlobalAudioManager';
+import { formatDuration } from '../utils';
+import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
+import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
+
+export const PlayerPage = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { currentUser } = useUserStore();
+  const { currentTrack, isPlaying, currentTime, duration, expand, collapse, setCurrentTrack } = usePlayerStore();
+  const { tracks, toggleLike, toggleBookmark, addCommentToTrack, addReport, toggleCommentLike, isCommentLikedByUser, getCommentLikeCount, comments } = useDatabase(currentUser?.id);
+  const { toggle, seek } = useAudioPlayer();
+  
+  // Get the global audio element for visualization
+  const globalAudio = getGlobalAudio();
+  
+  const [commentText, setCommentText] = useState('');
+
+  // Find the track by ID
+  const track = useMemo(() => {
+    if (!id) return currentTrack;
+    
+    // First try to find in the feed store tracks
+    const foundTrack = tracks.find(t => t.id === id);
+    if (foundTrack) return foundTrack;
+    
+    // If not found and we have a current track, check if it matches
+    if (currentTrack && currentTrack.id === id) return currentTrack;
+    
+    // If we still don't have a track, return null to show the not found message
+    return null;
+  }, [id, tracks, currentTrack]);
+
+  // Calculate isTrackPlaying for the visualizer
+  const isCurrentTrack = currentTrack?.id === track?.id;
+  const isTrackPlaying = isCurrentTrack && isPlaying;
+
+  useEffect(() => {
+    expand();
+    return () => collapse();
+  }, [expand, collapse]);
+
+  // When we have a track but no current track is set, set it as the current track
+  useEffect(() => {
+    if (track && (!currentTrack || currentTrack.id !== track.id)) {
+      setCurrentTrack(track);
+    }
+  }, [track, currentTrack, setCurrentTrack]);
+  
+  if (!track) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-6 pb-24">
+        <div className="true-black-card text-center">
+          <h2 className="text-lg font-medium text-text-primary mb-2">Track not found</h2>
+          <button 
+            onClick={() => navigate('/')}
+            className="text-accent-blue hover:underline"
+          >
+            Go back to feed
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fix for Infinity:NaN issue - ensure we have valid numbers
+  const safeCurrentTime = isFinite(currentTime) && !isNaN(currentTime) ? currentTime : 0;
+  const safeDuration = isFinite(duration) && !isNaN(duration) ? duration : 0;
+  // Ensure progress is always between 0 and 100
+  const progress = safeDuration > 0 ? Math.min(100, Math.max(0, (safeCurrentTime / safeDuration) * 100)) : 0;
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!safeDuration) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const newTime = percentage * safeDuration;
+    
+    seek(newTime);
+  };
+
+  const handleLike = () => {
+    console.log('❤️ PlayerPage: Like button clicked for track:', track.id);
+    const success = currentUser?.id ? toggleLike(track.id, currentUser.id) : false;
+    console.log('❤️ PlayerPage: Like result:', success);
+  };
+
+  const handleComment = () => {
+    // Navigate to comments page
+    navigate(`/comments`);
+  };
+
+  const handleAddComment = () => {
+    if (commentText.trim() && track && currentUser) {
+      const newComment = {
+        id: `comment-${Date.now()}`,
+        content: commentText.trim(),
+        user: currentUser,
+        createdAt: new Date(),
+        likes: 0,
+        isLiked: false
+      };
+      console.log('💬 PlayerPage: Adding comment to track:', track.id);
+      const success = addCommentToTrack(track.id, newComment);
+      console.log('💬 PlayerPage: Comment result:', success);
+      if (success) {
+        setCommentText('');
+      }
+    }
+  };
+
+  const handleBookmark = () => {
+    console.log('🔖 PlayerPage: Bookmark button clicked for track:', track.id);
+    const success = currentUser?.id ? toggleBookmark(track.id, currentUser.id) : false;
+    console.log('🔖 PlayerPage: Bookmark result:', success);
+  };
+
+  // Handle comment like interaction
+  const handleCommentLike = (commentId: string) => {
+    console.log('Comment like clicked:', commentId);
+    const success = currentUser?.id ? toggleCommentLike(commentId, currentUser.id) : false;
+    if (success) {
+      console.log('Comment like toggled successfully');
+    } else {
+      console.error('Failed to toggle comment like');
+    }
+  };
+
+
+  // Handle play button click with better error handling
+  const handlePlayClick = () => {
+    // Ensure we have a track before trying to play
+    if (track) {
+      console.log('Attempting to play track:', track.title);
+      console.log('Track URL:', track.url);
+      console.log('Current track in store:', currentTrack?.title);
+      console.log('Is playing:', isPlaying);
+      console.log('Global audio readyState:', globalAudio?.readyState);
+      console.log('Global audio networkState:', globalAudio?.networkState);
+      
+      // Toggle play state
+      toggle();
+    } else {
+      console.log('No track available to play');
+    }
+  };
+
+  // Get track comments - only show real comments, no sample comments
+  // Get comments for this track from the database
+  const trackComments = comments.filter(comment => comment.trackId === track.id);
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      {/* Spacer for fixed header */}
+      <div className="h-[72px]"></div>
+
+      <div className="px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col"> {/* Adjusted padding and height */}
+        {/* Username and statistics line */}
+        <div className="flex items-center space-x-2 mb-4">
+          <button 
+            onClick={() => navigate(`/profile/${track.user?.username || 'unknown'}`)}
+            className="flex items-center space-x-1 text-gray-400 text-xs hover:text-white transition-colors cursor-pointer"
+          >
+            <User size={12} />
+            <span>{track.user?.username || 'Unknown'}</span>
+          </button>
+          <div className="flex items-center space-x-1">
+            <Play 
+              size={14} 
+              strokeWidth={1.5} 
+              className="text-gray-400"
+              fill="none"
+            />
+            <span className="text-gray-400 text-xs">{track.plays || 0}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Heart 
+              size={14} 
+              strokeWidth={1.5} 
+              className="text-gray-400"
+              fill="none"
+            />
+            <span className="text-gray-400 text-xs">{track.likes}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <MessageCircle size={14} strokeWidth={1.5} className="text-gray-400" />
+            <span className="text-gray-400 text-xs">{track.commentsCount || trackComments.length}</span>
+          </div>
+        </div>
+
+        {/* Title - large and white */}
+        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+          {track.title}
+        </h1>
+
+        {/* Description - gray and smaller */}
+        <p className="text-gray-400 mb-6 leading-snug text-xs">
+          {track.description || "Intimate whispers sharing personal thoughts and desires"}
+        </p>
+
+        {/* Tags - flexible height */}
+        <div className="flex flex-wrap gap-2 mb-10">
+          {(() => {
+            const tags = track.tags || ['Soft', 'Female', 'Toy', 'Whisper', 'Intimate'];
+            const genderTags = ['Female', 'Male', 'Couple', 'Diverse'];
+            
+            // Find gender tag and move it to the front
+            const genderTag = tags.find(tag => genderTags.includes(tag));
+            const otherTags = tags.filter(tag => !genderTags.includes(tag));
+            
+            // Sort tags: gender first, then others
+            const sortedTags = genderTag ? [genderTag, ...otherTags] : otherTags;
+            
+            return sortedTags.map((tag, index) => (
+              <span
+                key={index}
+                className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full"
+              >
+                {tag}
+              </span>
+            ));
+          })()}
+        </div>
+
+        {/* Play button with time displays centered vertically in page */}
+        <div className="flex justify-between items-center my-16 relative">
+          {/* Left time display */}
+          <span className="text-gray-400 text-xs font-mono">
+            {formatDuration(safeCurrentTime)}
+          </span>
+          
+          {/* Play button with visualizer - like on Record page */}
+          <div className="relative">
+            {/* Unicorn Beam Audio Visualizer as container */}
+            <UnicornBeamAudioVisualizer
+              frequencies={[]}
+              volume={0}
+              isActive={isTrackPlaying}
+              size="medium"
+              className="relative"
+            />
+            
+            {/* Play Button - positioned over the visualizer */}
+            <button
+              onClick={handlePlayClick}
+              className="absolute z-10 rounded-full bg-transparent backdrop-blur-sm flex items-center justify-center shadow-voice overflow-visible"
+              aria-label={isTrackPlaying ? 'Pause' : 'Play'}
+              style={{
+                width: '100px',
+                height: '100px',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              {isTrackPlaying ? (
+                <Pause size={28} strokeWidth={1.5} className="text-white" />
+              ) : (
+                <Play size={28} strokeWidth={1.5} className="text-white ml-1" />
+              )}
+            </button>
+          </div>
+          
+          {/* Right time display */}
+          <span className="text-gray-400 text-xs font-mono">
+            {formatDuration(safeDuration)}
+          </span>
+        </div>
+        
+        {/* Comment input and action buttons at the bottom of content */}
+        <div className="mt-8 py-4 px-6 flex items-center gap-[15px] bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '40px' }}>
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="..."
+              className="w-full h-10 px-4 bg-transparent border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 transition-all duration-200 border-gray-500"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddComment();
+                }
+              }}
+            />
+            <button
+              onClick={handleAddComment}
+              disabled={!commentText.trim()}
+              className="absolute right-[5px] top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors w-10 h-10 flex items-center justify-center"
+            >
+              <Send size={16} strokeWidth={2} />
+            </button>
+          </div>
+          
+          {/* Button group with minimal spacing */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleLike}
+              className={`w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center transition-all duration-200 hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 ${
+                track.isLiked 
+                  ? "border-red-500 bg-gradient-to-r from-red-500/30 to-red-600/20" 
+                  : ""
+              }`}
+              title={track.isLiked ? 'Unlike' : 'Like'}
+            >
+              <Heart 
+                size={16} 
+                strokeWidth={2}
+                className={`transition-all duration-200 ${
+                  track.isLiked 
+                    ? "fill-red-500 text-red-500" 
+                    : "text-gray-300"
+                }`}
+              />
+            </button>
+            
+            <button
+              onClick={handleBookmark}
+              className={`w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center transition-all duration-200 hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 ${
+                track.isBookmarked 
+                  ? "border-yellow-500 bg-gradient-to-r from-yellow-500/30 to-yellow-600/20" 
+                  : ""
+              }`}
+              title={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+            >
+              <Bookmark 
+                size={16} 
+                strokeWidth={2}
+                className={`transition-all duration-200 ${
+                  track.isBookmarked 
+                    ? "fill-yellow-500 text-yellow-500" 
+                    : "text-gray-300"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+        
+        {/* Comments section - visible when scrolling */}
+        <div className="mt-4">
+          {trackComments.length > 0 ? (
+            <div className="space-y-4">
+              {trackComments.map((comment) => {
+                const isLiked = isCommentLikedByUser(comment.id, 'user-1');
+                const likeCount = getCommentLikeCount(comment.id);
+                
+                return (
+                  <div key={comment.id} className="border-b border-gray-800 pb-4">
+                    <div className="flex items-center mb-2">
+                      <span className="text-orange-500 text-sm font-medium">{comment.user.username}</span>
+                      <span className="text-gray-500 text-xs ml-2">
+                        {new Date(comment.createdAt).toLocaleDateString('de-DE')}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 text-sm">{comment.content}</p>
+                    <div className="flex items-center mt-2">
+                      <button 
+                        onClick={() => handleCommentLike(comment.id)}
+                        className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors"
+                      >
+                        <Heart 
+                          size={14} 
+                          className={isLiked ? "fill-red-500 text-red-500" : ""} 
+                          strokeWidth={1.5} 
+                        />
+                        {likeCount > 0 && (
+                          <span className="text-xs">{likeCount}</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <MessageCircle className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">No comments yet</p>
+              <p className="text-gray-600 text-xs mt-1">Be the first to comment!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Report Link - centered at bottom */}
+        <div className="mt-8 pt-6">
+          <div className="text-center">
+            <button
+              onClick={() => navigate('/report', { 
+                state: { 
+                  trackInfo: track, 
+                  trackId: track.id 
+                } 
+              })}
+              className="flex items-center justify-center space-x-2 text-gray-400 hover:text-red-400 text-sm transition-colors mx-auto"
+            >
+              <Flag size={14} strokeWidth={1.5} />
+              <span>Report inappropriate content</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+};
