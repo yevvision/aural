@@ -24,7 +24,7 @@ export const LiquidGlassEffect: React.FC<LiquidGlassEffectProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isHovered, setIsHovered] = useState(false);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   // Vertex shader source
   const vertexShaderSource = `

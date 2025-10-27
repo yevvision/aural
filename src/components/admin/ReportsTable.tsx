@@ -45,7 +45,7 @@ export const ReportsTable: React.FC<ReportsTableProps> = ({
       case 'recording':
         return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'comment':
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+        return 'bg-[#ff4e3a]/20 text-[#ff4e3a] border-[#ff4e3a]/30';
       case 'description':
         return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
       default:

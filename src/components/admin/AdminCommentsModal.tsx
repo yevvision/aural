@@ -5,7 +5,7 @@ interface AdminCommentsModalProps {
   track: AudioTrack | null;
   isOpen: boolean;
   onClose: () => void;
-  getCommentLikeCount: (commentId: string) => number;
+  getCommentLikeCount: (commentId: string) => Promise<number>;
 }
 
 export const AdminCommentsModal: React.FC<AdminCommentsModalProps> = ({
@@ -55,7 +55,7 @@ export const AdminCommentsModal: React.FC<AdminCommentsModalProps> = ({
                           {formatDate(comment.createdAt)}
                         </span>
                         <span className="ml-2 text-sm text-gray-500">
-                          • {getCommentLikeCount(comment.id)} Likes
+                          • {(comment as any).likeCount || 0} Likes
                         </span>
                       </div>
                       <p className="text-gray-700">{comment.content}</p>

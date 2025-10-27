@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
 import { useDatabase } from '../hooks/useDatabase';
 import { DatabaseService } from '../services/databaseService';
+import type { AudioTrack } from '../types';
 import { Button } from '../components/ui/Button';
 import { Panel, Card } from '../components/ui/glassmorphism';
 import { Avatar } from '../components/ui/Avatar';
@@ -14,6 +15,8 @@ import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
 import { AudioCard } from '../components/feed/AudioCard';
 import { useFeedStore } from '../stores/feedStore';
 import { Settings, Mic, Save, X } from 'lucide-react';
+import { CalendarElement } from '../components/ui/CalendarElement';
+import { Upload, Bookmark } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -26,7 +29,7 @@ export const ProfilePage: React.FC = () => {
   const [userAudio, setUserAudio] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'uploads' | 'liked' | 'bookmarked'>('uploads');
+  const [activeTab, setActiveTab] = useState<'uploads' | 'bookmarked'>('uploads');
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editBio, setEditBio] = useState('');
@@ -36,14 +39,32 @@ export const ProfilePage: React.FC = () => {
   const totalLikes = userAudio.reduce((sum, track) => sum + (track.likes || 0), 0);
   
   // Hole liked und bookmarked Tracks für den aktuellen User
-  const likedTracks = DatabaseService.getUserLikedTracks(profileUser?.id || '');
-  const bookmarkedTracks = DatabaseService.getUserBookmarkedTracks(profileUser?.id || '');
+  const [likedTracks, setLikedTracks] = useState<AudioTrack[]>([]);
+  const [bookmarkedTracks, setBookmarkedTracks] = useState<AudioTrack[]>([]);
+  
+  // Lade liked und bookmarked Tracks beim Mount oder wenn sich der User ändert
+  useEffect(() => {
+    const loadUserTracks = async () => {
+      if (profileUser?.id) {
+        try {
+          const [liked, bookmarked] = await Promise.all([
+            DatabaseService.getUserLikedTracks(profileUser.id),
+            DatabaseService.getUserBookmarkedTracks(profileUser.id)
+          ]);
+          setLikedTracks(liked);
+          setBookmarkedTracks(bookmarked);
+        } catch (error) {
+          console.error('Error loading user tracks:', error);
+        }
+      }
+    };
+    
+    loadUserTracks();
+  }, [profileUser?.id]);
   
   // Bestimme die anzuzeigenden Tracks basierend auf dem aktiven Tab
   const getDisplayTracks = () => {
     switch (activeTab) {
-      case 'liked':
-        return likedTracks;
       case 'bookmarked':
         return bookmarkedTracks;
       case 'uploads':
@@ -180,14 +201,14 @@ export const ProfilePage: React.FC = () => {
     <div className="min-h-screen bg-gradient-full">
       <div className="max-w-md mx-auto px-4 py-6 pb-24">
         {/* Header - Schwarze Karte ohne Schatten */}
-        <div className="bg-black rounded-2xl p-6 mb-6 relative">
+        <div className="rounded-2xl p-6 mb-6 relative" style={{ backgroundColor: '#0f0f0f' }}>
           {/* Settings Icon - ganz oben rechts in der Ecke, unabhängig vom Padding */}
           {isOwnProfile && !isEditing && (
             <button 
               onClick={handleEditProfile} 
               className="text-gray-400 hover:text-white absolute top-2 right-2 p-2 transition-colors duration-200"
             >
-              <Settings size={16} />
+              <Settings size={16} strokeWidth={2} />
             </button>
           )}
           
@@ -203,7 +224,7 @@ export const ProfilePage: React.FC = () => {
                     maxLength={15}
                     className="w-full px-4 py-4 bg-transparent border border-gray-500 rounded-lg
                              text-3xl md:text-4xl font-bold text-white placeholder-gray-400
-                             focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                             focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                              transition-all duration-200 text-center"
                     placeholder="Username (max 15 chars, no emojis)"
                   />
@@ -228,7 +249,7 @@ export const ProfilePage: React.FC = () => {
                   onChange={(e) => setEditBio(e.target.value)}
                   className="w-full px-4 py-4 bg-transparent border border-gray-500 rounded-lg
                            text-white placeholder-gray-400 resize-none
-                           focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                           focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                            transition-all duration-200"
                   placeholder="Enter description"
                   rows={4}
@@ -258,11 +279,11 @@ export const ProfilePage: React.FC = () => {
               </button>
               <button 
                 onClick={handleSaveProfile} 
-                className="px-6 py-3 rounded-full border-2 border-orange-500 bg-gradient-to-r from-orange-500/30 to-orange-600/20 flex items-center justify-center space-x-2 hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation shadow-lg"
+                className="px-6 py-3 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-2 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg"
                 style={{ minHeight: '48px' }}
               >
-                <Save size={16} className="text-orange-400" strokeWidth={2} />
-                <span className="text-orange-300 text-sm font-semibold">Save</span>
+                <Save size={16} className="text-[#ff4e3a]" strokeWidth={2} />
+                <span className="text-[#ff4e3a] text-sm font-semibold">Save</span>
               </button>
             </div>
           )}
@@ -296,7 +317,7 @@ export const ProfilePage: React.FC = () => {
         {/* Tab Navigation */}
         <div className="mb-6">
           <div className="tabs-container">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'uploads' | 'liked' | 'bookmarked')} className="w-full">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'uploads' | 'bookmarked')} className="w-full">
               <LiquidGlassEffect
                 intensity={0.0}
                 chromaticDispersion={0.015}
@@ -305,30 +326,24 @@ export const ProfilePage: React.FC = () => {
                 mouseTracking={false}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-3 bg-transparent border-0 rounded-full p-1 h-[53px] items-center justify-center">
+                <TabsList className="grid w-full grid-cols-2 bg-transparent border-0 rounded-full p-1 h-[53px] items-center justify-center">
                   <TabsTrigger
                     value="uploads"
-                    className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                    className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-[#ff4e3a] data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
                   >
-                    Uploads
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="liked"
-                    className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
-                  >
-                    Liked
+                    <Upload size={14} className="mr-1.5" />
+                    Uploads ({userAudio.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="bookmarked"
-                    className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                    className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-[#ff4e3a] data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
                   >
-                    Bookmarked
+                    <Bookmark size={14} className="mr-1.5" />
+                    Bookmarked ({bookmarkedTracks.length})
                   </TabsTrigger>
                 </TabsList>
               </LiquidGlassEffect>
               <TabsContent value="uploads" className="mt-4">
-              </TabsContent>
-              <TabsContent value="liked" className="mt-4">
               </TabsContent>
               <TabsContent value="bookmarked" className="mt-4">
               </TabsContent>
@@ -369,12 +384,12 @@ export const ProfilePage: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {displayTracks.map((audio, index) => (
-                <AudioCard 
-                  key={audio.id} 
-                  track={audio} 
-                  index={index}
-                  showDeleteButton={isOwnProfile && audio.user?.id === profileUser?.id}
-                  onDelete={(trackId) => {
+                  <AudioCard 
+                    key={audio.id} 
+                    track={audio} 
+                    index={index}
+                    showDeleteButton={isOwnProfile && audio.user?.id === profileUser?.id}
+                    onDelete={(trackId) => {
                     // Delete from database
                     const success = DatabaseService.deleteTrack(trackId);
                     if (success) {
@@ -397,7 +412,7 @@ export const ProfilePage: React.FC = () => {
             <Heading level={3} className="mb-3">Interessen</Heading>
             <div className="flex flex-wrap gap-2">
               {profileUser.tags.map((tag: string, index: number) => (
-                <Badge key={index} variant="secondary">
+                <Badge key={index} variant="secondary" showHashtag={true}>
                   {tag}
                 </Badge>
               ))}

@@ -79,7 +79,7 @@ export default function ExportDialog({
                 key={option.value}
                 className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                   selectedFormat === option.value
-                    ? 'border-orange-500 bg-orange-500/10'
+                    ? 'border-[#ff4e3a] bg-[#ff4e3a]/10'
                     : 'border-gray-600 hover:border-gray-500'
                 }`}
               >
@@ -112,7 +112,7 @@ export default function ExportDialog({
                   key={option.value}
                   className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                     quality === option.value
-                      ? 'border-orange-500 bg-orange-500/10'
+                      ? 'border-[#ff4e3a] bg-[#ff4e3a]/10'
                       : 'border-gray-600 hover:border-gray-500'
                   }`}
                 >
@@ -158,7 +158,7 @@ export default function ExportDialog({
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="flex-1 py-3 px-4 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 px-4 rounded-lg bg-[#ff4e3a] text-white hover:bg-[#ff4e3a] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isExporting ? (
               <motion.div
@@ -167,7 +167,7 @@ export default function ExportDialog({
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               />
             ) : (
-              <Download size={16} />
+              <Download size={16} strokeWidth={2} />
             )}
             {isExporting ? 'Exporting...' : 'Export'}
           </button>

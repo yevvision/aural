@@ -1,16 +1,7 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// TypeScript declaration for UnicornStudio
-declare global {
-  interface Window {
-    UnicornStudio?: {
-      isInitialized: boolean;
-      init: () => Promise<any>;
-    };
-    unicornScenes?: any;
-  }
-}
+// UnicornStudio types are now defined globally in vite-env.d.ts
 
 interface UnicornBackgroundProps {
   children: React.ReactNode;

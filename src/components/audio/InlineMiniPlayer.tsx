@@ -4,6 +4,7 @@ import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useDatabase } from '../../hooks/useDatabase';
 import { useUserStore } from '../../stores/userStore';
 import type { AudioTrack } from '../../types';
+import { DynamicPlayIcon } from '../ui/DynamicPlayIcon';
 import { useEffect, useState, useRef } from 'react';
 
 interface InlineMiniPlayerProps {
@@ -13,7 +14,7 @@ interface InlineMiniPlayerProps {
 export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
   const navigate = useNavigate();
   const { currentUser } = useUserStore();
-  const { isPlaying, currentTime, duration, toggle, seek } = useAudioPlayer();
+  const { isPlaying, currentTime, duration, isLoading, toggle, seek } = useAudioPlayer();
   const { tracks, toggleLike, toggleBookmark } = useDatabase(currentUser?.id); // Verwende zentrale Datenbank
   
   // Find the current track in the database to get the latest like state
@@ -150,9 +151,21 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
         >
           {/* Progress fill - orange color that accumulates from left to right */}
           <div 
-            className="h-full bg-orange-500 rounded-full transition-all duration-100"
+            className="h-full bg-[#ff4e3a] rounded-full transition-all duration-100"
             style={{ width: `${Math.max(0, progressWidth)}%` }}
           />
+          
+          {/* Loading animation overlay - subtle shimmer effect */}
+          {isLoading && (
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="h-full w-full bg-gradient-to-r from-transparent via-[#ff4e3a]/20 to-transparent animate-pulse"></div>
+              <div className="absolute inset-0 h-full w-12 bg-gradient-to-r from-transparent via-[#ff4e3a]/40 to-transparent" 
+                   style={{ 
+                     animation: 'shimmer 1.5s ease-in-out infinite',
+                     animationDelay: '0.2s'
+                   }}></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -166,7 +179,12 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
           className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+          <DynamicPlayIcon
+            isCurrentTrack={true}
+            isPlaying={isPlaying}
+            isFinished={false}
+            className="w-5 h-5 text-white"
+          />
         </button>
         
         {/* Time display in the center */}
@@ -185,11 +203,12 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
                 ? 'border border-red-500 bg-red-500/20' 
                 : 'border border-white hover:border-red-400'
             }`}
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             aria-label={updatedTrack.isLiked ? 'Unlike' : 'Like'}
             title={updatedTrack.isLiked ? 'Unlike' : 'Like'}
           >
             <Heart 
-              size={14} 
+              size={14} strokeWidth={2} 
               className={`transition-all duration-200 ${
                 updatedTrack.isLiked 
                   ? "fill-red-500 text-red-500" 
@@ -205,11 +224,12 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
                 ? 'border border-yellow-500 bg-yellow-500/20' 
                 : 'border border-white hover:border-yellow-400'
             }`}
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             aria-label={updatedTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
             title={updatedTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
           >
             <Bookmark 
-              size={14} 
+              size={14} strokeWidth={2} 
               className={`transition-all duration-200 ${
                 updatedTrack.isBookmarked 
                   ? "fill-yellow-500 text-yellow-500" 
@@ -225,6 +245,7 @@ export const InlineMiniPlayer = ({ track }: InlineMiniPlayerProps) => {
               navigate(`/player/${updatedTrack.id}`);
             }}
             className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             aria-label="Expand player"
           >
             <svg 

@@ -552,10 +552,29 @@ export const useFeedStore = create<FeedStore>()(
       onRehydrateStorage: () => {
         return (state, error) => {
           if (!error && state) {
-            // Load tracks from centralDB after rehydration
-            setTimeout(() => {
-              const dbTracks = centralDB.getAllTracks();
-              state.setTracks(dbTracks);
+            // Load tracks from server first, fallback to centralDB
+            setTimeout(async () => {
+              try {
+                // Versuche Server-Daten zu laden
+                const { serverDatabaseService } = await import('../services/serverDatabaseService');
+                const serverTracks = await serverDatabaseService.getAllTracks();
+                
+                if (serverTracks && serverTracks.length > 0) {
+                  console.log('🌐 FeedStore: Loaded tracks from server:', serverTracks.length);
+                  state.setTracks(serverTracks);
+                } else {
+                  // Fallback zu lokaler Datenbank
+                  const dbTracks = centralDB.getAllTracks();
+                  console.log('📱 FeedStore: Fallback to local database:', dbTracks.length);
+                  state.setTracks(dbTracks);
+                }
+              } catch (error) {
+                console.error('❌ FeedStore: Server load failed, using local database:', error);
+                // Fallback zu lokaler Datenbank
+                const dbTracks = centralDB.getAllTracks();
+                state.setTracks(dbTracks);
+              }
+              
               state.syncWithUserStore();
             }, 0);
           }

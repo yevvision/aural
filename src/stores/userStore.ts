@@ -189,33 +189,69 @@ export const useUserStore = create<UserStore>()(
         set({ currentUser: sanitizedUser });
       },
       
-      addMyTrack: (track) => {
+      addMyTrack: async (track) => {
         const sanitizedTrack = sanitizeAudioTrack({
           ...track,
           createdAt: new Date() // Ensure fresh Date object
         });
         
-        set((state) => {
-          const updatedUser = state.currentUser ? {
-            ...state.currentUser,
-            totalUploads: state.currentUser.totalUploads + 1
-          } : null;
-          
-          return {
-            myTracks: [sanitizedTrack, ...state.myTracks],
+        const state = get();
+        const updatedUser = state.currentUser ? {
+          ...state.currentUser,
+          totalUploads: state.currentUser.totalUploads + 1
+        } : null;
+        
+        const updatedTracks = [sanitizedTrack, ...state.myTracks];
+        
+        // Update on server first
+        if (state.currentUser) {
+          try {
+            console.log('🌐 UserStore: Adding track to server...');
+            const { serverDatabaseService } = await import('../services/serverDatabaseService');
+            const serverData = await serverDatabaseService.updateUserData(
+              state.currentUser.id,
+              updatedUser,
+              updatedTracks,
+              state.followedUsers
+            );
+            
+            if (serverData) {
+              console.log('✅ UserStore: Track added to server');
+              set({
+                myTracks: serverData.myTracks,
+                currentUser: serverData.user
+              });
+            } else {
+              console.error('❌ UserStore: Failed to add track to server');
+              // Fallback to local update
+              set({
+                myTracks: updatedTracks,
+                currentUser: updatedUser
+              });
+            }
+          } catch (error) {
+            console.error('❌ UserStore: Server update failed, updating locally:', error);
+            // Fallback to local update
+            set({
+              myTracks: updatedTracks,
+              currentUser: updatedUser
+            });
+          }
+        } else {
+          // No current user, just update locally
+          set({
+            myTracks: updatedTracks,
             currentUser: updatedUser
-          };
-        });
+          });
+        }
         
         // Track upload activity
         const sanitizedUser = sanitizeUser(track.user);
         useActivityStore.getState().addUserActivityAsNotification({
           type: 'my_upload',
-          userId: sanitizedUser.id,
           trackId: sanitizedTrack.id,
           trackTitle: sanitizedTrack.title
         });
-
       },
       
       updateMyTrack: (trackId, updates) => {
@@ -226,31 +262,59 @@ export const useUserStore = create<UserStore>()(
         }));
       },
       
-      updateProfile: (updates) => {
-        set((state) => {
-          // Update the current user
-          const updatedUser = state.currentUser ? { ...state.currentUser, ...updates } : null;
+      updateProfile: async (updates) => {
+        const state = get();
+        if (!state.currentUser) return;
+        
+        // Update the current user
+        const updatedUser = { ...state.currentUser, ...updates };
+        
+        // If the username was updated, also update all tracks by this user
+        let updatedTracks = state.myTracks;
+        if (updates.username !== undefined) {
+          updatedTracks = state.myTracks.map(track => ({
+            ...track,
+            user: {
+              ...track.user,
+              username: updates.username || track.user.username
+            }
+          }));
+        }
+        
+        // Update on server first
+        try {
+          console.log('🌐 UserStore: Updating profile on server...');
+          const { serverDatabaseService } = await import('../services/serverDatabaseService');
+          const serverData = await serverDatabaseService.updateUserData(
+            state.currentUser.id,
+            updatedUser,
+            updatedTracks,
+            state.followedUsers
+          );
           
-          // If the username was updated, also update all tracks by this user
-          if (updates.username !== undefined && state.currentUser) {
-            const updatedTracks = state.myTracks.map(track => ({
-              ...track,
-              user: {
-                ...track.user,
-                username: updates.username || track.user.username
-              }
-            }));
-            
-            return {
+          if (serverData) {
+            console.log('✅ UserStore: Profile updated on server');
+            set({
+              currentUser: serverData.user,
+              myTracks: serverData.myTracks,
+              followedUsers: serverData.followedUsers
+            });
+          } else {
+            console.error('❌ UserStore: Failed to update profile on server');
+            // Fallback to local update
+            set({
               currentUser: updatedUser,
               myTracks: updatedTracks
-            };
+            });
           }
-          
-          return {
-            currentUser: updatedUser
-          };
-        });
+        } catch (error) {
+          console.error('❌ UserStore: Server update failed, updating locally:', error);
+          // Fallback to local update
+          set({
+            currentUser: updatedUser,
+            myTracks: updatedTracks
+          });
+        }
       },
       
       deleteMyTrack: (trackId) => {
@@ -469,7 +533,33 @@ export const useUserStore = create<UserStore>()(
         followedUsers: state.followedUsers,
         activities: state.activities,
         preferences: state.preferences
-      })
+      }),
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          if (!error && state && state.currentUser) {
+            // Load user data from server first, fallback to localStorage
+            setTimeout(async () => {
+              try {
+                console.log('🌐 UserStore: Loading user data from server...');
+                const { serverDatabaseService } = await import('../services/serverDatabaseService');
+                const serverUserData = await serverDatabaseService.getUserData(state.currentUser.id);
+                
+                if (serverUserData) {
+                  console.log('🌐 UserStore: Loaded user data from server:', serverUserData);
+                  state.currentUser = serverUserData.user;
+                  state.myTracks = serverUserData.myTracks || [];
+                  state.followedUsers = serverUserData.followedUsers || [];
+                  console.log('✅ UserStore: Server data loaded and synced');
+                } else {
+                  console.log('📱 UserStore: No server data found, using localStorage data');
+                }
+              } catch (error) {
+                console.error('❌ UserStore: Server load failed, using localStorage data:', error);
+              }
+            }, 0);
+          }
+        };
+      }
     }
   )
 );

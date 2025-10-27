@@ -57,9 +57,9 @@ export const PendingUploadModal = ({
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6"
+        className="w-16 h-16 bg-[#ff4e3a]/20 rounded-full flex items-center justify-center mx-auto mb-6"
       >
-        <Clock className="w-8 h-8 text-orange-500" />
+        <Clock className="w-8 h-8 text-[#ff4e3a]" />
       </motion.div>
       
       <h2 className="text-2xl font-bold text-white mb-4">
@@ -81,9 +81,9 @@ export const PendingUploadModal = ({
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6"
+        className="w-16 h-16 bg-[#ff4e3a]/20 rounded-full flex items-center justify-center mx-auto mb-6"
       >
-        <CheckCircle className="w-8 h-8 text-orange-500" />
+        <CheckCircle className="w-8 h-8 text-[#ff4e3a]" />
       </motion.div>
       
       <h2 className="text-2xl font-bold text-white mb-4">
@@ -105,17 +105,17 @@ export const PendingUploadModal = ({
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6"
+        className="w-16 h-16 bg-[#ff4e3a]/20 rounded-full flex items-center justify-center mx-auto mb-6"
       >
         {isChecking ? (
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           >
-            <Clock className="w-8 h-8 text-orange-500" />
+            <Clock className="w-8 h-8 text-[#ff4e3a]" />
           </motion.div>
         ) : (
-          <CheckCircle className="w-8 h-8 text-orange-500" />
+          <CheckCircle className="w-8 h-8 text-[#ff4e3a]" />
         )}
       </motion.div>
       
@@ -139,7 +139,7 @@ export const PendingUploadModal = ({
             className="flex items-center space-x-3"
           >
             <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-              step.completed ? 'bg-orange-500' : 'bg-gray-600'
+              step.completed ? 'bg-[#ff4e3a]' : 'bg-gray-600'
             }`}>
               {step.completed ? (
                 <CheckCircle className="w-4 h-4 text-white" />
@@ -162,7 +162,7 @@ export const PendingUploadModal = ({
       
       <button
         onClick={() => window.open('/privacy', '_blank')}
-        className="text-orange-500 hover:text-orange-400 text-xs underline"
+        className="text-[#ff4e3a] hover:text-[#ff4e3a] text-xs underline"
       >
         Warum? (Transparenz)
       </button>
@@ -198,7 +198,7 @@ export const PendingUploadModal = ({
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
           >
-            <X size={20} />
+            <X size={20} strokeWidth={2} />
           </button>
 
           {/* Content */}
@@ -208,7 +208,7 @@ export const PendingUploadModal = ({
           <div className="mt-8 flex flex-col space-y-3">
             <button
               onClick={onClose}
-              className="w-full py-3 px-6 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-500 font-medium hover:bg-orange-500/30 transition-all duration-200"
+              className="w-full py-3 px-6 bg-[#ff4e3a]/20 border border-[#ff4e3a] rounded-lg text-[#ff4e3a] font-medium hover:bg-[#ff4e3a]/30 transition-all duration-200"
             >
               Verstanden
             </button>

@@ -42,12 +42,12 @@ export default function MobileZoomControls({
           onReset();
         }}
         disabled={disabled}
-        className="w-14 h-12 sm:w-12 sm:h-10 rounded-full border-2 border-orange-400 bg-gradient-to-br from-orange-500/30 to-orange-600/20 flex items-center justify-center hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+        className="w-14 h-12 sm:w-12 sm:h-10 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-br from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         style={{ minHeight: '48px', minWidth: '56px' }}
         whileHover={!disabled ? { scale: 1.1 } : {}}
         whileTap={!disabled ? { scale: 0.9 } : {}}
       >
-        <RotateCcw size={18} className="text-orange-300" strokeWidth={2} />
+        <RotateCcw size={18} className="text-[#ff4e3a]" strokeWidth={2} />
       </motion.button>
 
       <motion.button

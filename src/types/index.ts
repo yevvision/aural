@@ -63,6 +63,7 @@ export interface PlaybackState {
   volume: number;
   isExpanded: boolean;
   isLoading: boolean;
+  isFinished: boolean;
   // German spec: Additional playback features
   playlist?: AudioTrack[];
   currentIndex?: number;
@@ -191,7 +192,6 @@ export const PREDEFINED_TAGS = [
   'Female',
   'Male',
   'Toy',
-  'Couples',
   'ASMR',
   'Story',
   'Erotic',
@@ -209,6 +209,8 @@ export type PredefinedTag = typeof PREDEFINED_TAGS[number];
 export interface PlayerVisibilityContext {
   visibleAudioCardIds: Set<string>;
   setVisibleAudioCardIds: (update: (prev: Set<string>) => Set<string>) => void;
+  expandedAudioCardId: string | null;
+  setExpandedAudioCardId: (trackId: string | null) => void;
 }
 
 // German spec: Player queue management
@@ -322,15 +324,30 @@ export interface Notification {
 // NEU: Pending Upload Queue
 export interface PendingUpload {
   id: string;
+  uploadId: string; // Alias für id für Kompatibilität
   tempTrackId?: string; // Falls UI-Vorschau benötigt wird
   userId?: string; // Auch anonym möglich
+  username?: string; // Username für Anzeige
   deviceId: string; // Aus First-Party-Token
   fileHash: string; // Zur 5×-Duplikat-Regel
-  reason: 'rate' | 'duplicate5';
+  reason: 'rate' | 'duplicate5' | string; // Erweitert für verschiedene Gründe
   createdAt: Date;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'pending_review';
   decidedAt?: Date;
   decidedBy?: string;
+  // Zusätzliche Felder für Server-Integration
+  filename?: string;
+  originalName?: string;
+  title?: string;
+  description?: string;
+  duplicateCount?: number;
+  duration?: number;
+  size?: number;
+  mimeType?: string;
+  url?: string;
+  tags?: string[];
+  gender?: string;
+  source?: 'server' | 'localStorage'; // Für Debugging und Deduplizierung
 }
 
 // NEU: Follow System
@@ -358,4 +375,16 @@ export interface Play {
   trackId: string;
   count: number;
   lastPlayedAt: Date;
+}
+
+// UnicornStudio Type Definitions
+declare global {
+  interface Window {
+    UnicornStudio: {
+      create: (config: any) => any;
+      destroy: (instance: any) => void;
+      [key: string]: any;
+    };
+    unicornScenes: any;
+  }
 }

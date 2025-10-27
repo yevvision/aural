@@ -1,17 +1,56 @@
 import { centralDB } from '../database/centralDatabase_simple';
 import type { AudioTrack, ContentReport } from '../types';
 
-// Database Service - Wrapper für die zentrale Datenbank
-// Alle Komponenten verwenden DIESEN Service
+// Database Service - Server-first für Kern-Funktionalität
+// Nur Tracks und Pending Uploads sind server-first, Rest bleibt lokal
 class DatabaseServiceClass {
   private listeners: Set<() => void> = new Set();
+  private serverDataLoaded = false;
 
   // =============================================================================
-  // TRACKS - CRUD Operationen
+  // SERVER-FIRST DATA LOADING (nur für Tracks)
   // =============================================================================
 
-  // GET: Alle Tracks abrufen (mit User-spezifischen Daten)
+  // Load tracks from server and sync to local database
+  private async loadTracksFromServer(): Promise<void> {
+    try {
+      console.log('🌐 DatabaseService: Loading tracks from server...');
+      
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const serverTracks = await serverDatabaseService.getAllTracks();
+      
+      if (serverTracks && serverTracks.length > 0) {
+        console.log('🌐 DatabaseService: Server tracks loaded:', serverTracks.length);
+        
+        // Sync local database with server tracks
+        // Clear existing tracks and add server tracks
+        const currentData = centralDB.getDatabase();
+        currentData.tracks = serverTracks;
+        centralDB.saveDatabase(currentData);
+        
+        this.serverDataLoaded = true;
+        console.log('✅ DatabaseService: Server tracks loaded and synced to local database');
+      } else {
+        console.log('🔍 DatabaseService: No tracks found on server');
+        this.serverDataLoaded = true;
+      }
+      
+    } catch (error) {
+      console.error('❌ DatabaseService: Server load failed, using local database:', error);
+      this.serverDataLoaded = true; // Mark as loaded to avoid infinite retries
+    }
+  }
+
+  // =============================================================================
+  // TRACKS - CRUD Operationen (SERVER-FIRST)
+  // =============================================================================
+
+  // GET: Alle Tracks abrufen (server-first)
   getTracks(currentUserId?: string): AudioTrack[] {
+    // Load from server first if not already loaded
+    if (!this.serverDataLoaded) {
+      this.loadTracksFromServer();
+    }
     return centralDB.getAllTracks(currentUserId);
   }
 
@@ -19,6 +58,142 @@ class DatabaseServiceClass {
   getTrack(id: string): AudioTrack | undefined {
     return centralDB.getTrackById(id);
   }
+
+  // ADD: Neuen Track hinzufügen (server-first)
+  async addTrack(track: AudioTrack): Promise<boolean> {
+    try {
+      console.log('🌐 DatabaseService: Adding track to server:', track.id);
+      
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const serverSuccess = await serverDatabaseService.addTrack(track);
+      
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Track added to server successfully');
+        // Add to local database for immediate display
+        const localSuccess = centralDB.addTrack(track);
+        if (localSuccess) {
+          this.notifyListeners();
+        }
+        return true;
+      } else {
+        console.error('❌ DatabaseService: Failed to add track to server');
+        // Fallback to local
+        const localSuccess = centralDB.addTrack(track);
+        if (localSuccess) {
+          this.notifyListeners();
+        }
+        return localSuccess;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server error, adding locally:', error);
+      // Fallback to local
+      const localSuccess = centralDB.addTrack(track);
+      if (localSuccess) {
+        this.notifyListeners();
+      }
+      return localSuccess;
+    }
+  }
+
+  // DELETE: Track löschen (server-first)
+  async deleteTrack(trackId: string): Promise<boolean> {
+    try {
+      console.log('🌐 DatabaseService: Deleting track from server:', trackId);
+      
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const serverSuccess = await serverDatabaseService.deleteTrack(trackId);
+      
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Track deleted from server successfully');
+        // Remove from local database
+        const localSuccess = centralDB.deleteTrack(trackId);
+        if (localSuccess) {
+          this.notifyListeners();
+        }
+        return true;
+      } else {
+        console.error('❌ DatabaseService: Failed to delete track from server');
+        // Fallback to local
+        const localSuccess = centralDB.deleteTrack(trackId);
+        if (localSuccess) {
+          this.notifyListeners();
+        }
+        return localSuccess;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server error, deleting locally:', error);
+      // Fallback to local
+      const localSuccess = centralDB.deleteTrack(trackId);
+      if (localSuccess) {
+        this.notifyListeners();
+      }
+      return localSuccess;
+    }
+  }
+
+  // UPDATE: Track aktualisieren
+  updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
+    const success = centralDB.updateTrack(trackId, updates);
+    if (success) {
+      this.notifyListeners();
+    }
+    return success;
+  }
+
+  // =============================================================================
+  // PENDING UPLOADS (SERVER-FIRST)
+  // =============================================================================
+
+  // GET: Pending Uploads (server-first)
+  async getPendingUploads(): Promise<any[]> {
+    try {
+      console.log('🌐 DatabaseService: Getting pending uploads from server');
+      
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const serverPendingUploads = await serverDatabaseService.getPendingUploads();
+      
+      if (serverPendingUploads) {
+        console.log('✅ DatabaseService: Pending uploads retrieved from server successfully');
+        return serverPendingUploads;
+      } else {
+        console.error('❌ DatabaseService: Failed to get pending uploads from server');
+        // Fallback to local
+        return centralDB.getPendingUploads();
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server error, getting local pending uploads:', error);
+      // Fallback to local
+      return centralDB.getPendingUploads();
+    }
+  }
+
+  // APPROVE: Upload genehmigen (server-first)
+  async approveUpload(uploadId: string): Promise<AudioTrack | null> {
+    try {
+      console.log('🌐 DatabaseService: Approving upload on server:', uploadId);
+      
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const approvedTrack = await serverDatabaseService.approveUpload(uploadId);
+      
+      if (approvedTrack) {
+        console.log('✅ DatabaseService: Upload approved on server successfully');
+        // Add to local database
+        centralDB.addTrack(approvedTrack);
+        this.notifyListeners();
+        return approvedTrack;
+      } else {
+        console.error('❌ DatabaseService: Failed to approve upload on server');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server error, approving locally:', error);
+      return null;
+    }
+  }
+
+  // =============================================================================
+  // ALLE ANDEREN METHODEN - LOKAL (wie vorher)
+  // =============================================================================
 
   // GET: Alle Benutzer abrufen
   getUsers(): any[] {
@@ -30,162 +205,302 @@ class DatabaseServiceClass {
     return centralDB.getUserById(id);
   }
 
+  // ADD: User hinzufügen
+  addUser(user: any): boolean {
+    const success = centralDB.addUser(user);
+    if (success) {
+      this.notifyListeners();
+    }
+    return success;
+  }
+
   // UPDATE: User aktualisieren
   updateUser(userId: string, updates: any): boolean {
     const success = centralDB.updateUser(userId, updates);
-    
     if (success) {
-      // Notifiziere alle Listener über Änderung
       this.notifyListeners();
     }
-    
-    return success;
-  }
-
-  // ADD: Neuen Track hinzufügen
-  addTrack(track: AudioTrack): boolean {
-    const success = centralDB.addTrack(track);
-    
-    if (success) {
-      // Notifiziere alle Listener über Änderung
-      this.notifyListeners();
-    }
-    
-    return success;
-  }
-
-  // DELETE: Track löschen
-  deleteTrack(trackId: string): boolean {
-    const success = centralDB.deleteTrack(trackId);
-    
-    if (success) {
-      // Notifiziere alle Listener über Änderung
-      this.notifyListeners();
-    }
-    
-    return success;
-  }
-
-  // UPDATE: Track aktualisieren
-  updateTrack(trackId: string, updates: Partial<AudioTrack>): boolean {
-    const success = centralDB.updateTrack(trackId, updates);
-    
-    if (success) {
-      // Notifiziere alle Listener über Änderung
-      this.notifyListeners();
-    }
-    
     return success;
   }
 
   // ADD: Kommentar zu Track hinzufügen
-  addCommentToTrack(trackId: string, comment: any): boolean {
-    const success = centralDB.addCommentToTrack(trackId, comment);
-    
-    if (success) {
-      // Notifiziere alle Listener über Änderung
-      this.notifyListeners();
+  async addCommentToTrack(trackId: string, comment: any): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const success = await serverDatabaseService.addComment(comment);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
+    } catch (error) {
+      console.error('❌ DatabaseService: Server addCommentToTrack failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.addCommentToTrack(trackId, comment);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
   // DELETE: Kommentar von Track löschen
-  deleteCommentFromTrack(trackId: string, commentId: string): boolean {
-    const success = centralDB.deleteCommentFromTrack(trackId, commentId);
-    
-    if (success) {
-      // Notifiziere alle Listener über Änderung
-      this.notifyListeners();
+  async deleteCommentFromTrack(trackId: string, commentId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const success = await serverDatabaseService.deleteComment(commentId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
+    } catch (error) {
+      console.error('❌ DatabaseService: Server deleteCommentFromTrack failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.deleteCommentFromTrack(trackId, commentId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
-  // =============================================================================
-  // LIKES & BOOKMARKS
-  // =============================================================================
-
   // LIKE: Track liken/unliken
-  toggleLike(trackId: string, userId: string): boolean {
-    const success = centralDB.toggleLike(trackId, userId);
-    
-    if (success) {
-      this.notifyListeners();
+  async toggleLike(trackId: string, userId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      
+      // Check if like already exists
+      const existingLike = await serverDatabaseService.getLikeByUserAndTrack(userId, trackId);
+      
+      if (existingLike) {
+        // Remove like
+        const success = await serverDatabaseService.removeLike(existingLike.id);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      } else {
+        // Add like
+        const like = {
+          id: `like_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          trackId,
+          userId,
+          createdAt: new Date().toISOString()
+        };
+        const success = await serverDatabaseService.addLike(like);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server toggleLike failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.toggleLike(trackId, userId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
   // BOOKMARK: Track bookmarken/unbookmarken
-  toggleBookmark(trackId: string, userId: string): boolean {
-    const success = centralDB.toggleBookmark(trackId, userId);
-    
-    if (success) {
-      this.notifyListeners();
+  async toggleBookmark(trackId: string, userId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      
+      // Check if bookmark already exists
+      const existingBookmark = await serverDatabaseService.getBookmarkByUserAndTrack(userId, trackId);
+      
+      if (existingBookmark) {
+        // Remove bookmark
+        const success = await serverDatabaseService.removeBookmark(existingBookmark.id);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      } else {
+        // Add bookmark
+        const bookmark = {
+          id: `bookmark_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          trackId,
+          userId,
+          createdAt: new Date().toISOString()
+        };
+        const success = await serverDatabaseService.addBookmark(bookmark);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server toggleBookmark failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.toggleBookmark(trackId, userId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
   // PLAY: Play-Anzahl erhöhen
-  incrementPlay(trackId: string): boolean {
-    const success = centralDB.incrementPlay(trackId);
-    
-    if (success) {
-      this.notifyListeners();
+  async incrementPlay(trackId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      const success = await serverDatabaseService.incrementPlay(trackId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
+    } catch (error) {
+      console.error('❌ DatabaseService: Server incrementPlay failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.incrementPlay(trackId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
   // GET: User's liked tracks
-  getUserLikedTracks(userId: string): AudioTrack[] {
-    return centralDB.getUserLikedTracks(userId);
+  async getUserLikedTracks(userId: string): Promise<AudioTrack[]> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      return await serverDatabaseService.getUserLikedTracks(userId);
+    } catch (error) {
+      console.error('❌ DatabaseService: Server getUserLikedTracks failed, using local fallback:', error);
+      // Fallback to local
+      return centralDB.getUserLikedTracks(userId);
+    }
   }
 
   // GET: User's bookmarked tracks
-  getUserBookmarkedTracks(userId: string): AudioTrack[] {
-    return centralDB.getUserBookmarkedTracks(userId);
+  async getUserBookmarkedTracks(userId: string): Promise<AudioTrack[]> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      return await serverDatabaseService.getUserBookmarkedTracks(userId);
+    } catch (error) {
+      console.error('❌ DatabaseService: Server getUserBookmarkedTracks failed, using local fallback:', error);
+      // Fallback to local
+      return centralDB.getUserBookmarkedTracks(userId);
+    }
   }
 
-  // =============================================================================
-  // COMMENT LIKES
-  // =============================================================================
-
   // LIKE: Comment liken/unliken
-  toggleCommentLike(commentId: string, userId: string): boolean {
-    const success = centralDB.toggleCommentLike(commentId, userId);
-    
-    if (success) {
-      this.notifyListeners();
+  async toggleCommentLike(commentId: string, userId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      
+      // Check if comment like already exists
+      const existingLike = await serverDatabaseService.getCommentLikeByUserAndComment(userId, commentId);
+      
+      if (existingLike) {
+        // Remove comment like
+        const success = await serverDatabaseService.removeCommentLike(existingLike.id);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      } else {
+        // Add comment like
+        const commentLike = {
+          id: `commentLike_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          commentId,
+          userId,
+          createdAt: new Date().toISOString()
+        };
+        const success = await serverDatabaseService.addCommentLike(commentLike);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server toggleCommentLike failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.toggleCommentLike(commentId, userId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
     }
-    
-    return success;
   }
 
   // GET: Comment like status for user
-  isCommentLikedByUser(commentId: string, userId: string): boolean {
-    return centralDB.isCommentLikedByUser(commentId, userId);
+  async isCommentLikedByUser(commentId: string, userId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      return await serverDatabaseService.isCommentLikedByUser(commentId, userId);
+    } catch (error) {
+      console.error('❌ DatabaseService: Server isCommentLikedByUser failed, using local fallback:', error);
+      // Fallback to local
+      return centralDB.isCommentLikedByUser(commentId, userId);
+    }
   }
 
   // GET: Comment like count
-  getCommentLikeCount(commentId: string): number {
-    return centralDB.getCommentLikeCount(commentId);
+  async getCommentLikeCount(commentId: string): Promise<number> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      return await serverDatabaseService.getCommentLikeCount(commentId);
+    } catch (error) {
+      console.error('❌ DatabaseService: Server getCommentLikeCount failed, using local fallback:', error);
+      // Fallback to local
+      return centralDB.getCommentLikeCount(commentId);
+    }
   }
-
-  // =============================================================================
-  // FOLLOW OPERATIONS
-  // =============================================================================
 
   // FOLLOW: User folgen/entfolgen
-  toggleFollow(followerId: string, targetUserId: string): boolean {
-    return centralDB.toggleFollow(followerId, targetUserId);
+  async toggleFollow(followerId: string, targetUserId: string): Promise<boolean> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      
+      // Check if follow already exists
+      const existingFollow = await serverDatabaseService.getFollowByUsers(followerId, targetUserId);
+      
+      if (existingFollow) {
+        // Remove follow
+        const success = await serverDatabaseService.removeFollow(existingFollow.id);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      } else {
+        // Add follow
+        const follow = {
+          id: `follow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          followerId,
+          followingId: targetUserId,
+          createdAt: new Date().toISOString()
+        };
+        const success = await serverDatabaseService.addFollow(follow);
+        if (success) {
+          this.notifyListeners();
+        }
+        return success;
+      }
+    } catch (error) {
+      console.error('❌ DatabaseService: Server toggleFollow failed, using local fallback:', error);
+      // Fallback to local
+      const success = centralDB.toggleFollow(followerId, targetUserId);
+      if (success) {
+        this.notifyListeners();
+      }
+      return success;
+    }
   }
-
-  // =============================================================================
-  // ACTIVITY & NOTIFICATIONS
-  // =============================================================================
 
   // ADD: User Activity hinzufügen
   addUserActivity(activity: any): boolean {
@@ -248,10 +563,6 @@ class DatabaseServiceClass {
     centralDB.testPersistence();
   }
 
-  // =============================================================================
-  // REPORT-FUNKTIONEN
-  // =============================================================================
-
   // GET: Alle Reports abrufen
   getReports(): ContentReport[] {
     return centralDB.getAllReports();
@@ -260,61 +571,45 @@ class DatabaseServiceClass {
   // ADD: Neuen Report hinzufügen
   addReport(report: ContentReport): boolean {
     const success = centralDB.addReport(report);
-    
     if (success) {
       this.notifyListeners();
     }
-    
     return success;
   }
 
   // UPDATE: Report-Status aktualisieren
   updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved', reviewedBy?: string): boolean {
     const success = centralDB.updateReportStatus(reportId, status, reviewedBy);
-    
     if (success) {
       this.notifyListeners();
     }
-    
     return success;
   }
 
   // DELETE: Report löschen
   deleteReport(reportId: string): boolean {
     const success = centralDB.deleteReport(reportId);
-    
     if (success) {
       this.notifyListeners();
     }
-    
     return success;
   }
-
-  // =============================================================================
-  // ADMIN-FUNKTIONEN
-  // =============================================================================
 
   // Alle Benutzerinhalte löschen
   deleteAllUserContent(): boolean {
     const success = (centralDB as any).deleteAllUserContent();
-    
     if (success) {
-      // Notifiziere alle Listener über Änderung
       this.notifyListeners();
     }
-    
     return success;
   }
 
   // Spezifischen Track löschen (für problematische Tracks)
   forceDeleteTrack(trackTitle: string, username: string): boolean {
     const success = (centralDB as any).forceDeleteTrack(trackTitle, username);
-    
     if (success) {
-      // Notifiziere alle Listener über Änderung
       this.notifyListeners();
     }
-    
     return success;
   }
 
@@ -323,24 +618,32 @@ class DatabaseServiceClass {
     return centralDB.getStats();
   }
 
-  // GET: Alle Kommentare abrufen (aus Tracks extrahiert)
-  getComments(): any[] {
-    const allComments: any[] = [];
-    
-    const tracks = centralDB.getAllTracks();
-    tracks.forEach(track => {
-      if (track.comments && track.comments.length > 0) {
-        track.comments.forEach(comment => {
-          allComments.push({
-            ...comment,
-            trackId: track.id,
-            trackTitle: track.title
+  // GET: Alle Kommentare abrufen (server-first)
+  async getComments(): Promise<any[]> {
+    try {
+      // Server-first approach
+      const { serverDatabaseService } = await import('./serverDatabaseService');
+      return await serverDatabaseService.getAllComments();
+    } catch (error) {
+      console.error('❌ DatabaseService: Server getComments failed, using local fallback:', error);
+      // Fallback to local
+      const allComments: any[] = [];
+      
+      const tracks = centralDB.getAllTracks();
+      tracks.forEach(track => {
+        if (track.comments && track.comments.length > 0) {
+          track.comments.forEach(comment => {
+            allComments.push({
+              ...comment,
+              trackId: track.id,
+              trackTitle: track.title
+            });
           });
-        });
-      }
-    });
-    
-    return allComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+      });
+      
+      return allComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
   }
 
   // Datenbank zurücksetzen

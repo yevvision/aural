@@ -3,9 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { AudioCard } from '../components/feed/AudioCard';
-import { useFeedStore } from '../stores/feedStore';
 import { useUserStore } from '../stores/userStore';
-import { useDatabaseSync } from '../hooks/useDatabaseSync';
+import { useDatabase } from '../hooks/useDatabase';
 import { 
   PageTransition, 
   StaggerWrapper, 
@@ -25,9 +24,9 @@ const categoryNames = {
 export const CategoryPage = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { tracks } = useFeedStore();
+  const { currentUser } = useUserStore();
+  const { tracks, getTracksSorted } = useDatabase(currentUser?.id);
   const { myTracks, followedUsers } = useUserStore();
-  const { getTracksSorted } = useDatabaseSync();
 
   const [isLoading, setIsLoading] = useState(true);
   const [categoryTracks, setCategoryTracks] = useState<any[]>([]);

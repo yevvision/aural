@@ -255,7 +255,7 @@ export const AdminStatistics: React.FC<AdminStatisticsProps> = ({ onBack }) => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-[#ff4e3a] rounded-lg flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-white" />
             </div>
             <div>

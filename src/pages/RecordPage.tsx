@@ -15,8 +15,7 @@ import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudio
 export const RecordPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { recordedBlob, duration, reset: resetRecording } = useRecordingStore();
-  const [isRecording, setIsRecording] = useState(false);
+  const { recordedBlob, duration, reset: resetRecording, isRecording, startRecording: startRecordingStore, stopRecording: stopRecordingStore, pauseRecording: pauseRecordingStore, resumeRecording: resumeRecordingStore } = useRecordingStore();
   const [recordingDuration, setRecordingDuration] = useState(0);
   
   // Real-time audio visualization
@@ -33,8 +32,14 @@ export const RecordPage = () => {
     getCurrentStream,
   } = useMediaRecorder({
     onRecordingComplete: (blob, recordingDuration) => {
-      console.log('Recording completed:', { blob, recordingDuration });
-      setIsRecording(false);
+      console.log('🎵 Recording completed:', { 
+        blobSize: blob.size, 
+        blobType: blob.type, 
+        recordingDuration 
+      });
+      
+      // Set recording state to false immediately
+      stopRecordingStore();
       setRecordingDuration(0);
       stopAnalyzing();
       
@@ -53,13 +58,24 @@ export const RecordPage = () => {
       
       try {
         sessionStorage.setItem('recordingData', JSON.stringify(recordingData));
-        console.log('Recording data stored successfully with blob URL');
-        // Navigate directly to audio editor for processing
-        navigate('/audio-editor');
+        console.log('✅ Recording data stored successfully with blob URL');
+        console.log('🚀 Navigating to audio editor...');
+        
+        // Force navigation with a small delay to ensure state is updated
+        setTimeout(() => {
+          console.log('🎯 Executing navigation to /audio-editor');
+          navigate('/audio-editor');
+        }, 100);
+        
       } catch (err) {
-        console.error('Failed to store recording data:', err);
+        console.error('❌ Failed to store recording data:', err);
+        console.log('🚀 Still navigating to audio editor despite error...');
+        
         // Still navigate to audio editor
-        navigate('/audio-editor');
+        setTimeout(() => {
+          console.log('🎯 Executing fallback navigation to /audio-editor');
+          navigate('/audio-editor');
+        }, 100);
       }
     },
     onError: (error) => {
@@ -137,9 +153,11 @@ export const RecordPage = () => {
   const handleRecordClick = async () => {
     if (!isRecording) {
       try {
-        await startMediaRecording();
-        setIsRecording(true);
+        // Set global recording state immediately when button is clicked
+        startRecordingStore();
         setRecordingDuration(0);
+        
+        await startMediaRecording();
         
         // Start audio analysis for visualization
         const stream = getCurrentStream();
@@ -148,11 +166,13 @@ export const RecordPage = () => {
         }
       } catch (error) {
         console.error('Failed to start recording:', error);
+        // Reset global state if recording failed
+        stopRecordingStore();
       }
     } else {
       // Stop recording
       stopMediaRecording();
-      setIsRecording(false);
+      stopRecordingStore();
       stopAnalyzing();
     }
   };
@@ -161,8 +181,10 @@ export const RecordPage = () => {
   const handlePauseResumeClick = () => {
     if (isPaused) {
       resumeMediaRecording();
+      resumeRecordingStore();
     } else {
       pauseMediaRecording();
+      pauseRecordingStore();
     }
   };
 
@@ -170,7 +192,7 @@ export const RecordPage = () => {
   const handleCancelRecording = () => {
     // Cancel the recording and reset everything
     cancelMediaRecording(); // This properly cancels and resets the MediaRecorder
-    setIsRecording(false);
+    stopRecordingStore();
     setRecordingDuration(0);
     stopAnalyzing();
     
@@ -273,7 +295,7 @@ export const RecordPage = () => {
             </Body>
             <button
               onClick={handleUploadClick}
-              className="mt-2 text-orange-500 hover:text-orange-400 text-sm underline transition-colors duration-200"
+              className="mt-2 text-[#ff4e3a] hover:text-[#ff4e3a] text-sm underline transition-colors duration-200"
             >
               Upload file
             </button>

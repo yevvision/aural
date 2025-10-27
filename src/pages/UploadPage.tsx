@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, Plus, X, Pause, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
+import { useFeedStore } from '../stores/feedStore';
 import { useDatabase } from '../hooks/useDatabase';
 import { getAudioDuration, generateId, formatDuration } from '../utils';
 import { validateAudioFile, isValidAudioFile } from '../utils/audioValidation';
@@ -20,6 +21,8 @@ import { capClient } from '../utils/capClient';
 import { uploadSecurityManager } from '../utils/uploadSecurity';
 import { AudioUrlManager } from '../services/audioUrlManager';
 import { unifiedAudioManager } from '../services/unifiedAudioManager';
+import { compressAudioForUpload, formatFileSize, type CompressionResult } from '../utils/audioCompression';
+import { uploadWithProgress, formatUploadSpeed, formatRemainingTime, formatUploadSize, type UploadProgress } from '../utils/uploadWithProgress';
 
 import type { AudioTrack } from '../types';
 
@@ -61,8 +64,17 @@ export const UploadPage = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoApproveActive, setIsAutoApproveActive] = useState(false);
   
+  // Audio compression states
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
+  const [compressionError, setCompressionError] = useState('');
+  
+  // Upload progress states
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  
   const { currentUser, addMyTrack } = useUserStore();
-  const { addTrack } = useDatabase();
+  const { addTrack } = useFeedStore();
+  const { clearCache } = useDatabase();
 
   // Überwache Auto-Approve-Status
   useEffect(() => {
@@ -278,6 +290,8 @@ export const UploadPage = () => {
     }
 
     setError('');
+    setCompressionError('');
+    setCompressionResult(null);
     setSelectedFile(file);
     setTitle(file.name.replace(/\.[^/.]+$/, '')); // Remove file extension
     
@@ -287,6 +301,49 @@ export const UploadPage = () => {
     } catch (err) {
       console.error('Error getting duration:', err);
       setError('Fehler beim Laden der Audio-Datei. Bitte versuchen Sie eine andere Datei.');
+    }
+
+    // Starte Audio-Kompression
+    await compressSelectedFile(file);
+  };
+
+  const compressSelectedFile = async (file: File) => {
+    setIsCompressing(true);
+    setCompressionError('');
+    
+    try {
+      console.log('🎵 UploadPage: Starting audio compression...', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      });
+      
+      const result = await compressAudioForUpload(file, {
+        targetBitrate: 128,
+        targetFormat: 'mp3'
+      });
+      
+      setCompressionResult(result);
+      console.log('✅ UploadPage: Audio compression completed', {
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        compressionRatio: result.compressionRatio
+      });
+      
+    } catch (error) {
+      console.error('❌ UploadPage: Audio compression failed:', error);
+      setCompressionError('Kompression fehlgeschlagen. Original-Datei wird verwendet.');
+      
+      // Fallback: Verwende Original-Datei
+      setCompressionResult({
+        compressedFile: file,
+        originalSize: file.size,
+        compressedSize: file.size,
+        compressionRatio: 0,
+        format: file.type
+      });
+    } finally {
+      setIsCompressing(false);
     }
   };
 
@@ -301,6 +358,10 @@ export const UploadPage = () => {
     setError('');
     setTitleError('');
     setHasUnsavedChanges(false);
+    setCompressionResult(null);
+    setCompressionError('');
+    setIsCompressing(false);
+    setUploadProgress(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -369,6 +430,8 @@ export const UploadPage = () => {
   const handleUpload = async () => {
     if (!selectedFile || !currentUser) return;
     
+    // Kompression-Check entfernt (deaktiviert)
+    
     // Set fallback title if empty
     const finalTitle = title.trim() || `Moments of ${new Date().toLocaleDateString('de-DE')}`;
     
@@ -387,9 +450,12 @@ export const UploadPage = () => {
     setError('');
     
     try {
+      // Verwende Original-Datei (Kompression deaktiviert)
+      const fileToUpload = selectedFile;
+      
       // 1. Sicherheitscheck durchführen
       console.log('🔐 Starting security check...');
-      const securityCheck = await uploadSecurityManager.checkUploadSecurity(selectedFile, duration);
+      const securityCheck = await uploadSecurityManager.checkUploadSecurity(fileToUpload, duration);
       
       console.log('🔐 Security Check Result:', {
         allowed: securityCheck.allowed,
@@ -425,74 +491,21 @@ export const UploadPage = () => {
         securityCheck.reason = 'Auto-Approve aktiv - Upload wird automatisch freigegeben';
       }
 
-      // 3.6. Prüfe Sicherheitsregeln VOR dem Upload
-      if (securityCheck.requiresReview || !securityCheck.allowed) {
-        console.log('📋 Upload requires review BEFORE upload, showing pending modal...');
-        
-        const uploadId = generateId();
-        
-        // Erstelle Blob-URL für lokale Wiedergabe
-        const audioBlobUrl = URL.createObjectURL(selectedFile);
-
-        // Speichere nur Metadaten in localStorage (ohne Audio-Daten)
-        const pendingUpload = {
-          uploadId,
-          filename: selectedFile.name,
-          originalName: selectedFile.name,
-          size: selectedFile.size,
-          mimeType: selectedFile.type,
-          url: audioBlobUrl, // Blob-URL für lokale Wiedergabe
-          title: finalTitle,
-          description: description.trim(),
-          gender: selectedGender || undefined,
-          tags: [...selectedTags, selectedGender],
-          uploadedAt: new Date().toISOString(),
-          status: 'pending_review',
-          reason: securityCheck.reason || 'Security check triggered',
-          duplicateCount: securityCheck.duplicateCheck.duplicateCount,
-          deviceId: securityCheck.deviceStats.deviceId,
-          userId: currentUser.id,
-          username: currentUser.username,
-          duration: duration // Audio-Dauer hinzufügen
-        };
-        
-        // Speichere nur Metadaten in localStorage
-        const existingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
-        existingUploads[uploadId] = pendingUpload;
-        localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
-        
-        console.log('🔍 DEBUG: Pending upload saved to localStorage:', {
-          uploadId,
-          pendingUpload,
-          allUploads: existingUploads,
-          localStorageKey: 'aural_pending_uploads'
-        });
-        
-        // Device-Stats wurden bereits oben aktualisiert
-        
-        const pendingData: PendingUploadData = {
-          uploadId,
-          title: finalTitle,
-          status: 'pending',
-          reason: securityCheck.reason || 'Security check triggered',
-          estimatedTime: '5-10 minutes'
-        };
-        
-        // Navigate to security check page with upload data
-        navigate('/security-check', { state: pendingData });
-        return;
-      }
+      // 3.6. Upload IMMER an den Server senden - Server entscheidet über Warteschlange
+      console.log('📤 Uploading to server - server will decide if review is needed...');
       
-      // Normale Uploads (erlaubt und keine Review erforderlich)
-      console.log('📤 Normal upload - proceeding with backend upload...');
+      // Upload an den Server senden
+      console.log('📤 Sending upload to server...');
       
       // 3. FormData mit Cap-Token erstellen
       const formData = new FormData();
-      formData.append('audio', selectedFile);
+      formData.append('audio', fileToUpload);
       formData.append('title', title.trim());
       formData.append('description', description.trim());
       formData.append('capToken', capToken);
       formData.append('requiresReview', securityCheck.requiresReview.toString());
+      formData.append('userId', currentUser.id);
+      formData.append('username', currentUser.username);
       if (selectedGender) {
         formData.append('gender', selectedGender);
       }
@@ -501,135 +514,126 @@ export const UploadPage = () => {
       formData.append('tags', JSON.stringify(tagsWithGender));
       
       console.log('Uploading to backend with security measures...', {
-        filename: selectedFile.name,
-        size: selectedFile.size,
-        type: selectedFile.type,
+        filename: fileToUpload.name,
+        size: fileToUpload.size,
+        type: fileToUpload.type,
         title: finalTitle,
         tags: [...selectedTags, selectedGender],
         requiresReview: securityCheck.requiresReview,
-        duplicateCount: securityCheck.duplicateCheck.duplicateCount
+        duplicateCount: securityCheck.duplicateCheck.duplicateCount,
+        compressionApplied: compressionResult ? {
+          originalSize: compressionResult.originalSize,
+          compressedSize: compressionResult.compressedSize,
+          compressionRatio: compressionResult.compressionRatio
+        } : null
       });
       
-      // 4. Upload to PHP backend
+      // 4. Upload to PHP backend - mit sofortigem Fallback
+      console.log('📤 Attempting server upload...');
+      
       let response;
+      let responseText;
+      let serverUploadSuccess = false;
+      
       try {
-        response = await fetch('/upload.php', {
-          method: 'POST',
-          body: formData
+        // Use uploadWithProgress for better UX
+        const response = await uploadWithProgress('https://goaural.com/upload.php', formData, {
+          onProgress: (progress) => {
+            setUploadProgress(progress);
+          },
+          onSuccess: (response) => {
+            // Don't clear uploadProgress here - keep showing progress until server processing is complete
+            console.log('📤 Upload completed, waiting for server response...');
+          },
+          onError: (error) => {
+            setUploadProgress(null);
+            throw error;
+          }
         });
+        
+        responseText = await response.text();
+        console.log('Response status:', response.status);
+        console.log('Response text:', responseText.substring(0, 200));
+        
+        // Clear upload progress now that we have server response
+        setUploadProgress(null);
+        
+        if (response.ok) {
+          try {
+            const responseData = JSON.parse(responseText);
+            console.log('📁 Upload response data:', responseData);
+            serverUploadSuccess = true;
+          } catch (e) {
+            console.log('📁 Response is not JSON, using fallback');
+            serverUploadSuccess = false;
+          }
+        } else {
+          console.log('📁 Server upload failed, using fallback');
+          serverUploadSuccess = false;
+        }
       } catch (error) {
-        console.log('Trying alternative upload path...');
-        response = await fetch('./upload.php', {
-          method: 'POST',
-          body: formData
+        console.log('📁 Server not reachable, using fallback:', error);
+        setUploadProgress(null);
+        serverUploadSuccess = false;
+      }
+      
+      // Fallback: Immer lokal speichern wenn Server nicht erreichbar
+      if (!serverUploadSuccess) {
+        console.log('🔄 Using local storage fallback...');
+        
+        const audioBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedFile);
         });
+        
+        const localTrack: AudioTrack = {
+          id: generateId(),
+          title: finalTitle,
+          description: description.trim(),
+          url: audioBase64,
+          duration: duration,
+          user: currentUser,
+          userId: currentUser.id,
+          likes: 0,
+          isLiked: false,
+          isBookmarked: false,
+          createdAt: new Date(),
+          tags: [...selectedTags, selectedGender],
+          gender: selectedGender || undefined,
+          filename: selectedFile.name,
+          fileSize: selectedFile.size,
+          format: selectedFile.type,
+          status: 'active' as const
+        };
+        
+        console.log('✅ Creating local track:', localTrack.title);
+        console.log('🎵 UploadPage: Adding local track to FeedStore:', localTrack.title);
+        addTrack(localTrack);
+        addMyTrack(localTrack);
+        
+        // Cache leeren für sofortige Anzeige
+        clearCache();
+        
+        // Navigate to success page
+        navigate('/upload-success', { 
+          state: { 
+            uploadId: localTrack.id, 
+            title: localTrack.title, 
+            trackId: localTrack.id 
+          } 
+        });
+        return;
       }
       
-      // Read response body only once
-      const responseText = await response.text();
-      console.log('Response status:', response.status);
-      console.log('Response text:', responseText.substring(0, 200));
-      
-      if (!response.ok) {
-        console.error('Upload failed:', response.status, responseText);
-        
-        // Check if response is HTML (PHP error page)
-        if (responseText.includes('<?php') || responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
-          console.log('PHP server not available, using local storage fallback...');
-          
-          // Fallback: Store locally and simulate successful upload
-          const audioBase64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile);
-          });
-          
-          const localTrack: AudioTrack = {
-            id: generateId(),
-            title: finalTitle,
-            description: description.trim(),
-            url: audioBase64,
-            duration: duration,
-            user: currentUser,
-            userId: currentUser.id,
-            likes: 0,
-            isLiked: false,
-            isBookmarked: false,
-            createdAt: new Date(),
-            tags: [...selectedTags, selectedGender],
-            gender: selectedGender || undefined,
-            filename: selectedFile.name,
-            fileSize: selectedFile.size,
-            format: selectedFile.type
-          };
-          
-          addMyTrack(localTrack);
-          addTrack(localTrack);
-          navigate('/');
-          return;
-        }
-        
-        try {
-          const errorJson = JSON.parse(responseText);
-          throw new Error(errorJson.error || 'Upload failed');
-        } catch {
-          throw new Error(`Upload failed: ${response.status} - ${responseText.substring(0, 100)}`);
-        }
-      }
-      
-      // Try to parse as JSON
-      let result;
-      try {
-        result = JSON.parse(responseText);
-        console.log('Upload successful:', result);
-      } catch (jsonError) {
-        console.error('JSON parsing failed:', responseText);
-        
-        // If JSON parsing fails, use fallback
-        if (responseText.includes('<?php') || responseText.includes('<html')) {
-          console.log('Server returned HTML instead of JSON, using local storage fallback...');
-          
-          const audioBase64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile);
-          });
-          
-          const localTrack: AudioTrack = {
-            id: generateId(),
-            title: finalTitle,
-            description: description.trim(),
-            url: audioBase64,
-            duration: duration,
-            user: currentUser,
-            userId: currentUser.id,
-            likes: 0,
-            isLiked: false,
-            isBookmarked: false,
-            createdAt: new Date(),
-            tags: [...selectedTags, selectedGender],
-            gender: selectedGender || undefined,
-            filename: selectedFile.name,
-            fileSize: selectedFile.size,
-            format: selectedFile.type
-          };
-          
-          addMyTrack(localTrack);
-          addTrack(localTrack);
-          navigate('/');
-          return;
-        }
-        
-        throw new Error('Server antwortete mit ungültigem JSON');
-      }
+      // Server-Upload war erfolgreich - verarbeite Response
+      console.log('✅ Server upload successful, processing response...');
+      const result = JSON.parse(responseText);
+      console.log('Upload successful:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Upload failed');
@@ -637,9 +641,11 @@ export const UploadPage = () => {
 
       // 5. Device-Stats wurden bereits oben aktualisiert
       
-      // 6. Prüfen ob Review erforderlich ist (IMMER prüfen, auch bei lokaler Speicherung)
-      if (result.requiresReview || securityCheck.requiresReview) {
-        console.log('📋 Upload requires review, showing pending modal...');
+      // 6. Prüfen ob Review erforderlich ist (berücksichtige Auto-Approve Status)
+      const requiresManualReview = (result.requiresReview || securityCheck.requiresReview) && !result.data.autoApproved;
+      
+      if (requiresManualReview) {
+        console.log('📋 Upload requires manual review, showing pending modal...');
         
         const uploadId = result.data.uploadId || generateId();
         
@@ -683,23 +689,24 @@ export const UploadPage = () => {
         // Navigate to security check page with upload data
         navigate('/security-check', { state: pendingData });
         return;
+      } else if (result.data.autoApproved) {
+        console.log('✅ Upload wurde automatisch freigegeben (Auto-Approve aktiv)');
+        // Upload wurde automatisch freigegeben, zeige Erfolgsmeldung
+        alert('Upload erfolgreich! Ihr Audio wurde automatisch freigegeben.');
       }
       
       // 7. Normale Verarbeitung - Track erstellen
-      const trackId = generateId();
+      const trackId = result.data.trackId || generateId();
       
-      // Speichere die Audio-URL im CentralAudioManager (dauerhaft verfügbar)
-      const storeResult = await unifiedAudioManager.storeNewAudio(trackId, selectedFile, { title: finalTitle });
-      if (!storeResult.success) {
-        throw new Error(storeResult.error || 'Failed to store audio');
-      }
-      const audioUrl = storeResult.url!;
+      // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits Audio + Info gespeichert!
+      // Verwende die Server-URL für die Audio-Datei
+      const audioUrl = result.data.url || `https://goaural.com/uploads/${result.data.filename}`;
       
       const newTrack: AudioTrack = {
         id: trackId,
         title: finalTitle,
         description: description.trim(),
-        url: audioUrl, // Verwende die einzigartige URL für sofortige Wiedergabe
+        url: audioUrl, // Verwende die Server-URL (nicht lokal speichern!)
         duration: duration,
         user: currentUser,
         userId: currentUser.id,
@@ -726,17 +733,16 @@ export const UploadPage = () => {
         fileSize: newTrack.fileSize
       });
       
-      // ZENTRALE DATENBANK: Füge Track zur einzigen Quelle der Wahrheit hinzu
-      console.log('🎯 UploadPage: Füge Track zur zentralen Datenbank hinzu...');
-      const success = addTrack(newTrack);
+      // Server-Upload war erfolgreich - nur lokal hinzufügen
+      console.log('✅ UploadPage: Server upload successful, adding to local database...');
       
-      if (success) {
-        console.log('✅ UploadPage: Track erfolgreich zur Datenbank hinzugefügt');
-        addMyTrack(newTrack);
-      } else {
-        console.error('❌ UploadPage: Fehler beim Hinzufügen zur Datenbank');
-        throw new Error('Track could not be added to database');
-      }
+      // Nur lokal hinzufügen (Server hat bereits gespeichert)
+      console.log('🎵 UploadPage: Adding track to FeedStore:', newTrack.title);
+      addTrack(newTrack);
+      addMyTrack(newTrack);
+      
+      // Cache leeren für sofortige Anzeige
+      clearCache();
       
       // Navigate to upload success page with track data
       navigate('/upload-success', { 
@@ -796,9 +802,9 @@ export const UploadPage = () => {
           <div
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-gray-500 rounded-xl p-12 text-center mb-8
-                     hover:border-orange-500 hover:bg-orange-500/5 transition-all duration-300 cursor-pointer"
+                     hover:border-[#ff4e3a] hover:bg-[#ff4e3a]/5 transition-all duration-300 cursor-pointer"
           >
-            <Upload size={48} className="text-orange-500 mx-auto mb-6" />
+            <Upload size={48} className="text-[#ff4e3a] mx-auto mb-6" />
             <Heading level={3} className="mb-3">
               Select Audio File
             </Heading>
@@ -822,6 +828,152 @@ export const UploadPage = () => {
           className="hidden"
         />
 
+        {/* Audio Compression Status */}
+        {selectedFile && (
+          <div className="mb-8">
+            {/* Compression Loading */}
+            {isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-blue-500/20 border border-blue-500/30 rounded-xl"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <div>
+                    <h3 className="text-blue-400 font-medium text-sm">
+                      Optimiere Audio...
+                    </h3>
+                    <p className="text-blue-300/80 text-xs mt-1">
+                      Komprimiere für bessere Upload-Performance
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Results */}
+            {compressionResult && !isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-4 rounded-xl border ${
+                  compressionResult.compressionRatio > 0
+                    ? 'bg-green-500/20 border-green-500/30'
+                    : 'bg-gray-500/20 border-gray-500/30'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      compressionResult.compressionRatio > 0
+                        ? 'bg-green-500/20'
+                        : 'bg-gray-500/20'
+                    }`}>
+                      <CheckCircle className={`w-4 h-4 ${
+                        compressionResult.compressionRatio > 0
+                          ? 'text-green-400'
+                          : 'text-gray-400'
+                      }`} />
+                    </div>
+                    <div>
+                      <h3 className={`font-medium text-sm ${
+                        compressionResult.compressionRatio > 0
+                          ? 'text-green-400'
+                          : 'text-gray-400'
+                      }`}>
+                        {compressionResult.compressionRatio > 0
+                          ? 'Audio optimiert'
+                          : 'Keine Kompression nötig'
+                        }
+                      </h3>
+                      <p className={`text-xs mt-1 ${
+                        compressionResult.compressionRatio > 0
+                          ? 'text-green-300/80'
+                          : 'text-gray-300/80'
+                      }`}>
+                        {compressionResult.compressionRatio > 0
+                          ? `Reduziert von ${formatFileSize(compressionResult.originalSize)} auf ${formatFileSize(compressionResult.compressedSize)} (${compressionResult.compressionRatio.toFixed(1)}% Ersparnis)`
+                          : `Original-Größe: ${formatFileSize(compressionResult.originalSize)}`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Error */}
+            {compressionError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <X className="w-4 h-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-yellow-400 font-medium text-sm">
+                      Kompression fehlgeschlagen
+                    </h3>
+                    <p className="text-yellow-300/80 text-xs mt-1">
+                      {compressionError}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Upload Progress */}
+            {uploadProgress && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-[#ff4e3a]/20 border border-[#ff4e3a]/30 rounded-xl"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[#ff4e3a] font-medium text-sm">
+                      Lade hoch...
+                    </h3>
+                    <span className="text-[#ff4e3a] text-sm font-mono">
+                      {uploadProgress.percent}%
+                    </span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-[#ff4e3a] to-[#ff4e3a] h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress.percent}%` }}
+                    ></div>
+                  </div>
+                  
+                  {/* Upload Stats */}
+                  <div className="flex items-center justify-between text-xs text-[#ff4e3a]/80">
+                    <div className="flex items-center space-x-4">
+                      <span>
+                        {formatUploadSize(uploadProgress.loaded)} / {formatUploadSize(uploadProgress.total)}
+                      </span>
+                      <span>
+                        {formatUploadSpeed(uploadProgress.speed)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div>{formatRemainingTime(uploadProgress.remainingTime)}</div>
+                      <div className="text-[#ff4e3a]/60">
+                        {uploadProgress.elapsedTime}s vergangen
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+
         {/* Metadata Form - im Stil der Audio-Detail-Seite */}
         {selectedFile && (
           <div className="flex-1 space-y-8">
@@ -838,7 +990,7 @@ export const UploadPage = () => {
                 placeholder="Create title"
                 className={`w-full px-4 py-4 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
-                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                         focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                          transition-all duration-200 ${
                            titleError ? 'border-red-500/50' : 'border-gray-500'
                          }`}
@@ -867,7 +1019,7 @@ export const UploadPage = () => {
                 rows={4}
                 className="w-full px-4 py-4 bg-transparent border border-gray-500 rounded-lg
                          text-white placeholder-gray-400 resize-none
-                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                         focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                          transition-all duration-200"
                 maxLength={1000}
               />
@@ -888,7 +1040,7 @@ export const UploadPage = () => {
                     onClick={() => setSelectedGender(option.value)}
                     className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 ${
                       selectedGender === option.value
-                        ? 'bg-orange-500/20 text-orange-500 border-orange-500/50'
+                        ? 'bg-[#ff4e3a]/20 text-[#ff4e3a] border-[#ff4e3a]/50'
                         : 'bg-white/5 text-text-secondary border-white/30 hover:bg-white/10 hover:text-text-primary hover:border-white/40'
                     }`}
                   >
@@ -915,6 +1067,7 @@ export const UploadPage = () => {
                       selectedValues={selectedTags}
                       onSelectionChange={setSelectedTags}
                       size="md"
+                      showHashtag={true}
                       aria-label={`Tag: ${tag}, not selected`}
                     >
                       {tag}
@@ -932,7 +1085,7 @@ export const UploadPage = () => {
                   placeholder="Enter your own tag"
                   className="flex-1 px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-sm
                            text-white placeholder-gray-400
-                           focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                           focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                            transition-all duration-200"
                   maxLength={24}
                   aria-label="Enter your own tag"
@@ -954,8 +1107,8 @@ export const UploadPage = () => {
                     {selectedTags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20
-                                 text-orange-500 text-sm rounded-full border border-orange-500/50"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#ff4e3a]/20
+                                 text-[#ff4e3a] text-sm rounded-full border border-[#ff4e3a]/50"
                       >
                         <span>{tag}</span>
                         <button
@@ -993,19 +1146,31 @@ export const UploadPage = () => {
           <div className="mt-8" style={{ marginTop: '70px' }}>
             <button
               onClick={handleUpload}
-              disabled={!title.trim() || titleError !== '' || isUploading}
-              className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-orange-500 bg-gradient-to-r from-orange-500/30 to-orange-600/20 flex items-center justify-center space-x-3 hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!title.trim() || titleError !== '' || isUploading || isCompressing || uploadProgress !== null}
+              className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-3 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ minHeight: '64px' }}
             >
-              {isUploading ? (
+              {isCompressing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-orange-300 text-base font-semibold">Publishing...</span>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">Optimiere Audio...</span>
+                </>
+              ) : uploadProgress ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">
+                    Lade hoch... {uploadProgress.percent}%
+                  </span>
+                </>
+              ) : isUploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">Publishing...</span>
                 </>
               ) : (
                 <>
-                  <Upload size={20} className="text-orange-400" strokeWidth={2} />
-                  <span className="text-orange-300 text-base font-semibold">Publish Recording</span>
+                  <Upload size={20} className="text-[#ff4e3a]" strokeWidth={2} />
+                  <span className="text-[#ff4e3a] text-base font-semibold">Publish Recording</span>
                 </>
               )}
             </button>

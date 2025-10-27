@@ -97,7 +97,7 @@ export const CommentForm = ({ track, onCommentSubmit, onCancel }: CommentFormPro
             size="sm"
             className="flex items-center space-x-2"
           >
-            <Send size={16} />
+            <Send size={16} strokeWidth={2} />
             <span>{isSubmitting ? 'Senden...' : 'Senden'}</span>
           </Button>
         </div>

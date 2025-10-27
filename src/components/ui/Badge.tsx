@@ -5,13 +5,15 @@ interface BadgeProps {
   variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  showHashtag?: boolean;
 }
 
 export const Badge: React.FC<BadgeProps> = ({ 
   children, 
   variant = 'default',
   size = 'md',
-  className = ''
+  className = '',
+  showHashtag = false
 }) => {
   const baseClasses = 'inline-flex items-center font-medium rounded-full';
   
@@ -34,6 +36,7 @@ export const Badge: React.FC<BadgeProps> = ({
   
   return (
     <span className={classes}>
+      {showHashtag && <span className="opacity-60 mr-1">#</span>}
       {children}
     </span>
   );

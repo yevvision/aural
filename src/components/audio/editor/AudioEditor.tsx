@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Scissors, AlertCircle, Trash2, Play, Download, ArrowRight } from 'lucide-react';
-import WaveformVisualizer from './WaveformVisualizer';
 import { concatenateSegments, encodeWithFfmpegWorker, trimToWav } from '../../../hooks/useTrimExport';
 import { Button } from '../../ui/Button';
 import { Body } from '../../ui/Typography';
@@ -12,10 +11,16 @@ export default function AudioEditor({
   recordingBlob,
   onDone,
   enableFfmpeg = false,
+  waveformSelection,
+  waveformRegions,
+  removeRegionFn,
 }: {
   recordingBlob: Blob;
   onDone: (out: Blob) => void; // gibt den geschnittenen/encodierten Blob zurück
   enableFfmpeg?: boolean;
+  waveformSelection?: { start: number; end: number } | null;
+  waveformRegions?: { start: number; end: number; id: string }[];
+  removeRegionFn?: ((start: number, end: number) => void) | null;
 }) {
   console.log('🎵 AudioEditor: Received recording blob:', {
     size: recordingBlob?.size,
@@ -23,18 +28,39 @@ export default function AudioEditor({
     hasBlob: !!recordingBlob
   });
   
-  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(waveformSelection || null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSegments, setSelectedSegments] = useState<{ start: number; end: number }[]>([]);
-  const [allRegions, setAllRegions] = useState<{ start: number; end: number; id: string }[]>([]);
+  const [allRegions, setAllRegions] = useState<{ start: number; end: number; id: string }[]>(waveformRegions || []);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [waveformDuration, setWaveformDuration] = useState<number>(0);
   const [clickedSelection, setClickedSelection] = useState<{ start: number; end: number } | null>(null);
   const [isFixingAudio, setIsFixingAudio] = useState(false);
   const [fixedBlob, setFixedBlob] = useState<Blob | null>(null);
   const [currentBlob, setCurrentBlob] = useState<Blob | null>(null);
-  const canExport = allRegions.length > 0 || selectedSegments.length > 0 || (sel !== null && sel.start < sel.end && sel.end > sel.start);
+  // Allow export if we have any valid selection or regions, or if we have a recording blob
+  const canExport = (waveformRegions && waveformRegions.length > 0) || 
+                   allRegions.length > 0 || 
+                   selectedSegments.length > 0 || 
+                   (sel !== null && sel.start < sel.end && sel.end > sel.start) ||
+                   (waveformSelection !== null && waveformSelection.start < waveformSelection.end && waveformSelection.end > waveformSelection.start) ||
+                   (recordingBlob && recordingBlob.size > 0); // Allow export if we have a valid recording blob
+
+  // Debug logging for canExport
+  console.log('🎵 AudioEditor: canExport check:', {
+    canExport,
+    hasWaveformRegions: waveformRegions && waveformRegions.length > 0,
+    waveformRegionsLength: waveformRegions?.length || 0,
+    hasAllRegions: allRegions.length > 0,
+    allRegionsLength: allRegions.length,
+    hasSelectedSegments: selectedSegments.length > 0,
+    selectedSegmentsLength: selectedSegments.length,
+    hasSel: sel !== null && sel.start < sel.end && sel.end > sel.start,
+    hasWaveformSelection: waveformSelection !== null && waveformSelection.start < waveformSelection.end && waveformSelection.end > waveformSelection.start,
+    hasRecordingBlob: recordingBlob && recordingBlob.size > 0,
+    recordingBlobSize: recordingBlob?.size || 0
+  });
   
   // Haptic feedback helper
   const triggerHaptic = () => {
@@ -63,10 +89,10 @@ export default function AudioEditor({
     return 'rgba(245, 158, 11, 0.25)'; // orange
   };
 
-  const [removeRegionFn, setRemoveRegionFn] = useState<((start: number, end: number) => void) | null>(null);
+  const [localRemoveRegionFn, setLocalRemoveRegionFn] = useState<((start: number, end: number) => void) | null>(null);
 
   const handleRemoveRegionReady = (removeFn: (start: number, end: number) => void) => {
-    setRemoveRegionFn(() => removeFn);
+    setLocalRemoveRegionFn(() => removeFn);
   };
 
   // Hilfsfunktion zum Reparieren von Audio-Blobs
@@ -199,6 +225,14 @@ export default function AudioEditor({
         // Export selected segments
         console.log('🎵 AudioEditor: Exporting selected segments...');
         resultBlob = await concatenateSegments(blobToUse, selectedSegments);
+      } else if (waveformRegions && waveformRegions.length > 0) {
+        // Export waveform regions
+        console.log('🎵 AudioEditor: Exporting waveform regions...');
+        const regionSegments = waveformRegions.map(region => ({
+          start: region.start,
+          end: region.end
+        }));
+        resultBlob = await concatenateSegments(blobToUse, regionSegments);
       } else if (allRegions.length > 0) {
         // Export all regions
         console.log('🎵 AudioEditor: Exporting all regions...');
@@ -207,12 +241,18 @@ export default function AudioEditor({
           end: region.end
         }));
         resultBlob = await concatenateSegments(blobToUse, regionSegments);
+      } else if (waveformSelection && waveformSelection.start < waveformSelection.end && waveformSelection.end > waveformSelection.start) {
+        // Export waveform selection
+        console.log('🎵 AudioEditor: Exporting waveform selection...');
+        resultBlob = await trimToWav(blobToUse, waveformSelection.start, waveformSelection.end);
       } else if (sel && sel.start < sel.end && sel.end > sel.start) {
         // Export current selection
         console.log('🎵 AudioEditor: Exporting current selection...');
         resultBlob = await trimToWav(blobToUse, sel.start, sel.end);
       } else {
-        throw new Error('No valid selection to export');
+        // Export entire audio if no specific selection
+        console.log('🎵 AudioEditor: No specific selection, exporting entire audio...');
+        resultBlob = blobToUse;
       }
       
       console.log('✅ AudioEditor: Export completed, result blob:', {
@@ -264,19 +304,27 @@ export default function AudioEditor({
   }
 
   // Zeige Reparatur-Status
-  if (isFixingAudio) {
-    return (
-      <div className="space-y-4">
-        <div className="w-full h-32 rounded bg-orange-900/20 border border-orange-500/30 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <Body className="text-orange-400 text-sm">Repairing audio...</Body>
-            <Body className="text-orange-300 text-xs mt-1">Please wait a moment</Body>
-                </div>
-                </div>
+    if (isFixingAudio) {
+      return (
+        <div className="space-y-4">
+          <div className="w-full h-32 rounded bg-[#ff4e3a]/20 border border-[#ff4e3a]/30 flex items-center justify-center">
+            <div className="text-center">
+              {/* Subtile Loading-Animation statt Spinner */}
+              <div className="w-full h-2 bg-[#ff4e3a] rounded-full overflow-hidden mb-4">
+                <div className="h-full bg-gradient-to-r from-transparent via-[#ff4e3a]/30 to-transparent animate-pulse"></div>
+                <div className="absolute inset-0 h-full w-8 bg-gradient-to-r from-transparent via-[#ff4e3a]/50 to-transparent" 
+                     style={{ 
+                       animation: 'shimmer 1.5s ease-in-out infinite',
+                       animationDelay: '0.2s'
+                     }}></div>
               </div>
-            );
-  }
+              <Body className="text-[#ff4e3a] text-sm">Repairing audio...</Body>
+              <Body className="text-[#ff4e3a] text-xs mt-1">Please wait a moment</Body>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
   // Zeige Wellenform nur wenn wir einen gültigen Blob haben
   if (!currentBlob) {
@@ -284,7 +332,15 @@ export default function AudioEditor({
       <div className="space-y-4">
         <div className="w-full h-32 rounded bg-gray-900/20 border border-gray-500/30 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            {/* Subtile Loading-Animation in der Progress-Bar */}
+            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden mb-4">
+              <div className="h-full bg-gradient-to-r from-transparent via-gray-400/30 to-transparent animate-pulse"></div>
+              <div className="absolute inset-0 h-full w-8 bg-gradient-to-r from-transparent via-gray-400/50 to-transparent" 
+                   style={{ 
+                     animation: 'shimmer 1.5s ease-in-out infinite',
+                     animationDelay: '0.2s'
+                   }}></div>
+            </div>
             <Body className="text-gray-400 text-sm">Preparing audio...</Body>
           </div>
         </div>
@@ -294,16 +350,6 @@ export default function AudioEditor({
 
   return (
     <div className="space-y-4">
-      {/* Waveform Visualizer mit repariertem Blob */}
-      <WaveformVisualizer
-        blob={currentBlob}
-        onSelectionChange={handleSelectionChange}
-        onDurationChange={handleDurationChange}
-        onRegionsChange={handleRegionsChange}
-        onRemoveRegionReady={handleRemoveRegionReady}
-        className="w-full"
-      />
-
       {/* Audio Info */}
       <div className="text-center text-sm text-gray-400 mb-6">
         {audioDuration > 0 && (
@@ -335,7 +381,7 @@ export default function AudioEditor({
                   aria-label="Remove segment"
                   className="text-red-400 hover:text-red-300"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} strokeWidth={2} />
                 </Button>
           </div>
             ))}
@@ -356,18 +402,26 @@ export default function AudioEditor({
         <button
           onClick={handleExport}
           disabled={!canExport || busy}
-          className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-orange-500 bg-gradient-to-r from-orange-500/30 to-orange-600/20 flex items-center justify-center space-x-3 hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-3 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ minHeight: '64px' }}
         >
           {busy ? (
             <>
-              <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-orange-300 text-base font-semibold">Exporting...</span>
+              {/* Subtile Loading-Animation statt Spinner */}
+              <div className="w-16 h-2 bg-[#ff4e3a] rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-transparent via-[#ff4e3a]/30 to-transparent animate-pulse"></div>
+                <div className="absolute inset-0 h-full w-4 bg-gradient-to-r from-transparent via-[#ff4e3a]/50 to-transparent" 
+                     style={{ 
+                       animation: 'shimmer 1.5s ease-in-out infinite',
+                       animationDelay: '0.2s'
+                     }}></div>
+              </div>
+              <span className="text-[#ff4e3a] text-base font-semibold">Exporting...</span>
             </>
           ) : (
             <>
-              <ArrowRight size={20} className="text-orange-400" strokeWidth={2} />
-              <span className="text-orange-300 text-base font-semibold">Next Step</span>
+              <ArrowRight size={20} className="text-[#ff4e3a]" strokeWidth={2} />
+              <span className="text-[#ff4e3a] text-base font-semibold">Next Step</span>
             </>
           )}
         </button>

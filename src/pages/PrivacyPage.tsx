@@ -22,9 +22,9 @@ export const PrivacyPage = () => {
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6"
+                  className="w-20 h-20 bg-[#ff4e3a]/20 rounded-full flex items-center justify-center mx-auto mb-6"
                 >
-                  <Shield className="w-10 h-10 text-orange-500" />
+                  <Shield className="w-10 h-10 text-[#ff4e3a]" />
                 </motion.div>
                 
                 <h1 className="text-4xl font-bold text-white mb-4">
@@ -65,27 +65,27 @@ export const PrivacyPage = () => {
                         </h3>
                         <ul className="space-y-2 text-gray-300 text-sm">
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Dein Browser löst ein mathematisches Rätsel (unsichtbar für dich)</span>
                           </li>
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Größere Dateien erfordern mehr Rechenleistung</span>
                           </li>
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Bots können diese Rechenleistung nicht effizient aufbringen</span>
                           </li>
                         </ul>
                       </div>
                       
                       <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <ExternalLink size={16} />
+                        <ExternalLink size={16} strokeWidth={2} />
                         <a 
                           href="https://github.com/tiagozip/cap" 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-orange-500 hover:text-orange-400 transition-colors"
+                          className="text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors"
                         >
                           Cap auf GitHub ansehen
                         </a>
@@ -100,8 +100,8 @@ export const PrivacyPage = () => {
                 <RevealOnScroll>
                   <div className="bg-gray-800/30 border border-gray-700 rounded-2xl p-8">
                     <div className="flex items-start space-x-4 mb-6">
-                      <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Clock className="w-6 h-6 text-orange-500" />
+                      <div className="w-12 h-12 bg-[#ff4e3a]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-6 h-6 text-[#ff4e3a]" />
                       </div>
                       <div>
                         <h2 className="text-2xl font-bold text-white mb-2">
@@ -118,7 +118,7 @@ export const PrivacyPage = () => {
                         <h3 className="text-lg font-medium text-white mb-2">
                           30-Minuten-Limit
                         </h3>
-                        <p className="text-3xl font-bold text-orange-500 mb-2">3</p>
+                        <p className="text-3xl font-bold text-[#ff4e3a] mb-2">3</p>
                         <p className="text-gray-400 text-sm">
                           Maximal 3 Uploads alle 30 Minuten
                         </p>
@@ -128,7 +128,7 @@ export const PrivacyPage = () => {
                         <h3 className="text-lg font-medium text-white mb-2">
                           Tages-Limit
                         </h3>
-                        <p className="text-3xl font-bold text-orange-500 mb-2">5</p>
+                        <p className="text-3xl font-bold text-[#ff4e3a] mb-2">5</p>
                         <p className="text-gray-400 text-sm">
                           Maximal 5 Uploads pro Tag
                         </p>
@@ -138,7 +138,7 @@ export const PrivacyPage = () => {
                         <h3 className="text-lg font-medium text-white mb-2">
                           Audio-Zeit
                         </h3>
-                        <p className="text-3xl font-bold text-orange-500 mb-2">120</p>
+                        <p className="text-3xl font-bold text-[#ff4e3a] mb-2">120</p>
                         <p className="text-gray-400 text-sm">
                           Maximal 120 Minuten Audio pro Tag
                         </p>
@@ -173,15 +173,15 @@ export const PrivacyPage = () => {
                         </h3>
                         <ul className="space-y-2 text-gray-300 text-sm">
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Jede Datei wird mit SHA-256 gehasht</span>
                           </li>
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Ab 5 identischen Uploads → verdächtig</span>
                           </li>
                           <li className="flex items-start space-x-2">
-                            <span className="text-orange-500 mt-1">•</span>
+                            <span className="text-[#ff4e3a] mt-1">•</span>
                             <span>Verdächtige Uploads werden manuell geprüft</span>
                           </li>
                         </ul>
@@ -268,7 +268,7 @@ export const PrivacyPage = () => {
               {/* Contact */}
               <StaggerItem>
                 <RevealOnScroll>
-                  <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-2xl p-8 text-center">
+                  <div className="bg-gradient-to-r from-[#ff4e3a]/10 to-red-500/10 border border-[#ff4e3a]/20 rounded-2xl p-8 text-center">
                     <h2 className="text-2xl font-bold text-white mb-4">
                       Fragen oder Bedenken?
                     </h2>
@@ -276,7 +276,7 @@ export const PrivacyPage = () => {
                       Wenn du Fragen zu unseren Sicherheitsmaßnahmen hast oder 
                       ein Upload fälschlicherweise blockiert wurde, melde dich gerne.
                     </p>
-                    <button className="px-6 py-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-500 font-medium hover:bg-orange-500/30 transition-all duration-200">
+                    <button className="px-6 py-3 bg-[#ff4e3a]/20 border border-[#ff4e3a] rounded-lg text-[#ff4e3a] font-medium hover:bg-[#ff4e3a]/30 transition-all duration-200">
                       Kontakt aufnehmen
                     </button>
                   </div>

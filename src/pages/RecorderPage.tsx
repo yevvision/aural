@@ -11,6 +11,7 @@ import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisual
 import { UnicornAudioVisualizerAdvanced } from '../components/audio/UnicornAudioVisualizerAdvanced';
 import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
 import { generateId, formatSafeDate } from '../utils';
+import { compressAudioForUpload, formatFileSize, type CompressionResult } from '../utils/audioCompression';
 import { 
   PageTransition, 
   StaggerWrapper, 
@@ -30,6 +31,11 @@ export const RecorderPage = () => {
   const [previewTrack, setPreviewTrack] = useState<AudioTrack | null>(null);
   const [autoProceed, setAutoProceed] = useState(false); // New state for auto-proceed
   
+  // Audio compression states
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
+  const [compressionError, setCompressionError] = useState('');
+  
   const { currentUser, addMyTrack } = useUserStore();
   const { addTrack } = useFeedStore();
   
@@ -47,9 +53,11 @@ export const RecorderPage = () => {
     formatDuration,
     getCurrentStream,
   } = useMediaRecorder({
-    onRecordingComplete: (blob, recordingDuration) => {
+    onRecordingComplete: async (blob, recordingDuration) => {
       console.log('Recording completed:', recordingDuration);
-      // Don't auto-set title, let user set it in upload page
+      
+      // Starte Audio-Kompression nach der Aufnahme
+      await compressRecording(blob, recordingDuration);
     },
     onError: (errorMessage) => {
       console.error('MediaRecorder error:', errorMessage);
@@ -62,6 +70,82 @@ export const RecorderPage = () => {
 
   // Real-time audio visualization
   const { visualizerData, startAnalyzing, stopAnalyzing } = useRealtimeAudioVisualizer();
+
+  // Audio compression function for recordings
+  const compressRecording = async (blob: Blob, recordingDuration: number) => {
+    setIsCompressing(true);
+    setCompressionError('');
+    
+    try {
+      console.log('🎵 RecorderPage: Starting audio compression for recording...', {
+        blobSize: formatFileSize(blob.size),
+        blobType: blob.type,
+        duration: recordingDuration
+      });
+
+      // Create File object from blob
+      const fileName = `recording_${Date.now()}.webm`;
+      const file = new File([blob], fileName, { type: blob.type });
+
+      const result = await compressAudioForUpload(file, {
+        targetBitrate: 128, // 128 kbps für gute Qualität
+        targetFormat: 'mp3'
+      });
+
+      console.log('✅ RecorderPage: Audio compression completed', {
+        originalSize: formatFileSize(result.originalSize),
+        compressedSize: formatFileSize(result.compressedSize),
+        compressionRatio: result.compressionRatio.toFixed(1) + '%',
+        format: result.format
+      });
+
+      setCompressionResult(result);
+      
+      // Store compressed recording data in sessionStorage
+      const blobUrl = URL.createObjectURL(result.compressedFile);
+      const recordingData = {
+        file: {
+          name: result.compressedFile.name,
+          size: result.compressedFile.size,
+          type: result.compressedFile.type,
+          data: blobUrl
+        },
+        duration: recordingDuration,
+        recordedAt: new Date().toISOString(),
+        compression: {
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          compressionRatio: result.compressionRatio
+        }
+      };
+      
+      sessionStorage.setItem('recordingData', JSON.stringify(recordingData));
+      console.log('✅ RecorderPage: Compressed recording data stored in sessionStorage');
+      
+    } catch (error) {
+      console.error('❌ RecorderPage: Audio compression failed:', error);
+      setCompressionError('Kompression fehlgeschlagen. Original-Aufnahme wird verwendet.');
+      
+      // Fallback: Store original recording without compression
+      const blobUrl = URL.createObjectURL(blob);
+      const recordingData = {
+        file: {
+          name: `recording_${Date.now()}.webm`,
+          size: blob.size,
+          type: blob.type,
+          data: blobUrl
+        },
+        duration: recordingDuration,
+        recordedAt: new Date().toISOString()
+      };
+      
+      sessionStorage.setItem('recordingData', JSON.stringify(recordingData));
+      console.log('⚠️ RecorderPage: Original recording stored as fallback');
+      
+    } finally {
+      setIsCompressing(false);
+    }
+  };
   
   const { recordedBlob, reset: resetRecordingStore } = useRecordingStore();
   
@@ -467,11 +551,11 @@ export const RecorderPage = () => {
                 size="lg"
                 onClick={handlePauseResume}
                 variant="outline"
-                className={isPaused ? "border-orange-500 bg-orange-500/20" : ""}
+                className={isPaused ? "border-[#ff4e3a] bg-[#ff4e3a]/20" : ""}
                 aria-label={isPaused ? "Resume recording" : "Pause recording"}
               >
                 {isPaused ? 
-                  <Play size={24} className="text-orange-500" strokeWidth={1.5} /> :
+                  <Play size={24} className="text-[#ff4e3a]" strokeWidth={1.5} /> :
                   <Pause size={24} className="text-gray-400" strokeWidth={1.5} />
                 }
               </Button>
@@ -508,13 +592,86 @@ export const RecorderPage = () => {
           </div>
         )}
 
+        {/* Compression Status - nach der Aufnahme */}
+        {recordedBlob && !isRecording && (
+          <div className="mt-8">
+            {/* Compression Loading */}
+            {isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-[#ff4e3a]/10 border border-[#ff4e3a]/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <div>
+                    <h3 className="text-[#ff4e3a] font-medium text-sm">
+                      Optimiere Aufnahme...
+                    </h3>
+                    <p className="text-[#ff4e3a]/80 text-xs mt-1">
+                      Konvertiere zu MP3 für bessere Speichernutzung
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Results */}
+            {compressionResult && !isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                    <div className="text-green-400 text-sm">✓</div>
+                  </div>
+                  <div>
+                    <h3 className="text-green-400 font-medium text-sm">
+                      Aufnahme optimiert
+                    </h3>
+                    <p className="text-green-300/80 text-xs mt-1">
+                      Reduziert von {formatFileSize(compressionResult.originalSize)} auf {formatFileSize(compressionResult.compressedSize)} 
+                      ({compressionResult.compressionRatio.toFixed(1)}% Ersparnis)
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Error */}
+            {compressionError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <div className="text-yellow-400 text-sm">⚠</div>
+                  </div>
+                  <div>
+                    <h3 className="text-yellow-400 font-medium text-sm">
+                      {compressionError}
+                    </h3>
+                    <p className="text-yellow-300/80 text-xs mt-1">
+                      Original-Aufnahme wird verwendet
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+
         {/* Preview Controls - im Stil der Audio-Detail-Seite */}
         {recordedBlob && !isRecording && (
           <div className="mt-8 py-6 px-6 flex items-center space-x-4 bg-transparent backdrop-blur-sm -mx-6">
             {/* Auto-proceed message */}
             {autoProceed && (
               <div className="flex-1 text-center">
-                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <div className="w-6 h-6 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                 <Body className="text-white text-sm">Aufnahme wird vorbereitet...</Body>
               </div>
             )}
@@ -527,10 +684,10 @@ export const RecorderPage = () => {
                 variant="outline"
                 aria-label={currentTrack?.id === previewTrack?.id && isPlaying ? "Pause" : "Play"}
                 disabled={autoProceed}
-                className={currentTrack?.id === previewTrack?.id && isPlaying ? "border-orange-500 bg-orange-500/20" : ""}
+                className={currentTrack?.id === previewTrack?.id && isPlaying ? "border-[#ff4e3a] bg-[#ff4e3a]/20" : ""}
               >
                 {currentTrack?.id === previewTrack?.id && isPlaying ? 
-                  <Pause size={24} className="text-orange-500" strokeWidth={1.5} /> :
+                  <Pause size={24} className="text-[#ff4e3a]" strokeWidth={1.5} /> :
                   <Play size={24} className="text-gray-400" strokeWidth={1.5} />
                 }
               </Button>
@@ -562,11 +719,11 @@ export const RecorderPage = () => {
                   disabled={!recordedBlob || isSaving}
                   variant="outline"
                   aria-label="Save recording"
-                  className="border-orange-500 bg-orange-500/20"
+                  className="border-[#ff4e3a] bg-[#ff4e3a]/20"
                 >
                   {isSaving ? 
-                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> :
-                    <Save size={24} className="text-orange-500" strokeWidth={1.5} />
+                    <div className="w-6 h-6 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin" /> :
+                    <Save size={24} className="text-[#ff4e3a]" strokeWidth={1.5} />
                   }
                 </Button>
               </>

@@ -85,7 +85,7 @@ export const CommentTrackPage = () => {
                     onClick={handleBack}
                     className="w-10 h-10 p-0"
                   >
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={18} strokeWidth={2} />
                   </Button>
                   <div>
                     <h1 className="text-2xl font-bold text-text-primary">Kommentar schreiben</h1>

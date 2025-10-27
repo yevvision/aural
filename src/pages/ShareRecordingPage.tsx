@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, Plus, X, Pause, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
-import { useDatabase } from '../hooks/useDatabase';
+import { useFeedStore } from '../stores/feedStore';
 import { getAudioDuration, generateId, formatDuration } from '../utils';
 import { validateAudioFile, isValidAudioFile } from '../utils/audioValidation';
 import { 
@@ -20,6 +20,8 @@ import { capClient } from '../utils/capClient';
 import { uploadSecurityManager } from '../utils/uploadSecurity';
 import { AudioUrlManager } from '../services/audioUrlManager';
 import { unifiedAudioManager } from '../services/unifiedAudioManager';
+import { compressAudioForUpload, formatFileSize, type CompressionResult } from '../utils/audioCompression';
+import { uploadWithProgress, formatUploadSpeed, formatRemainingTime, formatUploadSize, type UploadProgress } from '../utils/uploadWithProgress';
 
 import type { AudioTrack } from '../types';
 
@@ -56,13 +58,19 @@ export const ShareRecordingPage = () => {
   const [customTag, setCustomTag] = useState('');
   const [duration, setDuration] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState('');
   const [titleError, setTitleError] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoApproveActive, setIsAutoApproveActive] = useState(false);
   
+  // Audio compression states
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionResult, setCompressionResult] = useState<CompressionResult | null>(null);
+  const [compressionError, setCompressionError] = useState('');
+  
   const { currentUser, addMyTrack } = useUserStore();
-  const { addTrack } = useDatabase();
+  const { addTrack } = useFeedStore();
 
   // Überwache Auto-Approve-Status
   useEffect(() => {
@@ -278,6 +286,8 @@ export const ShareRecordingPage = () => {
     }
 
     setError('');
+    setCompressionError('');
+    setCompressionResult(null);
     setSelectedFile(file);
     setTitle(file.name.replace(/\.[^/.]+$/, '')); // Remove file extension
     
@@ -287,6 +297,52 @@ export const ShareRecordingPage = () => {
     } catch (err) {
       console.error('Error getting duration:', err);
       setError('Fehler beim Laden der Audio-Datei. Bitte versuchen Sie eine andere Datei.');
+    }
+
+    // Starte Audio-Kompression
+    await compressSelectedFile(file);
+  };
+
+  const compressSelectedFile = async (file: File) => {
+    setIsCompressing(true);
+    setCompressionError('');
+    
+    try {
+      console.log('🎵 ShareRecordingPage: Starting audio compression...', {
+        fileName: file.name,
+        fileSize: formatFileSize(file.size),
+        fileType: file.type
+      });
+
+      const result = await compressAudioForUpload(file, {
+        targetBitrate: 128, // 128 kbps für gute Qualität
+        targetFormat: 'mp3'
+      });
+
+      console.log('✅ ShareRecordingPage: Audio compression completed', {
+        originalSize: formatFileSize(result.originalSize),
+        compressedSize: formatFileSize(result.compressedSize),
+        compressionRatio: result.compressionRatio.toFixed(1) + '%',
+        format: result.format
+      });
+
+      setCompressionResult(result);
+      
+      // Aktualisiere selectedFile mit komprimierter Datei
+      setSelectedFile(result.compressedFile);
+      
+    } catch (error) {
+      console.error('❌ ShareRecordingPage: Audio compression failed:', error);
+      setCompressionError('Kompression fehlgeschlagen. Original-Datei wird verwendet.');
+      setCompressionResult({
+        compressedFile: file,
+        originalSize: file.size,
+        compressedSize: file.size,
+        compressionRatio: 0,
+        format: file.type
+      });
+    } finally {
+      setIsCompressing(false);
     }
   };
 
@@ -301,6 +357,9 @@ export const ShareRecordingPage = () => {
     setError('');
     setTitleError('');
     setHasUnsavedChanges(false);
+    setCompressionResult(null);
+    setCompressionError('');
+    setIsCompressing(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -369,6 +428,11 @@ export const ShareRecordingPage = () => {
   const handleUpload = async () => {
     if (!selectedFile || !currentUser) return;
     
+    if (isCompressing) {
+      setError('Bitte warten Sie, bis die Audio-Optimierung abgeschlossen ist.');
+      return;
+    }
+    
     // Set fallback title if empty
     const finalTitle = title.trim() || `Moments auf ${new Date().toLocaleDateString('de-DE')}`;
     
@@ -425,66 +489,11 @@ export const ShareRecordingPage = () => {
         securityCheck.reason = 'Auto-Approve aktiv - Upload wird automatisch freigegeben';
       }
 
-      // 3.6. Prüfe Sicherheitsregeln VOR dem Upload
-      if (securityCheck.requiresReview || !securityCheck.allowed) {
-        console.log('📋 Upload requires review BEFORE upload, showing pending modal...');
-        
-        const uploadId = generateId();
-        
-        // Erstelle Blob-URL für lokale Wiedergabe
-        const audioBlobUrl = URL.createObjectURL(selectedFile);
-
-        // Speichere nur Metadaten in localStorage (ohne Audio-Daten)
-        const pendingUpload = {
-          uploadId,
-          filename: selectedFile.name,
-          originalName: selectedFile.name,
-          size: selectedFile.size,
-          mimeType: selectedFile.type,
-          url: audioBlobUrl, // Blob-URL für lokale Wiedergabe
-          title: finalTitle,
-          description: description.trim(),
-          gender: selectedGender || undefined,
-          tags: [...selectedTags, selectedGender],
-          uploadedAt: new Date().toISOString(),
-          status: 'pending_review',
-          reason: securityCheck.reason || 'Security check triggered',
-          duplicateCount: securityCheck.duplicateCheck.duplicateCount,
-          deviceId: securityCheck.deviceStats.deviceId,
-          userId: currentUser.id,
-          username: currentUser.username,
-          duration: duration // Audio-Dauer hinzufügen
-        };
-        
-        // Speichere nur Metadaten in localStorage
-        const existingUploads = JSON.parse(localStorage.getItem('aural_pending_uploads') || '{}');
-        existingUploads[uploadId] = pendingUpload;
-        localStorage.setItem('aural_pending_uploads', JSON.stringify(existingUploads));
-        
-        console.log('🔍 DEBUG: Pending upload saved to localStorage:', {
-          uploadId,
-          pendingUpload,
-          allUploads: existingUploads,
-          localStorageKey: 'aural_pending_uploads'
-        });
-        
-        // Device-Stats wurden bereits oben aktualisiert
-        
-        const pendingData: PendingUploadData = {
-          uploadId,
-          title: finalTitle,
-          status: 'pending',
-          reason: securityCheck.reason || 'Security check triggered',
-          estimatedTime: '5-10 minutes'
-        };
-        
-        // Navigate to security check page with upload data
-        navigate('/security-check', { state: pendingData });
-        return;
-      }
+      // 3.6. Upload IMMER an den Server senden - Server entscheidet über Warteschlange
+      console.log('📤 Uploading to server - server will decide if review is needed...');
       
-      // Normale Uploads (erlaubt und keine Review erforderlich)
-      console.log('📤 Normal upload - proceeding with backend upload...');
+      // Upload an den Server senden
+      console.log('📤 Sending upload to server...');
       
       // 3. FormData mit Cap-Token erstellen
       const formData = new FormData();
@@ -493,6 +502,8 @@ export const ShareRecordingPage = () => {
       formData.append('description', description.trim());
       formData.append('capToken', capToken);
       formData.append('requiresReview', securityCheck.requiresReview.toString());
+      formData.append('userId', currentUser.id);
+      formData.append('username', currentUser.username);
       if (selectedGender) {
         formData.append('gender', selectedGender);
       }
@@ -510,75 +521,94 @@ export const ShareRecordingPage = () => {
         duplicateCount: securityCheck.duplicateCheck.duplicateCount
       });
       
-      // 4. Upload to PHP backend
+      // 4. Upload to PHP backend with progress tracking
       let response;
+      let responseText;
+      let serverUploadSuccess = false;
+      
       try {
-        response = await fetch('/upload.php', {
-          method: 'POST',
-          body: formData
+        // Use uploadWithProgress for better UX
+        response = await uploadWithProgress('https://goaural.com/upload.php', formData, {
+          onProgress: (progress) => {
+            setUploadProgress(progress);
+          },
+          onSuccess: (response) => {
+            // Don't clear uploadProgress here - keep showing progress until server processing is complete
+            console.log('📤 Upload completed, waiting for server response...');
+          },
+          onError: (error) => {
+            setUploadProgress(null);
+            throw error;
+          }
         });
+        
+        responseText = await response.text();
+        console.log('Response status:', response.status);
+        console.log('Response text:', responseText.substring(0, 200));
+        
+        // Clear upload progress now that we have server response
+        setUploadProgress(null);
+        
+        if (response.ok) {
+          serverUploadSuccess = true;
+        } else {
+          console.log('📁 Server upload failed, using fallback');
+          serverUploadSuccess = false;
+        }
       } catch (error) {
-        console.log('Trying alternative upload path...');
-        response = await fetch('./upload.php', {
-          method: 'POST',
-          body: formData
-        });
+        console.log('📁 Server not reachable, using fallback:', error);
+        setUploadProgress(null);
+        serverUploadSuccess = false;
       }
       
-      // Read response body only once
-      const responseText = await response.text();
-      console.log('Response status:', response.status);
-      console.log('Response text:', responseText.substring(0, 200));
-      
-      if (!response.ok) {
-        console.error('Upload failed:', response.status, responseText);
+      // Fallback: Immer lokal speichern wenn Server nicht erreichbar
+      if (!serverUploadSuccess) {
+        console.log('🔄 Using local storage fallback...');
         
-        // Check if response is HTML (PHP error page)
-        if (responseText.includes('<?php') || responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
-          console.log('PHP server not available, using local storage fallback...');
-          
-          // Fallback: Store locally and simulate successful upload
-          const audioBase64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile);
-          });
-          
-          const localTrack: AudioTrack = {
-            id: generateId(),
-            title: finalTitle,
-            description: description.trim(),
-            url: audioBase64,
-            duration: duration,
-            user: currentUser,
-            userId: currentUser.id,
-            likes: 0,
-            isLiked: false,
-            isBookmarked: false,
-            createdAt: new Date(),
-            tags: [...selectedTags, selectedGender],
-            gender: selectedGender || undefined,
-            filename: selectedFile.name,
-            fileSize: selectedFile.size,
-            format: selectedFile.type
+        const audioBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result);
           };
-          
-          addMyTrack(localTrack);
-          addTrack(localTrack);
-          navigate('/');
-          return;
-        }
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedFile);
+        });
         
-        try {
-          const errorJson = JSON.parse(responseText);
-          throw new Error(errorJson.error || 'Upload failed');
-        } catch {
-          throw new Error(`Upload failed: ${response.status} - ${responseText.substring(0, 100)}`);
-        }
+        const localTrack: AudioTrack = {
+          id: generateId(),
+          title: finalTitle,
+          description: description.trim(),
+          url: audioBase64,
+          duration: duration,
+          user: currentUser,
+          userId: currentUser.id,
+          likes: 0,
+          isLiked: false,
+          isBookmarked: false,
+          createdAt: new Date(),
+          tags: [...selectedTags, selectedGender],
+          gender: selectedGender || undefined,
+          filename: selectedFile.name,
+          fileSize: selectedFile.size,
+          format: selectedFile.type,
+          status: 'active' as const
+        };
+        
+        console.log('✅ Creating local track:', localTrack.title);
+        console.log('🎵 ShareRecordingPage: Adding local track to FeedStore:', localTrack.title);
+        addTrack(localTrack);
+        addMyTrack(localTrack);
+        
+        // Navigate to success page
+        navigate('/upload-success', { 
+          state: { 
+            uploadId: localTrack.id, 
+            title: localTrack.title, 
+            trackId: localTrack.id 
+          } 
+        });
+        return;
       }
       
       // Try to parse as JSON
@@ -637,9 +667,11 @@ export const ShareRecordingPage = () => {
 
       // 5. Device-Stats wurden bereits oben aktualisiert
       
-      // 6. Prüfen ob Review erforderlich ist (IMMER prüfen, auch bei lokaler Speicherung)
-      if (result.requiresReview || securityCheck.requiresReview) {
-        console.log('📋 Upload requires review, showing pending modal...');
+      // 6. Prüfen ob Review erforderlich ist (berücksichtige Auto-Approve Status)
+      const requiresManualReview = (result.requiresReview || securityCheck.requiresReview) && !result.data.autoApproved;
+      
+      if (requiresManualReview) {
+        console.log('📋 Upload requires manual review, showing pending modal...');
         
         const uploadId = result.data.uploadId || generateId();
         
@@ -683,23 +715,24 @@ export const ShareRecordingPage = () => {
         // Navigate to security check page with upload data
         navigate('/security-check', { state: pendingData });
         return;
+      } else if (result.data.autoApproved) {
+        console.log('✅ Upload wurde automatisch freigegeben (Auto-Approve aktiv)');
+        // Upload wurde automatisch freigegeben, zeige Erfolgsmeldung
+        alert('Upload erfolgreich! Ihr Audio wurde automatisch freigegeben.');
       }
       
       // 7. Normale Verarbeitung - Track erstellen
-      const trackId = generateId();
+      const trackId = result.data.trackId || generateId();
       
-      // Speichere die Audio-URL im CentralAudioManager (dauerhaft verfügbar)
-      const storeResult = await unifiedAudioManager.storeNewAudio(trackId, selectedFile, { title: finalTitle });
-      if (!storeResult.success) {
-        throw new Error(storeResult.error || 'Failed to store audio');
-      }
-      const audioUrl = storeResult.url!;
+      // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits Audio + Info gespeichert!
+      // Verwende die Server-URL für die Audio-Datei
+      const audioUrl = result.data.url || `https://goaural.com/uploads/${result.data.filename}`;
       
       const newTrack: AudioTrack = {
         id: trackId,
         title: finalTitle,
         description: description.trim(),
-        url: audioUrl, // Verwende die einzigartige URL für sofortige Wiedergabe
+        url: audioUrl, // Verwende die Server-URL (nicht lokal speichern!)
         duration: duration,
         user: currentUser,
         userId: currentUser.id,
@@ -726,16 +759,24 @@ export const ShareRecordingPage = () => {
         fileSize: newTrack.fileSize
       });
       
-      // ZENTRALE DATENBANK: Füge Track zur einzigen Quelle der Wahrheit hinzu
-      console.log('🎯 ShareRecordingPage: Füge Track zur zentralen Datenbank hinzu...');
-      const success = addTrack(newTrack);
+      // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits alles gespeichert!
+      console.log('🔄 ShareRecordingPage: upload.php hat bereits Track gespeichert, synchronisiere nur lokal...');
       
-      if (success) {
-        console.log('✅ ShareRecordingPage: Track erfolgreich zur Datenbank hinzugefügt');
+      // WICHTIG: Nur lokal hinzufügen - upload.php hat bereits auf Server gespeichert!
+      // Verwende centralDB.addTrack() direkt um Server-Duplikate zu vermeiden
+      const { centralDB } = await import('../database/centralDatabase_simple');
+      const localSuccess = centralDB.addTrack(newTrack);
+      
+      if (localSuccess) {
+        console.log('🎵 ShareRecordingPage: Adding server track to FeedStore:', newTrack.title);
+        addTrack(newTrack);
         addMyTrack(newTrack);
+        console.log('✅ ShareRecordingPage: Track nur lokal synchronisiert - upload.php hat bereits auf Server gespeichert');
       } else {
-        console.error('❌ ShareRecordingPage: Fehler beim Hinzufügen zur Datenbank');
-        throw new Error('Track could not be added to database');
+        console.log('⚠️ ShareRecordingPage: Track bereits lokal vorhanden - das ist normal nach upload.php');
+        console.log('🎵 ShareRecordingPage: Adding existing track to FeedStore:', newTrack.title);
+        addTrack(newTrack);
+        addMyTrack(newTrack);
       }
       
       // Navigate to upload success page with track data
@@ -796,9 +837,9 @@ export const ShareRecordingPage = () => {
           <div
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-gray-500 rounded-xl p-12 text-center mb-8
-                     hover:border-orange-500 hover:bg-orange-500/5 transition-all duration-300 cursor-pointer"
+                     hover:border-[#ff4e3a] hover:bg-[#ff4e3a]/5 transition-all duration-300 cursor-pointer"
           >
-            <Upload size={48} className="text-orange-500 mx-auto mb-6" />
+            <Upload size={48} className="text-[#ff4e3a] mx-auto mb-6" />
             <Heading level={3} className="mb-3">
               Select Audio File
             </Heading>
@@ -810,8 +851,75 @@ export const ShareRecordingPage = () => {
             </Button>
           </div>
         ) : (
-          /* File Selected - no preview shown */
-          <div></div>
+          <div className="mb-8">
+            {/* Compression Loading */}
+            {isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-[#ff4e3a]/10 border border-[#ff4e3a]/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <div>
+                    <h3 className="text-[#ff4e3a] font-medium text-sm">
+                      Optimiere Audio...
+                    </h3>
+                    <p className="text-[#ff4e3a]/80 text-xs mt-1">
+                      Konvertiere zu MP3 für bessere Speichernutzung
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Results */}
+            {compressionResult && !isCompressing && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-green-400 font-medium text-sm">
+                      Audio optimiert
+                    </h3>
+                    <p className="text-green-300/80 text-xs mt-1">
+                      Reduziert von {formatFileSize(compressionResult.originalSize)} auf {formatFileSize(compressionResult.compressedSize)} 
+                      ({compressionResult.compressionRatio.toFixed(1)}% Ersparnis)
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Compression Error */}
+            {compressionError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                    <X className="w-4 h-4 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-yellow-400 font-medium text-sm">
+                      {compressionError}
+                    </h3>
+                    <p className="text-yellow-300/80 text-xs mt-1">
+                      Original-Datei wird verwendet
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
         )}
 
         <input
@@ -838,7 +946,7 @@ export const ShareRecordingPage = () => {
                 placeholder="Create title"
                 className={`w-full px-4 py-4 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
-                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                         focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                          transition-all duration-200 ${
                            titleError ? 'border-red-500/50' : 'border-gray-500'
                          }`}
@@ -867,7 +975,7 @@ export const ShareRecordingPage = () => {
                 rows={4}
                 className="w-full px-4 py-4 bg-transparent border border-gray-500 rounded-lg
                          text-white placeholder-gray-400 resize-none
-                         focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                         focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                          transition-all duration-200"
                 maxLength={1000}
               />
@@ -888,7 +996,7 @@ export const ShareRecordingPage = () => {
                     onClick={() => setSelectedGender(option.value)}
                     className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 ${
                       selectedGender === option.value
-                        ? 'bg-orange-500/20 text-orange-500 border-orange-500/50'
+                        ? 'bg-[#ff4e3a]/20 text-[#ff4e3a] border-[#ff4e3a]/50'
                         : 'bg-white/5 text-text-secondary border-white/30 hover:bg-white/10 hover:text-text-primary hover:border-white/40'
                     }`}
                   >
@@ -915,6 +1023,7 @@ export const ShareRecordingPage = () => {
                       selectedValues={selectedTags}
                       onSelectionChange={setSelectedTags}
                       size="md"
+                      showHashtag={true}
                       aria-label={`Tag: ${tag}, not selected`}
                     >
                       {tag}
@@ -932,7 +1041,7 @@ export const ShareRecordingPage = () => {
                   placeholder="Enter your own tag"
                   className="flex-1 px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-sm
                            text-white placeholder-gray-400
-                           focus:outline-none focus:border-orange-500 focus:bg-orange-500/5
+                           focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
                            transition-all duration-200"
                   maxLength={24}
                   aria-label="Enter your own tag"
@@ -954,8 +1063,8 @@ export const ShareRecordingPage = () => {
                     {selectedTags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20
-                                 text-orange-500 text-sm rounded-full border border-orange-500/50"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#ff4e3a]/20
+                                 text-[#ff4e3a] text-sm rounded-full border border-[#ff4e3a]/50"
                       >
                         <span>{tag}</span>
                         <button
@@ -993,19 +1102,33 @@ export const ShareRecordingPage = () => {
           <div className="mt-8" style={{ marginTop: '70px' }}>
             <button
               onClick={handleUpload}
-              disabled={!title.trim() || titleError !== '' || isUploading}
-              className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-orange-500 bg-gradient-to-r from-orange-500/30 to-orange-600/20 flex items-center justify-center space-x-3 hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!title.trim() || titleError !== '' || isUploading || isCompressing || uploadProgress !== null}
+              className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-3 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
               style={{ minHeight: '64px' }}
             >
-              {isUploading ? (
+              {isCompressing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-orange-300 text-base font-semibold">Publishing...</span>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">Optimiere Audio...</span>
+                </>
+              ) : uploadProgress ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">
+                    Lade hoch... {uploadProgress.percent}%
+                  </span>
+                </>
+              ) : isUploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#ff4e3a] text-base font-semibold">Publishing...</span>
                 </>
               ) : (
                 <>
-                  <Upload size={20} className="text-orange-400" strokeWidth={2} />
-                  <span className="text-orange-300 text-base font-semibold">Publish Recording</span>
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 -top-1 -left-1 -right-1 -bottom-1 bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-60 animate-shimmer"></div>
+                  <Upload size={20} className="text-[#ff4e3a] relative z-10" strokeWidth={2} />
+                  <span className="text-[#ff4e3a] text-base font-semibold relative z-10">Publish Recording</span>
                 </>
               )}
             </button>

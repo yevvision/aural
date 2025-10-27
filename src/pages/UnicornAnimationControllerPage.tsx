@@ -467,7 +467,7 @@ const UnicornAnimationControllerPage: React.FC = () => {
                 transition={{ delay: 0.4 }}
                 className="bg-gray-800/50 backdrop-blur-md rounded-xl p-6 border border-white/10"
               >
-                <Heading level={3} className="text-lg text-orange-400 mb-4">Steuerung</Heading>
+                <Heading level={3} className="text-lg text-[#ff4e3a] mb-4">Steuerung</Heading>
                 
                 <div className="space-y-4">
                   <Button
@@ -475,7 +475,7 @@ const UnicornAnimationControllerPage: React.FC = () => {
                     className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 ${
                       settings.isPaused 
                         ? 'bg-green-500 hover:bg-green-600 text-white' 
-                        : 'bg-orange-500 hover:bg-orange-600 text-white'
+                        : 'bg-[#ff4e3a] hover:bg-[#ff4e3a] text-white'
                     }`}
                   >
                     {settings.isPaused ? (
@@ -519,7 +519,7 @@ const UnicornAnimationControllerPage: React.FC = () => {
                   
                   <div className="flex justify-between">
                     <span className="text-gray-400">Status:</span>
-                    <span className={settings.isPlaying ? 'text-green-400' : 'text-orange-400'}>
+                    <span className={settings.isPlaying ? 'text-green-400' : 'text-[#ff4e3a]'}>
                       {settings.isPlaying ? 'Läuft' : 'Pausiert'}
                     </span>
                   </div>
@@ -612,14 +612,6 @@ const UnicornAnimationControllerPage: React.FC = () => {
 };
 
 // TypeScript declaration for UnicornStudio
-declare global {
-  interface Window {
-    UnicornStudio: {
-      init: () => Promise<any>;
-      destroy: () => void;
-      addScene: (config: any) => Promise<any>;
-    };
-  }
-}
+// UnicornStudio types are now defined globally in vite-env.d.ts
 
 export default UnicornAnimationControllerPage;

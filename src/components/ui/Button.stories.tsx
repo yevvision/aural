@@ -164,15 +164,15 @@ export const VoiceButtonExample: Story = {
     <div className="space-y-6">
       <h3 className="text-lg font-semibold text-white mb-4">Voice Buttons</h3>
       <div className="flex items-center space-x-6">
-        <VoiceButton size="md">
+        <Button variant="primary" size="md">
           <Mic className="w-6 h-6" />
-        </VoiceButton>
-        <VoiceButton size="lg" pulsing>
+        </Button>
+        <Button variant="primary" size="lg">
           <Mic className="w-8 h-8" />
-        </VoiceButton>
-        <VoiceButton size="xl">
+        </Button>
+        <Button variant="primary" size="xl">
           <Mic className="w-10 h-10" />
-        </VoiceButton>
+        </Button>
       </div>
     </div>
   ),
@@ -239,20 +239,20 @@ export const ButtonGroups: Story = {
       
       <div>
         <h4 className="text-sm font-medium text-gray-300 mb-2">Horizontal</h4>
-        <ButtonGroup orientation="horizontal">
+        <div className="flex space-x-2">
           <Button variant="outline">Previous</Button>
           <Button variant="primary">Current</Button>
           <Button variant="outline">Next</Button>
-        </ButtonGroup>
+        </div>
       </div>
       
       <div>
         <h4 className="text-sm font-medium text-gray-300 mb-2">Vertical</h4>
-        <ButtonGroup orientation="vertical">
+        <div className="flex flex-col space-y-2">
           <Button variant="glass">Option 1</Button>
           <Button variant="glass">Option 2</Button>
           <Button variant="glass">Option 3</Button>
-        </ButtonGroup>
+        </div>
       </div>
     </div>
   ),
@@ -272,9 +272,13 @@ export const FloatingActionButtons: Story = {
       <p className="text-center text-gray-400 mt-8">
         Floating Action Buttons erscheinen in den Ecken
       </p>
-      <FloatingActionButton position="bottom-right">
+      <Button 
+        variant="primary" 
+        size="lg"
+        className="absolute bottom-4 right-4 rounded-full w-14 h-14"
+      >
         <Mic className="w-6 h-6" />
-      </FloatingActionButton>
+      </Button>
     </div>
   ),
   parameters: {

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag, User } from 'lucide-react';
+import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag, User, Calendar } from 'lucide-react';
 import { usePlayerStore } from '../stores/playerStore';
 import { useUserStore } from '../stores/userStore';
 import { useDatabase } from '../hooks/useDatabase';
@@ -9,6 +9,7 @@ import { getGlobalAudio } from '../hooks/useGlobalAudioManager';
 import { formatDuration } from '../utils';
 import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
 import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
+import { DynamicPlayIcon } from '../components/ui/DynamicPlayIcon';
 
 export const PlayerPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -87,6 +88,16 @@ export const PlayerPage = () => {
     seek(newTime);
   };
 
+  const handleSkipBackward = () => {
+    const newTime = Math.max(0, safeCurrentTime - 15);
+    seek(newTime);
+  };
+
+  const handleSkipForward = () => {
+    const newTime = Math.min(safeDuration, safeCurrentTime + 15);
+    seek(newTime);
+  };
+
   const handleLike = () => {
     console.log('❤️ PlayerPage: Like button clicked for track:', track.id);
     const success = currentUser?.id ? toggleLike(track.id, currentUser.id) : false;
@@ -159,6 +170,7 @@ export const PlayerPage = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
 
@@ -169,13 +181,12 @@ export const PlayerPage = () => {
             onClick={() => navigate(`/profile/${track.user?.username || 'unknown'}`)}
             className="flex items-center space-x-1 text-gray-400 text-xs hover:text-white transition-colors cursor-pointer"
           >
-            <User size={12} />
+            <User size={12} strokeWidth={2} />
             <span>{track.user?.username || 'Unknown'}</span>
           </button>
           <div className="flex items-center space-x-1">
             <Play 
-              size={14} 
-              strokeWidth={1.5} 
+              size={14} strokeWidth={2} 
               className="text-gray-400"
               fill="none"
             />
@@ -183,8 +194,7 @@ export const PlayerPage = () => {
           </div>
           <div className="flex items-center space-x-1">
             <Heart 
-              size={14} 
-              strokeWidth={1.5} 
+              size={14} strokeWidth={2} 
               className="text-gray-400"
               fill="none"
             />
@@ -194,6 +204,18 @@ export const PlayerPage = () => {
             <MessageCircle size={14} strokeWidth={1.5} className="text-gray-400" />
             <span className="text-gray-400 text-xs">{track.commentsCount || trackComments.length}</span>
           </div>
+          {track.createdAt && (
+            <div className="flex items-center space-x-1">
+              <Calendar size={14} strokeWidth={1.5} className="text-gray-400" />
+              <span className="text-gray-400 text-xs">
+                {new Date(track.createdAt).toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Title - large and white */}
@@ -222,23 +244,36 @@ export const PlayerPage = () => {
             return sortedTags.map((tag, index) => (
               <span
                 key={index}
-                className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full"
+                className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1"
               >
+                <span className="text-gray-500">#</span>
                 {tag}
               </span>
             ));
           })()}
         </div>
 
-        {/* Play button with time displays centered vertically in page */}
+        {/* Play button with skip buttons centered vertically in page */}
         <div className="flex justify-between items-center my-16 relative">
-          {/* Left time display */}
-          <span className="text-gray-400 text-xs font-mono">
-            {formatDuration(safeCurrentTime)}
-          </span>
+          {/* Skip backward button */}
+          <button
+            onClick={handleSkipBackward}
+            className="flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            aria-label="15 Sekunden zurück"
+            title="15 Sekunden zurück"
+          >
+            <svg width="36" height="36" viewBox="0 0 90.675 81.032" className="text-white">
+              <g>
+                <path style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} d="M50.166,78.872c21.184,0,38.356-17.173,38.356-38.356
+                  S71.35,2.16,50.166,2.16s-38.356,17.173-38.356,38.356"/>
+                <polyline style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} points="1.306,27.653 11.809,40.569 24.726,30.066"/>
+                <text x="48.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="900" stroke="white" strokeWidth="1.5">15</text>
+              </g>
+            </svg>
+          </button>
           
           {/* Play button with visualizer - like on Record page */}
-          <div className="relative">
+          <div className="relative flex items-center justify-center">
             {/* Unicorn Beam Audio Visualizer as container */}
             <UnicornBeamAudioVisualizer
               frequencies={[]}
@@ -258,30 +293,77 @@ export const PlayerPage = () => {
                 height: '100px',
                 top: '50%',
                 left: '50%',
-                transform: 'translate(-50%, -50%)'
+                transform: 'translate(-50%, -50%)',
+                aspectRatio: '1/1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: 0,
+                padding: 0
               }}
             >
-              {isTrackPlaying ? (
-                <Pause size={28} strokeWidth={1.5} className="text-white" />
-              ) : (
-                <Play size={28} strokeWidth={1.5} className="text-white ml-1" />
-              )}
+              <DynamicPlayIcon
+                isCurrentTrack={isCurrentTrack}
+                isPlaying={isTrackPlaying}
+                isFinished={false}
+                variant="white-outline"
+              />
             </button>
           </div>
           
-          {/* Right time display */}
-          <span className="text-gray-400 text-xs font-mono">
-            {formatDuration(safeDuration)}
-          </span>
+          {/* Skip forward button */}
+          <button
+            onClick={handleSkipForward}
+            className="flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            aria-label="15 Sekunden vor"
+            title="15 Sekunden vor"
+          >
+            <svg width="36" height="36" viewBox="0 0 90.675 81.032" className="text-white">
+              <g>
+                <path style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} d="M40.509,78.872c-21.184,0-38.356-17.173-38.356-38.356
+                  S19.326,2.16,40.509,2.16s38.356,17.173,38.356,38.356"/>
+                <polyline style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} points="89.369,27.653 78.866,40.569 65.949,30.066"/>
+                <text x="42.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="900" stroke="white" strokeWidth="1.5">15</text>
+              </g>
+            </svg>
+          </button>
+        </div>
+        
+        {/* Progress Bar with time displays - 10px above comments/buttons */}
+        <div className="mt-8 mb-2.5 px-6 -mx-6">
+          <div className="flex items-center gap-[15px]">
+            {/* Left time display */}
+            <span className="text-gray-400 text-xs font-mono min-w-[40px] text-left">
+              {formatDuration(safeCurrentTime)}
+            </span>
+            
+            {/* Progress bar */}
+            <div 
+              className="h-0.5 bg-gray-700 rounded-full cursor-pointer hover:h-1 transition-all duration-200"
+              onClick={handleProgressClick}
+              title={`${formatDuration(safeCurrentTime)} / ${formatDuration(safeDuration)}`}
+              style={{ width: 'calc(100% - 110px)' }}
+            >
+              <div 
+                className="h-full bg-[#ff4e3a] rounded-full transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            
+            {/* Right time display */}
+            <span className="text-gray-400 text-xs font-mono min-w-[40px] text-right">
+              {formatDuration(safeDuration)}
+            </span>
+          </div>
         </div>
         
         {/* Comment input and action buttons at the bottom of content */}
-        <div className="mt-8 py-4 px-6 flex items-center gap-[15px] bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '40px' }}>
+        <div className="mt-4 py-4 px-6 flex items-center gap-[15px] bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '20px' }}>
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="..."
-              className="w-full h-10 px-4 bg-transparent border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 transition-all duration-200 border-gray-500"
+              placeholder="comment …"
+              className="w-full h-10 px-4 bg-transparent border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5 transition-all duration-200 border-gray-500"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               onKeyPress={(e) => {
@@ -308,6 +390,7 @@ export const PlayerPage = () => {
                   ? "border-red-500 bg-gradient-to-r from-red-500/30 to-red-600/20" 
                   : ""
               }`}
+              style={{ aspectRatio: '1/1' }}
               title={track.isLiked ? 'Unlike' : 'Like'}
             >
               <Heart 
@@ -328,6 +411,7 @@ export const PlayerPage = () => {
                   ? "border-yellow-500 bg-gradient-to-r from-yellow-500/30 to-yellow-600/20" 
                   : ""
               }`}
+              style={{ aspectRatio: '1/1' }}
               title={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
             >
               <Bookmark 
@@ -348,13 +432,29 @@ export const PlayerPage = () => {
           {trackComments.length > 0 ? (
             <div className="space-y-4">
               {trackComments.map((comment) => {
-                const isLiked = isCommentLikedByUser(comment.id, 'user-1');
-                const likeCount = getCommentLikeCount(comment.id);
+                const [isLiked, setIsLiked] = useState(false);
+                const [likeCount, setLikeCount] = useState(0);
+                
+                useEffect(() => {
+                  const loadCommentData = async () => {
+                    try {
+                      const [liked, count] = await Promise.all([
+                        isCommentLikedByUser(comment.id, 'user-1'),
+                        getCommentLikeCount(comment.id)
+                      ]);
+                      setIsLiked(liked);
+                      setLikeCount(count);
+                    } catch (error) {
+                      console.error('Error loading comment data:', error);
+                    }
+                  };
+                  loadCommentData();
+                }, [comment.id]);
                 
                 return (
                   <div key={comment.id} className="border-b border-gray-800 pb-4">
                     <div className="flex items-center mb-2">
-                      <span className="text-orange-500 text-sm font-medium">{comment.user.username}</span>
+                      <span className="text-[#ff4e3a] text-sm font-medium">{comment.user.username}</span>
                       <span className="text-gray-500 text-xs ml-2">
                         {new Date(comment.createdAt).toLocaleDateString('de-DE')}
                       </span>
@@ -366,9 +466,8 @@ export const PlayerPage = () => {
                         className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors"
                       >
                         <Heart 
-                          size={14} 
+                          size={14} strokeWidth={2} 
                           className={isLiked ? "fill-red-500 text-red-500" : ""} 
-                          strokeWidth={1.5} 
                         />
                         {likeCount > 0 && (
                           <span className="text-xs">{likeCount}</span>

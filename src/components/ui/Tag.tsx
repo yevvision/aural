@@ -13,6 +13,7 @@ interface TagProps extends Omit<HTMLMotionProps<'button'>, 'size'> {
   selected?: boolean;
   onToggle?: () => void;
   disabled?: boolean;
+  showHashtag?: boolean;
 }
 
 /**
@@ -28,6 +29,7 @@ export const Tag: React.FC<TagProps> = ({
   selected = false,
   onToggle,
   disabled = false,
+  showHashtag = false,
   ...props
 }) => {
   // Determine actual variant based on state
@@ -87,6 +89,7 @@ export const Tag: React.FC<TagProps> = ({
       whileHover={!disabled ? { scale: 1.02 } : undefined}
       {...props}
     >
+      {showHashtag && <span className="opacity-60 mr-1">#</span>}
       {children}
     </motion.button>
   );

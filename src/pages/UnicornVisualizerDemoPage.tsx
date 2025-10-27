@@ -128,8 +128,6 @@ export const UnicornVisualizerDemoPage = () => {
                   frequencies={visualizerData.frequencies}
                   volume={visualizerData.volume}
                   isActive={isRecording || isPlaying}
-                  audioElement={audioRef.current}
-                  isPlaying={isPlaying}
                   size="large"
                 />
               ) : (
@@ -206,7 +204,7 @@ export const UnicornVisualizerDemoPage = () => {
                     onClick={handlePlayPause}
                     className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
                       isPlaying 
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                        ? 'bg-[#ff4e3a] hover:bg-[#ff4e3a] text-white' 
                         : 'bg-green-500 hover:bg-green-600 text-white'
                     }`}
                   >
@@ -289,7 +287,7 @@ export const UnicornVisualizerDemoPage = () => {
             </div>
 
             <div className="bg-gray-800 p-6 rounded-lg">
-              <Heading level={3} className="text-xl mb-4 text-orange-400">
+              <Heading level={3} className="text-xl mb-4 text-[#ff4e3a]">
                 ⚡ Echtzeit-Reaktion
               </Heading>
               <Body className="text-gray-300">

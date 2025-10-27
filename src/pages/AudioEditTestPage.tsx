@@ -171,7 +171,7 @@ export const AudioEditTestPage = () => {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center px-4">
               <motion.div
-                className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+                className="w-8 h-8 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin mx-auto mb-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}

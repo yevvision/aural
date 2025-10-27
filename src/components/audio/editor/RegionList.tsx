@@ -41,7 +41,7 @@ export const RegionList: React.FC<RegionListProps> = ({
   return (
     <div className="mt-6 w-full" style={{ marginTop: '75px' }}>
       <h3 className="text-lg font-medium text-white mb-4">Markers</h3>
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <div className="bg-black rounded-lg overflow-hidden">
         {regions.length > 0 ? (
           <table className="w-full">
             <tbody>
@@ -67,7 +67,7 @@ export const RegionList: React.FC<RegionListProps> = ({
                             onPlayRegion(region);
                           }
                         }}
-                        className="w-10 h-10 rounded-full bg-orange-600 hover:bg-orange-500 active:bg-orange-700 flex items-center justify-center transition-colors duration-200"
+                        className="w-10 h-10 rounded-full bg-[#ff4e3a] hover:bg-[#ff4e3a] active:bg-[#ff4e3a] flex items-center justify-center transition-colors duration-200"
                       >
                         {isPlaying && currentPlayingRegionId === region.id ? (
                           <Pause size={16} className="text-white" />

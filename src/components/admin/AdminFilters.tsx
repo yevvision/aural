@@ -36,14 +36,14 @@ export const AdminFilters: React.FC<AdminFiltersProps> = ({
             placeholder="Suchen..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e3a] focus:border-transparent"
           />
         </div>
         <div className="flex gap-2">
           <select
             value={userFilter}
             onChange={(e) => onUserFilterChange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e3a] focus:border-transparent"
           >
             <option value="all">Alle Benutzer</option>
             {allUsers.map(user => (
@@ -55,7 +55,7 @@ export const AdminFilters: React.FC<AdminFiltersProps> = ({
           <select
             value={sortField}
             onChange={(e) => onSortFieldChange(e.target.value as SortField)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e3a] focus:border-transparent"
           >
             <option value="date">Datum</option>
             <option value="title">Titel</option>
@@ -67,7 +67,7 @@ export const AdminFilters: React.FC<AdminFiltersProps> = ({
           </select>
           <button
             onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            className="px-4 py-2 bg-[#ff4e3a] text-white rounded-lg hover:bg-[#ff4e3a] transition-colors"
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
           </button>

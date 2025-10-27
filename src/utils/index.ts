@@ -909,6 +909,7 @@ export const sanitizeAudioTrack = (track: any): AudioTrack => {
     description: track.description ? String(track.description) : undefined,
     duration: typeof track.duration === 'number' ? track.duration : 0,
     url: String(track.url || ''),
+    userId: String(track.userId || track.user?.id || ''),
     user: sanitizeUser(track.user),
     likes: typeof track.likes === 'number' ? track.likes : 0,
     isLiked: Boolean(track.isLiked),

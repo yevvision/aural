@@ -4,7 +4,7 @@ import { Search, Filter, Trash2, Plus, BarChart3, Users, Upload, MessageSquare, 
 import { useUserStore } from '../stores/userStore';
 import type { AudioTrack, User } from '../types';
 import { MiniPlayer } from '../components/audio/MiniPlayer';
-import { useGlobalAudioManager } from '../hooks/useGlobalAudioManager';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useDatabase } from '../hooks/useDatabase';
 import { Button } from '../components/ui/Button';
 import { Heading, Body, Caption } from '../components/ui/Typography';
@@ -33,7 +33,7 @@ type SortOrder = 'asc' | 'desc';
 
 export const AdminPage: React.FC = () => {
   const { currentUser } = useUserStore();
-  const { play, currentTrack, isPlaying, pause, toggle } = useGlobalAudioManager();
+  const { play, currentTrack, isPlaying, pause, toggle } = useAudioPlayer();
   const { 
     tracks,
     users,
@@ -83,22 +83,54 @@ export const AdminPage: React.FC = () => {
     loadPendingCount();
   }, []);
 
-  // Load pending count
-  const loadPendingCount = () => {
+  // Load pending count from server and localStorage
+  const loadPendingCount = async () => {
     try {
-      const pendingUploadsData = localStorage.getItem('aural_pending_uploads');
-      if (pendingUploadsData) {
-        const uploads = JSON.parse(pendingUploadsData);
-        const pendingList = Object.values(uploads).filter((upload: any) => 
-          upload.status === 'pending_review'
-        );
-        setPendingCount(pendingList.length);
-      } else {
+      const { serverDatabaseService } = await import('../services/serverDatabaseService');
+      const serverPendingUploads = await serverDatabaseService.getPendingUploads();
+      
+      // Lade auch aus localStorage
+      let localPendingCount = 0;
+      try {
+        const pendingUploadsData = localStorage.getItem('aural_pending_uploads');
+        if (pendingUploadsData) {
+          const uploads = JSON.parse(pendingUploadsData);
+          const pendingList = Object.values(uploads).filter((upload: any) => 
+            upload.status === 'pending_review'
+          );
+          localPendingCount = pendingList.length;
+        }
+      } catch (localError) {
+        console.error('Failed to load pending count from localStorage:', localError);
+      }
+      
+      // Verwende Server-Daten als primäre Quelle, localStorage als Fallback
+      const totalPendingCount = serverPendingUploads.length > 0 ? serverPendingUploads.length : localPendingCount;
+      setPendingCount(totalPendingCount);
+      
+      console.log('📊 Pending count loaded:', {
+        server: serverPendingUploads.length,
+        local: localPendingCount,
+        total: totalPendingCount
+      });
+    } catch (error) {
+      console.error('Failed to load pending count from server:', error);
+      // Fallback to localStorage only
+      try {
+        const pendingUploadsData = localStorage.getItem('aural_pending_uploads');
+        if (pendingUploadsData) {
+          const uploads = JSON.parse(pendingUploadsData);
+          const pendingList = Object.values(uploads).filter((upload: any) => 
+            upload.status === 'pending_review'
+          );
+          setPendingCount(pendingList.length);
+        } else {
+          setPendingCount(0);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
         setPendingCount(0);
       }
-    } catch (error) {
-      console.error('Failed to load pending count:', error);
-      setPendingCount(0);
     }
   };
 
@@ -473,7 +505,7 @@ export const AdminPage: React.FC = () => {
             onClick={handleForceDeleteTrack}
             variant="glass"
             size="md"
-            className="flex items-center gap-2 hover:text-orange-400"
+            className="flex items-center gap-2 hover:text-[#ff4e3a]"
           >
             <Trash2 className="w-4 h-4" />
             "naaa" von yev_cloud löschen
@@ -604,7 +636,7 @@ export const AdminPage: React.FC = () => {
                                 <span className="mx-2">•</span>
                                 <span>{new Date(comment.createdAt).toLocaleDateString('de-DE')}</span>
                                 <span className="mx-2">•</span>
-                                <span>{getCommentLikeCount(comment.id)} Likes</span>
+                                <span>{(comment as any).likeCount || 0} Likes</span>
                               </div>
                             </div>
                             <Button
@@ -676,8 +708,8 @@ export const AdminPage: React.FC = () => {
                 </Button>
               </div>
               <PendingUploadsQueue
-                onUploadProcessed={(uploadId, action) => {
-                  console.log(`Upload ${action}: ${uploadId}`);
+                onUploadProcessed={(track) => {
+                  console.log(`Upload approved: ${track.id}`);
                   // Aktualisiere Pending-Count nach Verarbeitung
                   loadPendingCount();
                   // Lade Daten neu um freigegebene Tracks zu zeigen
@@ -696,7 +728,7 @@ export const AdminPage: React.FC = () => {
             track={selectedTrack}
             isOpen={showCommentsModal}
             onClose={() => setShowCommentsModal(false)}
-            getCommentLikeCount={getCommentLikeCount}
+            getCommentLikeCount={async (commentId: string) => await getCommentLikeCount(commentId)}
           />
         )}
 

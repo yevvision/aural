@@ -34,8 +34,8 @@ const CustomRadioButton = ({
         <div 
           className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
             checked 
-              ? 'border-orange-500 bg-orange-500' 
-              : 'border-gray-600 bg-gray-700 hover:border-orange-400'
+              ? 'border-[#ff4e3a] bg-[#ff4e3a]' 
+              : 'border-gray-600 bg-gray-700 hover:border-[#ff4e3a]'
           }`}
         >
           {checked && (
@@ -193,7 +193,7 @@ export const ReportPage = () => {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Please provide more details about why you're reporting this content..."
-            className="w-full h-32 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:bg-orange-500/5 transition-all duration-200 resize-none"
+            className="w-full h-32 px-4 py-3 bg-transparent border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5 transition-all duration-200 resize-none"
             maxLength={500}
           />
           <div className="text-right text-sm text-gray-400 mt-2">
@@ -214,18 +214,18 @@ export const ReportPage = () => {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-6 py-3 rounded-full border-2 border-orange-500 bg-gradient-to-r from-orange-500/30 to-orange-600/20 flex items-center justify-center space-x-2 hover:from-orange-500/40 hover:to-orange-600/30 active:from-orange-500/50 active:to-orange-600/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-2 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ minHeight: '48px' }}
           >
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-orange-300 text-sm font-semibold">Submitting...</span>
+                <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-[#ff4e3a] text-sm font-semibold">Submitting...</span>
               </>
             ) : (
               <>
-                <Send size={16} className="text-orange-400" strokeWidth={2} />
-                <span className="text-orange-300 text-sm font-semibold">Submit Report</span>
+                <Send size={16} className="text-[#ff4e3a]" strokeWidth={2} />
+                <span className="text-[#ff4e3a] text-sm font-semibold">Submit Report</span>
               </>
             )}
           </button>

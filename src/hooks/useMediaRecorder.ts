@@ -8,9 +8,6 @@ interface UseMediaRecorderOptions {
 
 export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
   const [isSupported, setIsSupported] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [duration, setDuration] = useState(0);
   const [isCheckingSupport, setIsCheckingSupport] = useState(true);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -19,7 +16,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
   const startTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCancellingRef = useRef(false);
-  const { setRecordedBlob } = useRecordingStore();
+  const { setRecordedBlob, isRecording, isPaused, duration, startRecording: startRecordingStore, stopRecording: stopRecordingStore, pauseRecording: pauseRecordingStore, resumeRecording: resumeRecordingStore, setDuration: setDurationStore } = useRecordingStore();
 
   // Debug logging helper
   const addDebugLog = (message: string, data?: any) => {
@@ -113,21 +110,19 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
       mediaRecorder.onstart = () => {
         addDebugLog('MediaRecorder started');
-        setIsRecording(true);
-        setIsPaused(false);
         startTimeRef.current = Date.now();
         chunksRef.current = [];
         
         // Start duration timer
         durationIntervalRef.current = setInterval(() => {
           const elapsed = (Date.now() - startTimeRef.current) / 1000;
-          setDuration(elapsed);
+          setDurationStore(elapsed);
         }, 100);
       };
 
       mediaRecorder.onpause = () => {
         addDebugLog('MediaRecorder paused');
-        setIsPaused(true);
+        pauseRecordingStore();
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);
           durationIntervalRef.current = null;
@@ -136,13 +131,13 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
       mediaRecorder.onresume = () => {
         addDebugLog('MediaRecorder resumed');
-        setIsPaused(false);
+        resumeRecordingStore();
         startTimeRef.current = Date.now() - (duration * 1000);
         
         // Resume duration timer
         durationIntervalRef.current = setInterval(() => {
           const elapsed = (Date.now() - startTimeRef.current) / 1000;
-          setDuration(elapsed);
+          setDurationStore(elapsed);
         }, 100);
       };
 
@@ -155,8 +150,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
           durationIntervalRef.current = null;
         }
         
-        setIsRecording(false);
-        setIsPaused(false);
+        stopRecordingStore();
         
         // Check if this is a cancellation
         if (isCancellingRef.current) {
@@ -204,8 +198,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
       mediaRecorder.onerror = (event) => {
         addDebugLog('MediaRecorder error', { error: event });
         options.onError?.('Aufnahmefehler');
-        setIsRecording(false);
-        setIsPaused(false);
+        stopRecordingStore();
       };
 
       setIsSupported(true);
@@ -219,7 +212,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
       options.onError?.('Fehler beim Initialisieren der Aufnahme');
       return false;
     }
-  }, [options, setRecordedBlob]);
+  }, [options, setRecordedBlob, stopRecordingStore]);
 
   const startRecording = useCallback(async () => {
     if (!mediaRecorderRef.current || isRecording) {
@@ -232,13 +225,17 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
     try {
       addDebugLog('Starting recording...');
+      // Set global recording state immediately when recording starts
+      startRecordingStore();
       mediaRecorderRef.current.start(100); // 100ms timeslice
       addDebugLog('MediaRecorder started with 100ms timeslice');
     } catch (error) {
       addDebugLog('Error starting recording', { error: error.message || error });
       options.onError?.('Fehler beim Starten der Aufnahme');
+      // Reset global state if recording failed
+      stopRecordingStore();
     }
-  }, [isRecording, options]);
+  }, [isRecording, options, startRecordingStore, stopRecordingStore]);
 
   const pauseRecording = useCallback(() => {
     if (!mediaRecorderRef.current || !isRecording || isPaused) {
@@ -252,12 +249,13 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
     try {
       addDebugLog('Pausing recording...');
+      pauseRecordingStore();
       mediaRecorderRef.current.pause();
     } catch (error) {
       addDebugLog('Error pausing recording', { error: error.message || error });
       options.onError?.('Fehler beim Pausieren der Aufnahme');
     }
-  }, [isRecording, isPaused, options]);
+  }, [isRecording, isPaused, options, pauseRecordingStore]);
 
   const resumeRecording = useCallback(() => {
     if (!mediaRecorderRef.current || !isRecording || !isPaused) {
@@ -271,12 +269,13 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
     try {
       addDebugLog('Resuming recording...');
+      resumeRecordingStore();
       mediaRecorderRef.current.resume();
     } catch (error) {
       addDebugLog('Error resuming recording', { error: error.message || error });
       options.onError?.('Fehler beim Fortsetzen der Aufnahme');
     }
-  }, [isRecording, isPaused, options]);
+  }, [isRecording, isPaused, options, resumeRecordingStore]);
 
   const stopRecording = useCallback(() => {
     if (!mediaRecorderRef.current || !isRecording) {
@@ -289,12 +288,13 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
 
     try {
       addDebugLog('Stopping MediaRecorder...');
-        mediaRecorderRef.current.stop();
-      } catch (error) {
+      stopRecordingStore();
+      mediaRecorderRef.current.stop();
+    } catch (error) {
       addDebugLog('Error stopping recording', { error: error.message || error });
-        options.onError?.('Fehler beim Stoppen der Aufnahme');
+      options.onError?.('Fehler beim Stoppen der Aufnahme');
     }
-  }, [isRecording, options]);
+  }, [isRecording, options, stopRecordingStore]);
 
   const cancelRecording = useCallback(() => {
     if (!mediaRecorderRef.current) {
@@ -307,12 +307,11 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
       isCancellingRef.current = true;
       
       if (isRecording) {
-      mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stop();
       }
       
-      setIsRecording(false);
-      setIsPaused(false);
-      setDuration(0);
+      stopRecordingStore();
+      setDurationStore(0);
       
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
@@ -324,7 +323,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
       addDebugLog('Error cancelling recording', { error: error.message || error });
       options.onError?.('Fehler beim Abbrechen der Aufnahme');
     }
-  }, [isRecording, options]);
+  }, [isRecording, options, stopRecordingStore, setDurationStore]);
 
   const formatDuration = useCallback((seconds: number): string => {
     const mins = Math.floor(seconds / 60);

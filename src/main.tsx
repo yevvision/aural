@@ -7,6 +7,7 @@ import './utils/audioPlaybackFix' // Importiere Audio-Playback-Fix
 import './utils/audioLogger' // Importiere Audio-Logger
 import { unifiedAudioManager } from './services/unifiedAudioManager' // Importiere Unified Audio Manager
 import { centralDB } from './database/centralDatabase_simple' // Importiere zentrale Datenbank
+import { autoMigrateIfNeeded } from './utils/migrateToServer' // Importiere Migration
 
 // Initialisiere UnifiedAudioManager mit besserer Fehlerbehandlung
 unifiedAudioManager.initialize().then(() => {
@@ -15,6 +16,36 @@ unifiedAudioManager.initialize().then(() => {
   console.error('❌ UnifiedAudioManager initialization failed:', error);
   // App trotzdem starten, auch wenn AudioManager fehlschlägt
 });
+
+// Führe automatische Migration durch wenn nötig
+autoMigrateIfNeeded().then(() => {
+  console.log('✅ Migration check completed');
+}).catch((error) => {
+  console.error('❌ Migration check failed:', error);
+  // App trotzdem starten, auch wenn Migration fehlschlägt
+});
+
+// Lade Daten aus dist_original/ und überschreibe localStorage
+const loadDistOriginalData = async () => {
+  try {
+    console.log('🔧 Main: Loading data from dist_original/...');
+    const response = await fetch('/aural_database.json');
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem('aural-central-database', JSON.stringify(data));
+      console.log('✅ Main: Loaded data from dist_original/, tracks:', data.tracks?.length || 0);
+      // Lade die Datenbank neu
+      centralDB.loadFromStorage();
+    } else {
+      console.error('❌ Main: Failed to load aural_database.json');
+    }
+  } catch (error) {
+    console.error('❌ Main: Error loading dist_original data:', error);
+  }
+};
+
+// Lade Daten vor dem App-Start (immer)
+loadDistOriginalData();
 
 // Globale Fehlerbehandlung - CSP-konform
 window.addEventListener('error', (event) => {
@@ -110,7 +141,7 @@ sessionKeys.forEach(key => {
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (parsed.data && parsed.data.startsWith('blob:http://localhost:5174/')) {
+      if (parsed.data && (parsed.data.startsWith('blob:http://localhost:5174/') || parsed.data.startsWith('blob:http://localhost:5175/'))) {
         sessionStorage.removeItem(key);
         sessionCleanedCount++;
       }

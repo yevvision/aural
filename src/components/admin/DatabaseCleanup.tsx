@@ -2,7 +2,7 @@ import React from 'react';
 import { useUserStore } from '../../stores/userStore';
 import { useActivityStore } from '../../stores/activityStore';
 import { useNotificationsStore } from '../../stores/notificationsStore';
-import DatabaseService from '../../services/databaseService';
+import { serverDatabaseService } from '../../services/serverDatabaseService';
 import type { AudioTrack, User } from '../../types';
 
 interface DatabaseCleanupProps {
@@ -15,7 +15,7 @@ export const DatabaseCleanup: React.FC<DatabaseCleanupProps> = ({ onCleanup, onD
   const { clearActivities, clearUserActivities } = useActivityStore();
   const { clearAll } = useNotificationsStore();
 
-  const handleCreateHollaPost = () => {
+  const handleCreateHollaPost = async () => {
     // Erstelle einen neuen zufälligen Post von hollladiewaldfee
     const postTemplates = [
       {
@@ -83,11 +83,11 @@ export const DatabaseCleanup: React.FC<DatabaseCleanupProps> = ({ onCleanup, onD
 
     console.log('🎯 DatabaseCleanup: Neuer Holla-Post erstellt:', newTrack);
 
-    // Track zur zentralen Datenbank hinzufügen
-    const success = DatabaseService.addTrack(newTrack);
+    // Track zur Server-Datenbank hinzufügen
+    const success = await serverDatabaseService.addTrack(newTrack);
     
     if (success) {
-      console.log('✅ DatabaseCleanup: Post erfolgreich zur Datenbank hinzugefügt');
+      console.log('✅ DatabaseCleanup: Post erfolgreich zur Server-Datenbank hinzugefügt');
       
       // Activity hinzufügen für Benachrichtigungen
       const { addActivity } = useActivityStore.getState();

@@ -27,7 +27,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             onClick={() => setActiveTab('uploads')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'uploads'
-                ? 'border-orange-500 text-orange-600'
+                ? 'border-[#ff4e3a] text-[#ff4e3a]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -37,7 +37,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             onClick={() => setActiveTab('users')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'users'
-                ? 'border-orange-500 text-orange-600'
+                ? 'border-[#ff4e3a] text-[#ff4e3a]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -47,7 +47,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             onClick={() => setActiveTab('comments')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'comments'
-                ? 'border-orange-500 text-orange-600'
+                ? 'border-[#ff4e3a] text-[#ff4e3a]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -57,7 +57,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             onClick={() => setActiveTab('reports')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'reports'
-                ? 'border-orange-500 text-orange-600'
+                ? 'border-[#ff4e3a] text-[#ff4e3a]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -67,7 +67,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({
             onClick={() => setActiveTab('pending')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'pending'
-                ? 'border-orange-500 text-orange-600'
+                ? 'border-[#ff4e3a] text-[#ff4e3a]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >

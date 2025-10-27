@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWaveformEditor } from '../../../hooks/useWaveformEditor';
-import { Play, Pause, Plus } from 'lucide-react';
+import { Play, Pause, Plus, Trash2 } from 'lucide-react';
 import { ZoomSlider } from './ZoomSlider';
-import { RegionList } from './RegionList';
 
 export default function WaveformVisualizer({
   blob,
@@ -25,6 +24,10 @@ export default function WaveformVisualizer({
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [showFullRecordingMessage, setShowFullRecordingMessage] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<{ start: number; end: number; id: string } | null>(null);
+  const [lastModifiedRegion, setLastModifiedRegion] = useState<{ start: number; end: number; id: string } | null>(null);
+  const [showRegionPlayButton, setShowRegionPlayButton] = useState(false);
   
   // Debug logging function
   const addDebugLog = (message: string, data?: any) => {
@@ -72,8 +75,48 @@ export default function WaveformVisualizer({
     addNewRegion(0);
   };
   
-  const { wavesurfer, selection, addOrReplaceRegion, addNewRegion, removeRegion, removeRegionById, allRegions, isReady, zoomLevel, currentPlayingRegionId, isPlaying, setZoom, zoomIn, zoomOut, zoom, play, pause, playRegion, pauseRegion, playAllRegions, playing, duration } =
-    useWaveformEditor({ container: containerRef.current, audioBlob: blob, height: 120, barWidth: 2 });
+  // Only initialize WaveSurfer when we have a valid blob and container
+  const shouldInitialize = blob && containerRef.current && blob.size > 0;
+  
+  const { wavesurfer, selection, addOrReplaceRegion, addNewRegion, removeRegion, removeRegionById, updateRegionActiveState, setRegionActive, setAllRegionsInactive, forceRemoveBorders, allRegions, isReady, zoomLevel, currentPlayingRegionId, isPlaying, activeRegionId, setZoom, zoomIn, zoomOut, zoom, play, pause, playRegion, pauseRegion, playAllRegions, playing, duration } =
+    useWaveformEditor({ 
+      container: shouldInitialize ? containerRef.current : null, 
+      audioBlob: shouldInitialize ? blob : null, 
+      height: 120, 
+      barWidth: 2,
+      onRegionClick: (region) => {
+        setSelectedRegion(region);
+        setLastModifiedRegion(region);
+        setShowRegionPlayButton(true);
+        // Markiere diese Region als aktiv
+        setRegionActive(region.id);
+        addDebugLog('Region clicked, showing play button', region);
+      },
+      onRegionUpdate: (region) => {
+        // Immer die zuletzt veränderte Region aktualisieren und anzeigen
+        setLastModifiedRegion(region);
+        setShowRegionPlayButton(true);
+        // Markiere diese Region als aktiv
+        setRegionActive(region.id);
+        addDebugLog('Region updated, showing play button for modified region', region);
+      },
+      onRegionActivated: (region) => {
+        // Region wurde aktiviert - aktualisiere die Active Region Anzeige
+        setLastModifiedRegion(region);
+        setShowRegionPlayButton(true);
+        addDebugLog('Region activated, updating Active Region display', region);
+      }
+    });
+
+  // Loading state management
+  useEffect(() => {
+    if (blob && !isReady && !isLoading) {
+      setIsLoading(true);
+      setError(null);
+    } else if (isReady && isLoading) {
+      setIsLoading(false);
+    }
+  }, [blob, isReady, isLoading]);
 
   // Log component state changes
   useEffect(() => {
@@ -105,50 +148,74 @@ export default function WaveformVisualizer({
     }
   }, [removeRegion]); // Remove onRemoveRegionReady from dependencies to prevent infinite loop
 
-  // Error boundary effect with better error handling
+  // Prüfe ob die zuletzt veränderte Region noch existiert, wenn sich allRegions ändert
+  useEffect(() => {
+    if (lastModifiedRegion && showRegionPlayButton) {
+      const regionStillExists = allRegions.some(r => r.id === lastModifiedRegion.id);
+      if (!regionStillExists) {
+        // Region wurde gelöscht, verstecke den Play-Button
+        setShowRegionPlayButton(false);
+        setLastModifiedRegion(null);
+        addDebugLog('Last modified region was deleted, hiding play button', lastModifiedRegion);
+      }
+    }
+  }, [allRegions, lastModifiedRegion, showRegionPlayButton]);
+
+  // Debug-Logging für lastModifiedRegion Änderungen
+  useEffect(() => {
+    if (lastModifiedRegion) {
+      addDebugLog('Last modified region state updated', {
+        id: lastModifiedRegion.id,
+        start: lastModifiedRegion.start,
+        end: lastModifiedRegion.end,
+        duration: lastModifiedRegion.end - lastModifiedRegion.start,
+        showButton: showRegionPlayButton
+      });
+    }
+  }, [lastModifiedRegion, showRegionPlayButton]);
+
+  // Markiere alle Regionen als inaktiv, wenn der Play-Button geschlossen wird
+  useEffect(() => {
+    if (!showRegionPlayButton) {
+      setAllRegionsInactive();
+      addDebugLog('Play button closed, marking all regions as inactive');
+    }
+  }, [showRegionPlayButton, setAllRegionsInactive]);
+
+  // Error boundary effect - listen to WaveSurfer's own error events
   useEffect(() => {
     if (blob && !isReady) {
-      // Detect mobile device and adjust timeout accordingly
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                      window.innerWidth <= 768 || 
-                      ('ontouchstart' in window);
-      
-      // Much shorter timeout for mobile - if it doesn't work quickly, show fallback
-      const timeoutDuration = isMobile ? 15000 : 25000; // 15 seconds for mobile, 25 for desktop
-      
-      addDebugLog('Starting timeout for waveform loading', { 
+      addDebugLog('Waveform loading started', { 
         blobSize: blob.size, 
-        blobType: blob.type, 
-        isMobile, 
-        timeoutDuration 
+        blobType: blob.type
       });
-      
-      const timeout = setTimeout(() => {
-        if (!isReady) {
-          addDebugLog(`TIMEOUT: Waveform failed to load within ${timeoutDuration/1000} seconds`, { 
-            isReady, 
-            duration, 
-            isMobile,
-            userAgent: navigator.userAgent,
-            screenWidth: window.innerWidth,
-            hasTouch: 'ontouchstart' in window
-          });
-          
-          // On mobile, show a more helpful message with fallback option
-          if (isMobile) {
-            setError('Mobile Waveform-Problem: Verwenden Sie die einfache Test-Seite für bessere Kompatibilität.');
-          } else {
-            setError(`Wellenform konnte nicht geladen werden (${timeoutDuration/1000}s Timeout). Bitte versuchen Sie es erneut oder verwenden Sie eine kürzere Audio-Datei.`);
-          }
-        }
-      }, timeoutDuration);
-      
-      return () => {
-        addDebugLog('Clearing timeout (component unmounting or isReady changed)');
-        clearTimeout(timeout);
-      };
     }
   }, [blob, isReady]);
+
+  // Listen to WaveSurfer error events
+  useEffect(() => {
+    if (wavesurfer?.current) {
+      const handleError = (error: any) => {
+        addDebugLog('WaveSurfer error detected', { error: error.message || error });
+        setError('Fehler beim Laden der Wellenform. Bitte versuchen Sie es erneut.');
+      };
+
+      const handleReady = () => {
+        addDebugLog('WaveSurfer ready');
+        setError(null);
+      };
+
+      wavesurfer.current.on('error', handleError);
+      wavesurfer.current.on('ready', handleReady);
+
+      return () => {
+        if (wavesurfer.current) {
+          wavesurfer.current.un('error', handleError);
+          wavesurfer.current.un('ready', handleReady);
+        }
+      };
+    }
+  }, [wavesurfer]);
 
   // Remove duplicate audio validation - let useWaveformEditor handle it
   // The validation is already done in useWaveformEditor, so we don't need to duplicate it here
@@ -213,7 +280,9 @@ export default function WaveformVisualizer({
             userSelect: 'none',
             WebkitUserSelect: 'none',
             WebkitTouchCallout: 'none',
-            height: '100%' // Volle Höhe nutzen
+            height: '120px',
+            width: '100%',
+            backgroundColor: '#000000'
           }}
         />
       
@@ -221,13 +290,115 @@ export default function WaveformVisualizer({
       <div className="mt-4 w-full">
         <ZoomSlider 
           zoomLevel={zoomLevel}
-          onZoomChange={setZoom}
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
+          onZoomChange={(level) => {
+            if (isReady && wavesurfer?.current) {
+              try {
+                setZoom(level);
+              } catch (error) {
+                addDebugLog('Zoom change failed', { error: error.message || error });
+                console.warn('Zoom change failed:', error);
+              }
+            }
+          }}
+          onZoomIn={() => {
+            if (isReady && wavesurfer?.current) {
+              try {
+                zoomIn();
+              } catch (error) {
+                addDebugLog('Zoom in failed', { error: error.message || error });
+                console.warn('Zoom in failed:', error);
+              }
+            }
+          }}
+          onZoomOut={() => {
+            if (isReady && wavesurfer?.current) {
+              try {
+                zoomOut();
+              } catch (error) {
+                addDebugLog('Zoom out failed', { error: error.message || error });
+                console.warn('Zoom out failed:', error);
+              }
+            }
+          }}
           minZoom={1}
           maxZoom={1000}
         />
       </div>
+
+      {/* Region Play Button - erscheint nur wenn eine Region ausgewählt oder verändert wurde */}
+      {showRegionPlayButton && lastModifiedRegion && (
+        <div className="mt-4 w-full">
+          <div className="bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h4 className="text-orange-300 font-medium text-sm mb-1">Active Region</h4>
+                <p className="text-orange-400/80 text-xs">
+                  {Math.round(lastModifiedRegion.start)}s - {Math.round(lastModifiedRegion.end)}s
+                  <span className="ml-2 text-orange-500/60">
+                    ({Math.round(lastModifiedRegion.end - lastModifiedRegion.start)}s)
+                  </span>
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => {
+                    triggerHaptic();
+                    if (isPlaying && currentPlayingRegionId === lastModifiedRegion.id) {
+                      pauseRegion();
+                    } else {
+                      playRegion(lastModifiedRegion);
+                    }
+                  }}
+                  className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 flex items-center justify-center transition-colors duration-200 shadow-lg"
+                >
+                  {isPlaying && currentPlayingRegionId === lastModifiedRegion.id ? (
+                    <Pause size={18} className="text-white" strokeWidth={2} />
+                  ) : (
+                    <Play size={18} className="text-white ml-0.5" strokeWidth={2} />
+                  )}
+                </button>
+                
+                 <button
+                   onClick={() => {
+                     triggerHaptic();
+                     if (allRegions.length > 1 && lastModifiedRegion) {
+                       // Finde die vorherige Region (nach Zeit sortiert)
+                       const sortedRegions = [...allRegions].sort((a, b) => a.start - b.start);
+                       const currentIndex = sortedRegions.findIndex(r => r.id === lastModifiedRegion.id);
+                       const previousRegion = currentIndex > 0 ? sortedRegions[currentIndex - 1] : sortedRegions[currentIndex + 1];
+                       
+                       // Region löschen
+                       removeRegionById(lastModifiedRegion.id);
+                       
+                       // Vorherige Region aktivieren
+                       if (previousRegion) {
+                         setLastModifiedRegion(previousRegion);
+                         setShowRegionPlayButton(true);
+                         setRegionActive(previousRegion.id);
+                         addDebugLog('Region deleted, previous region activated', previousRegion);
+                       } else {
+                         setShowRegionPlayButton(false);
+                         setLastModifiedRegion(null);
+                         addDebugLog('Region deleted, no previous region', lastModifiedRegion);
+                       }
+                     }
+                   }}
+                   disabled={allRegions.length <= 1}
+                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                     allRegions.length <= 1 
+                       ? 'bg-gray-700 cursor-not-allowed opacity-50' 
+                       : 'bg-red-600 hover:bg-red-500 active:bg-red-700'
+                   }`}
+                   title={allRegions.length <= 1 ? 'Mindestens eine Region muss vorhanden bleiben' : 'Region löschen'}
+                 >
+                   <Trash2 size={14} className="text-white" strokeWidth={2} />
+                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Mobile-optimized control buttons with larger touch targets */}
       <div className="mt-6 flex items-center gap-4">
@@ -259,8 +430,16 @@ export default function WaveformVisualizer({
         
         {!isReady && (
           <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-orange-400 text-sm font-medium">loading…</span>
+            {/* Subtile Loading-Animation statt Spinner */}
+            <div className="w-16 h-2 bg-gray-600 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-transparent via-[#ff4e3a]/30 to-transparent animate-pulse"></div>
+              <div className="absolute inset-0 h-full w-4 bg-gradient-to-r from-transparent via-[#ff4e3a]/50 to-transparent" 
+                   style={{ 
+                     animation: 'shimmer 1.5s ease-in-out infinite',
+                     animationDelay: '0.2s'
+                   }}></div>
+            </div>
+            <span className="text-[#ff4e3a] text-sm font-medium">loading…</span>
           </div>
         )}
       </div>
@@ -276,20 +455,6 @@ export default function WaveformVisualizer({
         </div>
       )}
 
-      {/* Region List */}
-      {isReady && allRegions.length > 0 && (
-        <RegionList
-          regions={allRegions}
-          onPlayRegion={playRegion}
-          onPauseRegion={pauseRegion}
-          onDeleteRegion={(regionId) => {
-            removeRegionById(regionId);
-          }}
-          onPlayAllRegions={playAllRegions}
-          isPlaying={isPlaying}
-          currentPlayingRegionId={currentPlayingRegionId}
-        />
-      )}
 
       {/* Mobile-optimized help text */}
       {isReady && !selection && (

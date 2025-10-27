@@ -161,7 +161,7 @@ export const AdminUploadsTable: React.FC<AdminUploadsTableProps> = ({
                       )}
                     </motion.button>
                     <div>
-                      <div className="text-sm font-medium text-orange-500">{track.title}</div>
+                      <div className="text-sm font-medium text-[#ff4e3a]">{track.title}</div>
                       {track.description && (
                         <div className="text-sm text-text-secondary truncate max-w-xs">
                           {track.description}
@@ -170,7 +170,7 @@ export const AdminUploadsTable: React.FC<AdminUploadsTableProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-500">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-[#ff4e3a]">
                   {track.user ? track.user.username : 'Unbekannt'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-white">

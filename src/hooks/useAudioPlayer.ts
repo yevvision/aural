@@ -12,6 +12,7 @@ export const useAudioPlayer = () => {
     currentTime,
     duration,
     volume,
+    isLoading,
     setCurrentTrack,
     togglePlay
   } = usePlayerStore();
@@ -67,6 +68,7 @@ export const useAudioPlayer = () => {
     currentTime,
     duration,
     volume,
+    isLoading,
     
     // Actions
     play,

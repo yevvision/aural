@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Heart, User, Play, Clock, Send, ArrowLeft, Upload, Bookmark, UserPlus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { MessageCircle, Heart, User, Play, Clock, Send, ArrowLeft, Upload, Bookmark, UserPlus, ChevronDown, ChevronUp, Trash2, Bell, Activity } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
-import { useFeedStore } from '../stores/feedStore';
 import { usePlayerStore } from '../stores/playerStore';
 import { useActivityStore } from '../stores/activityStore';
 import { useDatabase } from '../hooks/useDatabase';
@@ -22,10 +21,9 @@ export const CommentsPage = () => {
   const trackId = searchParams.get('trackId');
   
   const { currentUser } = useUserStore();
-  const { tracks, addComment } = useFeedStore();
   const { setCurrentTrack } = usePlayerStore();
   const { activities, markAllAsRead, userActivities, markAllUserActivitiesAsRead, removeUserActivitiesFromNotifications, cleanupOldActivities } = useActivityStore();
-  const { activities: dbActivities, notifications: dbNotifications, isLoading, markNotificationAsRead, markActivityAsRead } = useDatabase(currentUser?.id);
+  const { tracks, addCommentToTrack, activities: dbActivities, notifications: dbNotifications, isLoading, markNotificationAsRead, markActivityAsRead } = useDatabase(currentUser?.id);
   
   // Verwende Daten aus der zentralen Datenbank
   const userNotifications = dbNotifications || [];
@@ -136,7 +134,20 @@ export const CommentsPage = () => {
     
     setIsSubmitting(true);
     try {
-      addComment(selectedTrack.id, commentText.trim());
+      const comment = {
+        id: Date.now().toString(),
+        content: commentText.trim(),
+        user: {
+          id: currentUser.id,
+          username: currentUser.username,
+          totalLikes: 0,
+          totalUploads: 0,
+          createdAt: new Date()
+        },
+        trackId: selectedTrack.id,
+        createdAt: new Date()
+      };
+      addCommentToTrack(selectedTrack.id, comment);
       setCommentText('');
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -282,7 +293,7 @@ export const CommentsPage = () => {
           {/* Activity View Tabs - Reorganized with notifications on left and my_activity on right */}
           <RevealOnScroll direction="up" className="mb-6">
             <div className="tabs-container">
-              <Tabs value={viewMode} onValueChange={setViewMode} className="w-full">
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "notifications" | "my_activity")} className="w-full">
                 <LiquidGlassEffect
                   intensity={0.0}
                   chromaticDispersion={0.015}
@@ -294,14 +305,16 @@ export const CommentsPage = () => {
                   <TabsList className="grid w-full grid-cols-2 bg-transparent border-0 rounded-full p-1 h-[53px] items-center justify-center">
                     <TabsTrigger
                       value="notifications"
-                      className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                      className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-[#ff4e3a] data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
                     >
+                      <Bell size={14} className="mr-1.5" />
                       Notifications
                     </TabsTrigger>
                     <TabsTrigger
                       value="my_activity"
-                      className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                      className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-[#ff4e3a] data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
                     >
+                      <Activity size={14} className="mr-1.5" />
                       My Activities
                     </TabsTrigger>
                   </TabsList>
@@ -397,7 +410,7 @@ export const CommentsPage = () => {
                                   {' '}liked{' '}
                                   <span
                                     onClick={() => handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type)}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -406,7 +419,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -419,7 +432,7 @@ export const CommentsPage = () => {
                                   {' '}commented on{' '}
                                   <span
                                     onClick={() => handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type)}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -428,7 +441,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -441,7 +454,7 @@ export const CommentsPage = () => {
                                   {' '}bookmarked{' '}
                                   <span
                                     onClick={() => handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type)}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -450,7 +463,7 @@ export const CommentsPage = () => {
                                       {' '}by{' '}
                                       <span
                                         onClick={() => handleUserClick(activity.trackUser?.id || '')}
-                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.trackUser.username}
                                       </span>
@@ -463,7 +476,7 @@ export const CommentsPage = () => {
                                   {' '}uploaded{' '}
                                   <span
                                     onClick={() => handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type)}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -474,7 +487,7 @@ export const CommentsPage = () => {
                                   {' '}started following{' '}
                                   <span
                                     onClick={() => handleUserClick(activity.followedUser?.id || '')}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     {activity.followedUser?.username}
                                   </span>
@@ -483,7 +496,7 @@ export const CommentsPage = () => {
                               {activity.type === 'my_upload_rejected' && (
                                 <>
                                   {' '}upload was rejected:{' '}
-                                  <span className="font-medium text-orange-500">
+                                  <span className="font-medium text-[#ff4e3a]">
                                     „{activity.trackTitle}"
                                   </span>
                                 </>
@@ -491,7 +504,7 @@ export const CommentsPage = () => {
                               {activity.type === 'my_delete' && (
                                 <>
                                   {' '}deleted{' '}
-                                  <span className="font-medium text-orange-500">
+                                  <span className="font-medium text-[#ff4e3a]">
                                     „{activity.trackTitle}"
                                   </span>
                                 </>
@@ -510,7 +523,7 @@ export const CommentsPage = () => {
                                       console.log('🖱️ Click on upload_approved track:', activity.trackTitle, 'ID:', activity.trackId);
                                       handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type);
                                     }}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     „{activity.trackTitle}"
                                   </span>
@@ -519,7 +532,7 @@ export const CommentsPage = () => {
                               ) : activity.type === 'upload_rejected' ? (
                                 <>
                                   Your upload{' '}
-                                  <span className="font-medium text-orange-500">
+                                  <span className="font-medium text-[#ff4e3a]">
                                     „{activity.trackTitle}"
                                   </span>
                                   {' '}was rejected
@@ -528,7 +541,7 @@ export const CommentsPage = () => {
                                 <>
                                   <span
                                     onClick={() => handleUserClick((activity as NotificationActivity).user.id)}
-                                    className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                    className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                   >
                                     {(activity as NotificationActivity).user.id === 'self' 
                                       ? 'You have' 
@@ -544,7 +557,7 @@ export const CommentsPage = () => {
                                       {' '}
                                       <span
                                         onClick={() => handleTrackClickWithRejectionCheck(activity.trackId || '', activity.type)}
-                                        className="font-medium text-orange-500 hover:text-orange-400 transition-colors duration-200 cursor-pointer"
+                                        className="font-medium text-[#ff4e3a] hover:text-[#ff4e3a] transition-colors duration-200 cursor-pointer"
                                       >
                                         {activity.type === 'followed_user_upload' ? '' : '„'}{activity.trackTitle}{activity.type === 'followed_user_upload' ? '' : '"'}
                                       </span>
@@ -565,7 +578,7 @@ export const CommentsPage = () => {
 
                         {/* Timestamp */}
                         <div className="flex items-center space-x-1 text-xs text-gray-400 mt-1">
-                          <Clock size={10} />
+                          <Clock size={10} strokeWidth={2} />
                           <span>{timeAgo(activity.createdAt)}</span>
                           {!activity.isRead && viewMode === 'notifications' && (
                             <span className="w-1.5 h-1.5 bg-gradient-primary rounded-full ml-2"></span>

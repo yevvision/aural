@@ -3,6 +3,7 @@ import { TopNavigation } from './TopNavigation';
 import { Footer } from './Footer';
 import { MiniPlayer } from '../audio/MiniPlayer';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useRecordingStore } from '../../stores/userStore';
 import { initializeGlobalAudioManager, useGlobalAudioManager } from '../../hooks/useGlobalAudioManager';
 import { useEffect, useState, useCallback } from 'react';
 import UnicornBackgroundSimple from '../UnicornBackgroundSimple';
@@ -32,14 +33,21 @@ export const useBackNavigation = () => {
 
 export const AppLayout = () => {
   const { currentTrack } = usePlayerStore();
+  const { isRecording } = useRecordingStore();
   const location = useLocation();
   const [visibleAudioCardIds, setVisibleAudioCardIdsState] = useState<Set<string>>(new Set());
+  const [expandedAudioCardId, setExpandedAudioCardIdState] = useState<string | null>(null);
   const [isContentReady, setIsContentReady] = useState(false);
   
   // Create a stable wrapper function that matches the expected signature
   const setVisibleAudioCardIds = useCallback((update: (prev: Set<string>) => Set<string>) => {
     setVisibleAudioCardIdsState(update);
   }, []);
+  
+  const setExpandedAudioCardId = useCallback((trackId: string | null) => {
+    setExpandedAudioCardIdState(trackId);
+  }, []);
+  
   const [showBackButton, setShowBackButton] = useState(false);
   // Debug console removed
   
@@ -55,11 +63,9 @@ export const AppLayout = () => {
     
     // Starte automatische Reparatur nach kurzer Verzögerung
     setTimeout(() => {
-      audioPersistenceManager.autoRepairAllAudioUrls().then(repairedCount => {
-        if (repairedCount > 0) {
-          console.log(`✅ AppLayout: ${repairedCount} audio URLs repaired automatically`);
-        }
-      });
+      audioPersistenceManager.autoRepairAllAudioUrls().then(() => {
+        console.log(`✅ AppLayout: Audio URLs repair process completed`);
+      }).catch(console.error);
     }, 2000);
   }, []);
 
@@ -99,6 +105,7 @@ export const AppLayout = () => {
   useEffect(() => {
     // Clear visibility tracking when changing routes
     setVisibleAudioCardIdsState(new Set());
+    setExpandedAudioCardIdState(null);
   }, [location.pathname]);
 
   // Check if we're on the record page, player page, upload page, audio editor page, or report page for mobile layout
@@ -121,14 +128,14 @@ export const AppLayout = () => {
           <TopNavigation />
           
           {/* Main Content with reduced top padding for category/subpages */}
-          <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
+          <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
             <div style={{ minHeight: '100%' }}>
-              <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
+              <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds, expandedAudioCardId, setExpandedAudioCardId }} />
             </div>
           </main>
           
           {/* Mini Player - fixed at bottom of screen when there's a current track and it's not visible */}
-          {currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && (
+          {currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording && (
             <div className="fixed bottom-0 left-0 right-0 z-50">
               <MiniPlayer displayMode="fixed" />
             </div>
@@ -151,14 +158,14 @@ export const AppLayout = () => {
             <TopNavigation />
             
             {/* Main Content with reduced top padding for category/subpages */}
-            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
+            <main className={`flex-1 overflow-hidden ${showBackButton ? 'pt-2' : 'pt-20'} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording ? 'pb-24' : 'pb-0'} ${isScrolled ? 'content-blur' : ''} ${currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording ? 'content-blur-bottom' : ''} ${isRecordPage ? 'pb-0' : ''}`}>
               <div style={{ minHeight: '100%' }}>
-                <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds }} />
+                <Outlet context={{ visibleAudioCardIds, setVisibleAudioCardIds, expandedAudioCardId, setExpandedAudioCardId }} />
               </div>
             </main>
             
             {/* Mini Player - fixed at bottom of screen when there's a current track and it's not visible */}
-            {currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && (
+            {currentTrack && !location.pathname.startsWith('/player/') && !isCurrentTrackVisible && !isRecording && (
               <div className="fixed bottom-0 left-0 right-0 z-50">
                 <MiniPlayer displayMode="fixed" />
               </div>

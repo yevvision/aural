@@ -1,6 +1,6 @@
-import { Clock, Heart, Trash2, User, Play } from 'lucide-react';
+import { Clock, Heart, Trash2, User, Play, Calendar, ExternalLink, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useLocation } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useUserStore } from '../../stores/userStore';
 import { useDatabase } from '../../hooks/useDatabase';
@@ -12,7 +12,7 @@ import { unifiedAudioManager } from '../../services/unifiedAudioManager';
 import { fixAudioUrl, needsUrlFix } from '../../utils/audioUrlFix';
 import { Body } from '../ui/Typography';
 import { ConfirmationDialog } from '../ui';
-import { InlineMiniPlayer } from '../audio/InlineMiniPlayer';
+import { DynamicPlayIcon } from '../ui/DynamicPlayIcon';
 import type { AudioTrack, PlayerVisibilityContext } from '../../types';
 import { useState, useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -48,19 +48,27 @@ const createNewBlobUrlForTrack = async (track: any): Promise<string | null> => {
 };
 
 export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete }: AudioCardProps) => {
-  const { currentTrack, isPlaying, play, pause } = useAudioPlayer();
-  const { reset, setCurrentTrack } = usePlayerStore(); // Add reset and setCurrentTrack functions from player store
-  const { currentUser } = useUserStore();
-  const { tracks, toggleLike } = useDatabase(currentUser?.id); // Verwende aktuellen User
+  const { currentTrack, isPlaying, currentTime, duration, isLoading, play, pause, toggle } = useAudioPlayer();
   
-  // Hole den aktuellen Track aus der Datenbank, um sicherzustellen, dass Like/Bookmark-Status aktuell ist
-  const currentTrackData = tracks.find(t => t.id === track.id) || track;
+  // Lokaler Loading-State nur für diese Card (verhindert UI-Flash)
+  const { reset, setCurrentTrack, isFinished } = usePlayerStore(); // Add reset and setCurrentTrack functions from player store
+  
+  // Ensure isFinished is a boolean
+  const safeIsFinished = Boolean(isFinished);
+  const { currentUser } = useUserStore();
+  const { toggleLike, toggleBookmark } = useDatabase(currentUser?.id); // Verwende aktuellen User für toggleLike und toggleBookmark
+  
+  // Verwende den übergebenen Track direkt, um Duplikate zu vermeiden
+  const currentTrackData = track;
   const navigate = useNavigate();
+  const location = useLocation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const audioCardRef = useRef<HTMLDivElement>(null);
   const context = useOutletContext<PlayerVisibilityContext>();
   const visibleAudioCardIds = context?.visibleAudioCardIds || new Set();
   const setVisibleAudioCardIds = context?.setVisibleAudioCardIds || ((update: (prev: Set<string>) => Set<string>) => {});
+  const expandedAudioCardId = context?.expandedAudioCardId || null;
+  const setExpandedAudioCardId = context?.setExpandedAudioCardId || (() => {});
   
   // Create a unique ID for this card instance
   const cardInstanceId = useRef(`${track.id}-${Math.random().toString(36).substr(2, 9)}`).current;
@@ -71,6 +79,9 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
 
   // Sanitize track and user data
   const safeTrack = sanitizeAudioTrack(currentTrackData);
+  
+  // Check if this card is expanded (after safeTrack is defined)
+  const isExpanded = expandedAudioCardId === safeTrack.id;
   const safeUser = sanitizeUser(currentTrackData.user);
 
   // Track data available
@@ -78,6 +89,35 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   const isCurrentTrack = currentTrack?.id === safeTrack.id;
   const isTrackPlaying = isCurrentTrack && isPlaying;
   const isOwnTrack = currentUser?.id === safeTrack.userId || currentUser?.id === safeTrack.user?.id;
+  
+  // Lokaler Loading-State nur für diese Card
+  const isThisCardLoading = isCurrentTrack && isLoading;
+
+  // Format date for display
+  const formatDate = (date: Date | string): string => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit'
+    });
+  };
+
+  // Check if we're on a profile page using URL
+  const isOnProfilePageByURL = location.pathname.startsWith('/profile');
+  
+  // Debug: Log when on profile page
+  if (isOnProfilePageByURL) {
+    console.log('🗓️ AudioCard on profile page:', {
+      trackId: safeTrack.id,
+      title: safeTrack.title,
+      createdAt: safeTrack.createdAt,
+      formattedDate: safeTrack.createdAt ? formatDate(safeTrack.createdAt) : 'NO DATE',
+      isOnProfilePageByURL,
+      pathname: location.pathname,
+      username: safeUser.username
+    });
+  }
 
   // Initialize Intersection Observer and handle visibility
   useEffect(() => {
@@ -126,26 +166,75 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   }, [isCurrentTrack, cardInstanceId]);
 
   const handleCardClick = async () => {
+    // If already expanded, just close it without stopping audio
+    if (isExpanded) {
+      setExpandedAudioCardId(null);
+      return;
+    }
+    
+    // Set this card as expanded (will automatically close other expanded cards)
+    setExpandedAudioCardId(safeTrack.id);
+    
+    // Also play the audio
+    // Debug: Zeige Audio-Informationen
+    console.log('🎵 AudioCard: Card clicked for track:', safeTrack.title);
+    debugAudioPlayback(safeTrack);
+    
+    // If this is the current track and it's finished, restart it
+    if (isCurrentTrack && safeIsFinished) {
+      console.log('🎵 AudioCard: Restarting finished track...');
+      // Reset the track to restart from beginning
+      setCurrentTrack(safeTrack);
+      play(safeTrack);
+    } else if (isCurrentTrack) {
+      // If this is the current track and it's not finished, toggle play/pause
+      if (isTrackPlaying) {
+        pause();
+      } else {
+        play(safeTrack);
+      }
+    } else {
+      // PERFORMANCE OPTIMIZATION: Audio nur beim Klick laden!
+      console.log('🎵 AudioCard: Starting audio playback...');
+      
+      // Setze den Track als aktuellen Track (ohne Audio zu laden)
+      setCurrentTrack(safeTrack);
+      
+      // Audio wird erst beim tatsächlichen Play geladen
+      play(safeTrack);
+    }
+  };
+
+  const handlePlayClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
     // Debug: Zeige Audio-Informationen
     console.log('🎵 AudioCard: Play button clicked for track:', safeTrack.title);
     debugAudioPlayback(safeTrack);
     
-    // First click: play and open player
-    // Second click: close player (regardless of play state)
-    if (isCurrentTrack) {
-      // If this is the current track, collapse the player
-      reset(); // Clear the current track to collapse the player
+    // If this is the current track and it's finished, restart it
+    if (isCurrentTrack && safeIsFinished) {
+      console.log('🎵 AudioCard: Restarting finished track...');
+      // Reset the track to restart from beginning
+      setCurrentTrack(safeTrack);
+      play(safeTrack);
+    } else if (isCurrentTrack) {
+      // If this is the current track and it's not finished, toggle play/pause
+      if (isTrackPlaying) {
+        // Use toggle instead of pause to ensure proper pause behavior
+        toggle();
+      } else {
+        play(safeTrack);
+      }
     } else {
-      // Verwende vereinfachte Audio-Wiedergabe
+      // PERFORMANCE OPTIMIZATION: Audio nur beim Klick laden!
       console.log('🎵 AudioCard: Starting audio playback...');
       
-      // Setze den Track als aktuellen Track
+      // Setze den Track als aktuellen Track (ohne Audio zu laden)
       setCurrentTrack(safeTrack);
       
-      // Starte die Wiedergabe über den normalen Play-Mechanismus
+      // Audio wird erst beim tatsächlichen Play geladen
       play(safeTrack);
-      
-      // Don't immediately set as visible - let the Intersection Observer handle it
     }
   };
 
@@ -167,7 +256,9 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
     <>
       <motion.div
         ref={audioCardRef}
-        className="true-black-card cursor-pointer overflow-hidden relative"
+        className={`true-black-card cursor-pointer overflow-hidden relative transition-all duration-300 ${
+          isExpanded ? 'pb-5' : ''
+        }`}
         onClick={handleCardClick}
         initial={{ opacity: 0, y: 15, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -181,54 +272,73 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
           transition: { duration: 0.2 }
         }}
       >
-        {/* Delete button for own tracks - positioned at top right corner, dark gray */}
+        {/* Action buttons for own tracks - positioned at same height as play button */}
         {showDeleteButton && (
-          <button
-            onClick={handleDeleteClick}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-300 transition-colors z-30"
-            aria-label="Delete recording"
-          >
-            <Trash2 size={16} />
-          </button>
+          <div className="absolute top-6 right-4 flex gap-2 z-30 items-center">
+            {/* Player button - only show on profile page */}
+            {isOnProfilePageByURL && (
+              <motion.button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentTrack(safeTrack);
+                  navigate(`/player/${safeTrack.id}`);
+                }}
+                className="w-9 h-9 rounded-full border border-gray-500 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:bg-gray-500/10"
+                style={{ aspectRatio: '1/1', minWidth: '36px', minHeight: '36px', maxWidth: '36px', maxHeight: '36px' }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                aria-label="Open in player"
+                title="Open in player"
+              >
+                <ExternalLink size={16} strokeWidth={2} className="text-gray-500 hover:text-gray-300" />
+              </motion.button>
+            )}
+            {/* Delete button */}
+            <motion.button
+              onClick={handleDeleteClick}
+              className="w-9 h-9 rounded-full border border-gray-500 hover:border-red-400 flex items-center justify-center transition-all duration-200 hover:bg-red-500/10"
+              style={{ aspectRatio: '1/1', minWidth: '36px', minHeight: '36px', maxWidth: '36px', maxHeight: '36px' }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label="Delete recording"
+              title="Delete recording"
+            >
+              <Trash2 size={16} strokeWidth={2} className="text-gray-500 hover:text-red-400" />
+            </motion.button>
+          </div>
         )}
         
+        {/* Top Section - Always visible (Play-Button, Title, Metadata) */}
         <div className="flex items-start space-x-6 relative z-20">
-          {/* SVG Icon */}
-          <div className="flex-shrink-0 mt-1">
-            <svg 
-              version="1.1" 
-              id="Ebene_1" 
-              xmlns="http://www.w3.org/2000/svg" 
-              xmlnsXlink="http://www.w3.org/1999/xlink" 
-              x="0px" 
-              y="0px"
-              viewBox="0 0 87.733 86.526" 
-              style={{["enableBackground" as any]: "new 0 0 87.733 86.526"}} 
-              xmlSpace="preserve"
-              className="w-9 h-9 text-orange-500"
+          {/* Dynamic Play Icon - Clickable in expanded state */}
+          {isExpanded ? (
+            <motion.button
+              onClick={handlePlayClick}
+              className="w-9 h-9 flex items-center justify-center"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label={isTrackPlaying ? 'Pause' : 'Play'}
+              title={isTrackPlaying ? 'Pause' : 'Play'}
             >
-              <g>
-                <g>
-                  <g>
-                    <circle 
-                      style={{fill:"none",stroke:"#f97316",strokeWidth:"3.8739",strokeMiterlimit:"10"}} 
-                      cx="43.866" 
-                      cy="42.242" 
-                      r="40.577"
-                    />
-                  </g>
-                  <path 
-                    style={{fill:"none",stroke:"#f97316",strokeWidth:"3.8739",strokeMiterlimit:"10"}} 
-                    d="M51.459,25.293l-4.025-4.025c-4.387-4.387-11.5-4.387-15.887,0s-4.387,11.5,0,15.887l4.025,4.025l-4.025,4.025c-4.387,4.387-4.387,11.5,0,15.887s11.5,4.387,15.887,0l4.025-4.025L67.346,41.18L51.459,25.293z"
-                  />
-                </g>
-              </g>
-            </svg>
-          </div>
+              <DynamicPlayIcon
+                isCurrentTrack={isCurrentTrack}
+                isPlaying={isTrackPlaying}
+                isFinished={isCurrentTrack && safeIsFinished}
+                className="w-9 h-9 text-[#ff4e3a]"
+              />
+            </motion.button>
+          ) : (
+            <DynamicPlayIcon
+              isCurrentTrack={isCurrentTrack}
+              isPlaying={isTrackPlaying}
+              isFinished={isCurrentTrack && safeIsFinished}
+              className="w-9 h-9 text-[#ff4e3a]"
+            />
+          )}
           
           {/* Track info with unified typography */}
           <div className="flex-1 min-w-0">
-            
             {/* Title in white with unified font size */}
             <div className="text-white text-[13px] font-normal mb-1.5 line-clamp-2 leading-tight">
               {safeTrack.title}
@@ -236,18 +346,20 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
             
             {/* Metadata in gray with unified font size */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] font-normal text-gray-400">
-              <Link 
-                to={`/profile/${safeUser.id}`}
-                className="text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <User size={12} />
-                <span>{safeUser.username}</span>
-              </Link>
+              {!isOnProfilePageByURL && (
+                <Link 
+                  to={`/profile/${safeUser.id}`}
+                  className="text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <User size={12} strokeWidth={2} />
+                  <span>{safeUser.username}</span>
+                </Link>
+              )}
               
               <div className="flex items-center gap-1">
                 <Play 
-                  size={13} 
+                  size={13} strokeWidth={2} 
                   className="text-gray-400"
                   fill="none"
                 />
@@ -277,7 +389,7 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 }}
               >
                 <Heart 
-                  size={12} 
+                  size={12} strokeWidth={2} 
                   className="text-gray-400"
                   fill="none"
                 />
@@ -286,30 +398,152 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <Clock size={12} />
+                <Clock size={12} strokeWidth={2} />
                 <span className="tabular-nums">{formatDuration(safeTrack.duration)}</span>
               </div>
+              
+              {/* Date as last element on profile page */}
+              {isOnProfilePageByURL && safeTrack.createdAt && (
+                <div className="flex items-center gap-1">
+                  <Calendar size={12} strokeWidth={2} />
+                  <span>{formatDate(safeTrack.createdAt)}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Inline MiniPlayer when track is the current track (playing or paused) with smooth animation */}
+        {/* Expanded View - Additional Controls */}
         <AnimatePresence>
-          {isCurrentTrack && (
-            <motion.div 
-              className="relative z-20"
-              initial={{ opacity: 0, height: 0, marginTop: 0 }}
-              animate={{ opacity: 1, height: 'auto', marginTop: '1rem' }}
-              exit={{ opacity: 0, height: 0, marginTop: 0 }}
-              transition={{ 
-                duration: 0.3, 
-                ease: "easeInOut"
-              }}
+          {isExpanded && (
+            <motion.div
+              className="relative z-20 mt-4"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
             >
-              <InlineMiniPlayer track={safeTrack} />
+              {/* Progress Bar */}
+              <div className="w-full h-1 bg-gray-700 rounded-full overflow-hidden mb-6">
+                <div 
+                  className="h-full bg-[#ff4e3a] rounded-full transition-all duration-100"
+                  style={{ width: `${Math.max(0, (currentTime || 0) / (duration || 1)) * 100}%` }}
+                />
+                {/* Loading animation overlay */}
+                {isThisCardLoading && duration === 0 && (
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div className="h-full w-full bg-gradient-to-r from-transparent via-[#ff4e3a]/20 to-transparent animate-pulse"></div>
+                    <div className="absolute inset-0 h-full w-8 bg-gradient-to-r from-transparent via-[#ff4e3a]/40 to-transparent" 
+                         style={{ 
+                           animation: 'shimmer 1.5s ease-in-out infinite',
+                           animationDelay: '0.2s'
+                         }}></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Section - Controls */}
+              <div className="flex items-center justify-between">
+                {/* Time Display */}
+                <div className="text-white text-sm">
+                  {formatDuration(currentTime || 0)} / {formatDuration(duration || safeTrack.duration)}
+                </div>
+                
+                {/* Action Buttons - Same as MiniPlayer */}
+                <div className="flex items-center space-x-2">
+                  {/* Like button with enhanced visual feedback */}
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (currentUser?.id) {
+                        toggleLike(safeTrack.id, currentUser.id);
+                      }
+                    }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                      safeTrack.isLiked
+                        ? 'border border-red-500 bg-red-500/20' 
+                        : 'border border-white hover:border-red-400'
+                    }`}
+                    style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-label={safeTrack.isLiked ? 'Unlike' : 'Like'}
+                    title={safeTrack.isLiked ? 'Unlike' : 'Like'}
+                  >
+                    <Heart 
+                      size={14} 
+                      className={`transition-all duration-200 ${
+                        safeTrack.isLiked 
+                          ? "fill-red-500 text-red-500" 
+                          : "text-white hover:text-red-400"
+                      }`}
+                      strokeWidth={1.5}
+                    />
+                  </motion.button>
+
+                  {/* Bookmark button with enhanced visual feedback */}
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (currentUser?.id) {
+                        toggleBookmark(safeTrack.id, currentUser.id);
+                      }
+                    }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                      safeTrack.isBookmarked
+                        ? 'border border-yellow-500 bg-yellow-500/20' 
+                        : 'border border-white hover:border-yellow-400'
+                    }`}
+                    style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-label={safeTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                    title={safeTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
+                  >
+                    <Bookmark 
+                      size={14} 
+                      className={`transition-all duration-200 ${
+                        safeTrack.isBookmarked 
+                          ? "fill-yellow-500 text-yellow-500" 
+                          : "text-white hover:text-yellow-400"
+                      }`}
+                      strokeWidth={1.5}
+                    />
+                  </motion.button>
+
+                  {/* Expand button */}
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentTrack(safeTrack);
+                      navigate(`/player/${safeTrack.id}`);
+                    }}
+                    className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
+                    style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-label="Expand player"
+                  >
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="1.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      className="text-white"
+                    >
+                      <path d="M7 17L17 7M17 7H7M17 7V17" />
+                    </svg>
+                  </motion.button>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
+
       </motion.div>
 
       {/* Custom Delete Confirmation Dialog */}

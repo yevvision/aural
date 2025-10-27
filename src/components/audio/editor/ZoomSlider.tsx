@@ -86,14 +86,12 @@ export const ZoomSlider: React.FC<ZoomSliderProps> = ({
         <div className="flex items-center space-x-3 w-full" style={{ marginTop: '5px' }}>
           <button
             onClick={onZoomOut}
-            className="w-8 h-8 rounded-full bg-orange-600 hover:bg-orange-500 active:bg-orange-700 flex items-center justify-center transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30 active:bg-white/30 flex items-center justify-center transition-all duration-200 disabled:bg-gray-600/20 disabled:border-gray-600/30 disabled:cursor-not-allowed disabled:text-gray-400"
             disabled={zoomLevel <= minZoom}
           >
-            <ZoomOut size={16} className="text-white" />
+            <ZoomOut size={16} strokeWidth={2} />
           </button>
           <div className="flex-1 relative" style={{ marginTop: '-10px' }}>
-            {/* Fallback graue Linie - 2px dick */}
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-600 rounded-full transform -translate-y-1/2" style={{ height: '2px' }}></div>
             <input
               type="range"
               min={minZoom}
@@ -106,10 +104,10 @@ export const ZoomSlider: React.FC<ZoomSliderProps> = ({
           </div>
           <button
             onClick={onZoomIn}
-            className="w-8 h-8 rounded-full bg-orange-600 hover:bg-orange-500 active:bg-orange-700 flex items-center justify-center transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30 active:bg-white/30 flex items-center justify-center transition-all duration-200 disabled:bg-gray-600/20 disabled:border-gray-600/30 disabled:cursor-not-allowed disabled:text-gray-400"
             disabled={zoomLevel >= maxZoom}
           >
-            <ZoomIn size={16} className="text-white" />
+            <ZoomIn size={16} strokeWidth={2} />
           </button>
         </div>
       </div>

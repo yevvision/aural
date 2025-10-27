@@ -67,7 +67,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
               >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="text-sm font-medium text-orange-500">{user.username}</div>
+                    <div className="text-sm font-medium text-[#ff4e3a]">{user.username}</div>
                     {user.isVerified && (
                       <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
                         <CheckCircle className="w-3 h-3 mr-1" />

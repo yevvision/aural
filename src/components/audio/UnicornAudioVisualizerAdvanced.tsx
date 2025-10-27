@@ -10,21 +10,7 @@ interface UnicornAudioVisualizerProps {
   size?: 'small' | 'medium' | 'large';
 }
 
-// TypeScript declaration for UnicornStudio
-declare global {
-  interface Window {
-    UnicornStudio?: {
-      isInitialized: boolean;
-      init: () => Promise<any>;
-      destroy: () => void;
-      setParameter?: (parameter: string, value: any) => void;
-      setAnimationSpeed?: (speed: number) => void;
-      setColor?: (color: string) => void;
-      setIntensity?: (intensity: number) => void;
-    };
-    unicornScenes?: any;
-  }
-}
+// UnicornStudio types are now defined globally in vite-env.d.ts
 
 export const UnicornAudioVisualizerAdvanced: React.FC<UnicornAudioVisualizerProps> = ({
   frequencies = [],
@@ -53,7 +39,7 @@ export const UnicornAudioVisualizerAdvanced: React.FC<UnicornAudioVisualizerProp
 
   // Initialize Unicorn Studio with audio integration
   const initializeUnicornStudio = useCallback(async () => {
-    if (window.UnicornStudio && !isInitialized.current) {
+    if ((window as any).UnicornStudio && !isInitialized.current) {
       try {
         console.log('[Unicorn Audio Visualizer Advanced] Initializing Unicorn Studio...');
         isInitialized.current = true;

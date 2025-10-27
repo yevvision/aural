@@ -179,7 +179,7 @@ export class UploadSecurityManager {
 
     // TEMPORÄR: Alle Uploads zur Warteschlange für Testing
     // TODO: Entfernen nach Tests
-    const forceReview = true; // Setze auf false, um normale Logik zu verwenden
+    const forceReview = true; // Setze auf true, um alle Uploads zur Warteschlange zu schicken
 
     // Entscheidung treffen
     const requiresReview = forceReview || duplicateCheck.isSuspicious || rateLimitCheck.requiresReview;

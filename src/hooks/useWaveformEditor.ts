@@ -10,9 +10,12 @@ type UseWaveformEditorOpts = {
   audioBlob: Blob | null;
   barWidth?: number;
   height?: number;
+  onRegionClick?: (region: { start: number; end: number; id: string }) => void;
+  onRegionUpdate?: (region: { start: number; end: number; id: string }) => void;
+  onRegionActivated?: (region: { start: number; end: number; id: string }) => void;
 };
 
-export function useWaveformEditor({ container, audioBlob, barWidth = 2, height = 200 }: UseWaveformEditorOpts) {
+export function useWaveformEditor({ container, audioBlob, barWidth = 2, height = 200, onRegionClick, onRegionUpdate, onRegionActivated }: UseWaveformEditorOpts) {
   const wsRef = useRef<WaveSurfer | null>(null);
   const regionsRef = useRef<ReturnType<typeof RegionsPlugin['create']> | null>(null);
   const [duration, setDuration] = useState(0);
@@ -23,13 +26,222 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
   const [currentPlayingRegionId, setCurrentPlayingRegionId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasShownDemo, setHasShownDemo] = useState(false);
-
+  const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   // Debug logging function
   const addDebugLog = (message: string, data?: any) => {
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] ${message}`;
     console.log(`🔍 useWaveformEditor: ${logMessage}`, data || '');
   };
+
+  // Function to force remove borders from all regions
+  const forceRemoveBorders = useCallback(() => {
+    if (!regionsRef.current) return;
+    
+    const currentRegions = regionsRef.current.getRegions();
+    console.log('🔄 Force removing borders from all regions:', currentRegions.length);
+    
+    currentRegions.forEach((region: any, index: number) => {
+      try {
+        if (region.element) {
+          console.log(`🔄 Processing region ${index + 1}:`, {
+            id: region.id,
+            currentStyles: {
+              background: region.element.style.background,
+              border: region.element.style.border,
+              opacity: region.element.style.opacity
+            }
+          });
+          
+          // Set green background for inactive regions
+          region.element.style.background = 'rgba(34, 197, 94, 0.2)';
+          region.element.style.opacity = '0.7';
+          
+          // Force remove all border-related styles
+          region.element.style.border = 'none';
+          region.element.style.outline = 'none';
+          region.element.style.boxShadow = 'none';
+          region.element.style.borderWidth = '0';
+          region.element.style.borderStyle = 'none';
+          region.element.style.borderColor = 'transparent';
+          
+          // Hide all handles
+          if (region.handleLeft && region.handleLeft.element) {
+            region.handleLeft.element.style.display = 'none';
+          }
+          if (region.handleRight && region.handleRight.element) {
+            region.handleRight.element.style.display = 'none';
+          }
+          
+          console.log(`✅ Region ${index + 1} processed:`, {
+            newStyles: {
+              background: region.element.style.background,
+              border: region.element.style.border,
+              opacity: region.element.style.opacity
+            }
+          });
+        } else {
+          console.warn(`❌ Region ${index + 1} has no element`);
+        }
+      } catch (error) {
+        console.warn('❌ Error force removing borders:', error);
+      }
+    });
+  }, []);
+
+  // Function to set region as active - EINFACH UND DIREKT
+  const setRegionActive = useCallback((regionId: string) => {
+    console.log('🎯 Setting region as active:', regionId);
+    setActiveRegionId(regionId);
+    
+    // Direkt nach kurzer Zeit anwenden
+    setTimeout(() => {
+      const currentRegions = regionsRef.current?.getRegions() || [];
+      
+      currentRegions.forEach((region: any) => {
+        if (region.element) {
+          if (region.id === regionId) {
+            // Set as active (orange with border and handles)
+            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('border', '2px solid #f97316', 'important');
+            region.element.style.setProperty('opacity', '1', 'important');
+            region.element.classList.add('active');
+            
+            // Show handles
+            if (region.handleLeft && region.handleLeft.element) {
+              region.handleLeft.element.style.display = 'block';
+              region.handleLeft.element.style.width = '24px';
+              region.handleLeft.element.style.height = '24px';
+              region.handleLeft.element.style.background = '#f97316';
+            }
+            if (region.handleRight && region.handleRight.element) {
+              region.handleRight.element.style.display = 'block';
+              region.handleRight.element.style.width = '24px';
+              region.handleRight.element.style.height = '24px';
+              region.handleRight.element.style.background = '#f97316';
+            }
+            
+            console.log('✅ Region set as active (orange):', region.id);
+            
+            // Callback für Active Region Anzeige aufrufen
+            if (onRegionActivated) {
+              onRegionActivated({ start: region.start, end: region.end, id: region.id });
+            }
+          } else {
+            // Set as inactive (orange without border and handles)
+            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('border', 'none', 'important');
+            region.element.style.setProperty('opacity', '0.7', 'important');
+            region.element.classList.remove('active');
+            
+            // Hide handles
+            if (region.handleLeft && region.handleLeft.element) {
+              region.handleLeft.element.style.display = 'none';
+            }
+            if (region.handleRight && region.handleRight.element) {
+              region.handleRight.element.style.display = 'none';
+            }
+            
+            console.log('✅ Region set as inactive (orange):', region.id);
+          }
+        }
+      });
+    }, 100);
+  }, []);
+
+  // AGGRESSIVE Funktion: Setze alle Regionen als inaktiv
+  const setAllRegionsInactive = useCallback(() => {
+    if (!regionsRef.current) return;
+    
+    console.log('🔥 AGGRESSIVE: Setting all regions as inactive');
+    setActiveRegionId(null);
+    
+    const currentRegions = regionsRef.current.getRegions();
+    
+    currentRegions.forEach((region: any) => {
+      if (region.element) {
+        // RADIKALE Überschreibung
+        region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
+        region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+        region.element.style.setProperty('border', 'none', 'important');
+        region.element.style.setProperty('border-width', '0', 'important');
+        region.element.style.setProperty('border-style', 'none', 'important');
+        region.element.style.setProperty('border-color', 'transparent', 'important');
+        region.element.style.setProperty('opacity', '0.7', 'important');
+        
+        region.element.classList.remove('active');
+        region.element.setAttribute('data-status', 'inactive');
+        
+        // Hide handles
+        if (region.handleLeft && region.handleLeft.element) {
+          region.handleLeft.element.style.display = 'none';
+        }
+        if (region.handleRight && region.handleRight.element) {
+          region.handleRight.element.style.display = 'none';
+        }
+        
+        console.log('🔥 Region AGGRESSIVELY set as inactive (green):', region.id);
+      }
+    });
+  }, []);
+
+  // Function to update region active state (legacy compatibility)
+  const updateRegionActiveState = useCallback((regionId: string | null) => {
+    if (regionId) {
+      setRegionActive(regionId);
+    } else {
+      setAllRegionsInactive();
+    }
+  }, [setRegionActive, setAllRegionsInactive]);
+
+  // Function to force region visual update without recreating them
+  const forceRegionVisualUpdate = useCallback(() => {
+    if (!regionsRef.current) {
+      console.log('No regions ref available');
+      return;
+    }
+
+    const currentRegions = regionsRef.current.getRegions();
+    console.log('Forcing visual update for regions:', currentRegions.length, 'regions');
+
+    currentRegions.forEach((region: any) => {
+      try {
+        // Force region to redraw by accessing its internal properties
+        if (region.element) {
+          // Trigger a reflow by temporarily hiding and showing the element
+          region.element.style.display = 'none';
+          region.element.offsetHeight; // Force reflow
+          region.element.style.display = '';
+        }
+
+        // Force update of region handles
+        if (region.handleLeft && region.handleLeft.element) {
+          region.handleLeft.element.style.display = 'none';
+          region.handleLeft.element.offsetHeight;
+          region.handleLeft.element.style.display = '';
+        }
+        if (region.handleRight && region.handleRight.element) {
+          region.handleRight.element.style.display = 'none';
+          region.handleRight.element.offsetHeight;
+          region.handleRight.element.style.display = '';
+        }
+
+        // Force region to recalculate its position
+        if (typeof region.update === 'function') {
+          region.update({
+            start: region.start,
+            end: region.end
+          });
+        }
+
+        console.log('Region visual update forced:', region.id);
+      } catch (error) {
+        console.warn('Error forcing region visual update:', error);
+      }
+    });
+  }, []);
 
   // Animation function to show region is draggable
   const animateRegionDemo = useCallback(async (region: any, duration: number) => {
@@ -139,14 +351,14 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         autoCenter: true,
         // Mobile-specific optimizations
         fillParent: true,
-        // Better touch handling
-        backend: isMobile ? 'WebAudio' : 'MediaElement',  // WebAudio auf Mobile für bessere Performance
-        mediaControls: false,
+        // Better touch handling - use MediaElement for better audio playback on mobile
+        backend: 'MediaElement',  // MediaElement für bessere Audio-Wiedergabe auf Mobile
+        mediaControls: false,     // Media-Controls ausgeblendet - eigene Buttons verwenden
         // Enhanced mobile touch support
         cursorWidth: isMobile ? 2 : 3,            // Dünnerer Cursor auf Mobile
         hideScrollbar: true,
         // Drag Selection für Touch-Screens aktivieren
-        dragSelection: true,       // Ermöglicht Drag-to-Select auf Touch-Screens
+        // dragSelection: true,       // Ermöglicht Drag-to-Select auf Touch-Screens - nicht unterstützt in dieser Version
         // Mobile performance optimizations
         ...(isMobile && {
           // Mobile-spezifische Optimierungen
@@ -159,47 +371,16 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
       });
 
       // Regions plugin with mobile optimizations
-      const regions = ws.registerPlugin(RegionsPlugin.create({
-        // Mobile-optimierte Region-Konfiguration
-        dragSelection: {
-          slop: 5, // Größerer Bereich für Touch-Selection
-        },
-        regions: {
-          // Griffe: 24px breit und hoch, 50% über Kante, orange, kein Border, kein Springen
-          handleStyle: {
-            left: {
-              backgroundColor: '#f97316',
-              border: 'none',
-              borderRadius: '3px',
-              width: '24px',
-              height: '24px',
-              cursor: 'col-resize',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-            },
-            right: {
-              backgroundColor: '#f97316',
-              border: 'none',
-              borderRadius: '3px',
-              width: '24px',
-              height: '24px',
-              cursor: 'col-resize',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-            }
-          },
-          // Mindestlänge für Touch-Bedienung
-          minLength: 0.5, // 0.5 Sekunden Minimum
-          // Orange Region-Markierung wie die Buttons
-          color: 'rgba(249, 115, 22, 0.25)',
-          border: '2px solid #f97316',
-          borderRadius: '4px',
-        }
-      }));
+      const regions = ws.registerPlugin(RegionsPlugin.create());
 
       // Zoom plugin für Schieberegler-Steuerung
       const zoom = ws.registerPlugin(ZoomPlugin.create({
         scale: 0.5, // 50% Vergrößerung pro Scroll-Schritt
         maxZoom: 1000, // Maximale Zoom-Stufe
       }));
+
+      // Add error handling for zoom plugin - note: zoom plugin may not have error event
+      // We'll handle zoom errors in the main WaveSurfer error handler instead
 
       // Timeline plugin für Zeitmarkierungen
       const timeline = ws.registerPlugin(TimelinePlugin.create());
@@ -216,20 +397,22 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
             linear-gradient(90deg, transparent calc(var(--box-size) - 1px), #3b82f6 var(--box-size), transparent var(--box-size));
           background-size: 100% var(--box-size), var(--box-size) 100%;
           border-radius: 0px;
+          height: 120px !important;
+          width: 100% !important;
+          position: relative !important;
+          overflow: hidden !important;
         }
 
         /* Cursor Styling - rot */
         .wavesurfer-container ::part(cursor) {
-          height: 180px;
+          height: 120px !important;
           width: 3px;
           background: #c9242c;
         }
 
-        /* Region-Markierung - orange wie die Buttons */
+        /* Region-Markierung - ENTFERNT - wird durch .wavesurfer-region CSS gesteuert */
         .wavesurfer-container ::part(region) {
-          background-color: rgba(249, 115, 22, 0.25) !important;
-          border: 2px solid #f97316 !important;
-          border-radius: 4px !important;
+          /* Keine Styles hier - wird durch .wavesurfer-region CSS gesteuert */
         }
 
         /* Region-Handles - 24px breit und hoch, 50% über Kante, vertikal mittig, orange */
@@ -247,6 +430,20 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           transform: translateY(-50%) !important;
           margin: 0 !important;
           padding: 0 !important;
+        }
+
+        /* Erweiterte Greiffläche für Region-Handles - transparente Fläche oberhalb und unterhalb */
+        .wavesurfer-container ::part(region-handle-left)::before,
+        .wavesurfer-container ::part(region-handle-right)::before {
+          content: '' !important;
+          position: absolute !important;
+          top: -50px !important;
+          left: -10px !important;
+          width: 44px !important;
+          height: 100px !important;
+          background: transparent !important;
+          cursor: col-resize !important;
+          z-index: 10 !important;
         }
 
         /* Spezifische Positionierung für linken Griff */
@@ -345,11 +542,9 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           position: absolute !important;
         }
 
-        /* Region Hover-Effekt */
+        /* Region Hover-Effekt - ENTFERNT - wird durch .wavesurfer-region CSS gesteuert */
         .wavesurfer-container ::part(region):hover {
-          background-color: rgba(249, 115, 22, 0.4) !important;
-          border-color: #ea580c !important;
-          box-shadow: 0 0 8px rgba(249, 115, 22, 0.3) !important;
+          /* Keine Styles hier - wird durch .wavesurfer-region CSS gesteuert */
         }
 
         /* Active State für Touch */
@@ -366,14 +561,67 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           border-radius: 4px !important;
         }
 
-        /* Fallback für ältere Browser - direkte Klassen */
-        .wavesurfer-region {
+        /* RADIKALE LÖSUNG: Überschreibe ALLE WaveSurfer-Styles */
+        .wavesurfer-region,
+        .wavesurfer-region[style*="background"],
+        .wavesurfer-region[style*="border"],
+        .wavesurfer-region[style*="color"] {
+          background: rgba(249, 115, 22, 0.2) !important;
+          background-color: rgba(249, 115, 22, 0.2) !important;
+          border: none !important;
+          border-width: 0 !important;
+          border-style: none !important;
+          border-color: transparent !important;
+          border-radius: 4px !important;
+          opacity: 0.7 !important;
+          outline: none !important;
+          box-shadow: none !important;
+        }
+        
+        /* AKTIVE MARKER - ORANGE */
+        .wavesurfer-region.active,
+        .wavesurfer-region.active[style*="background"],
+        .wavesurfer-region.active[style*="border"],
+        .wavesurfer-region.active[style*="color"] {
+          background: rgba(249, 115, 22, 0.25) !important;
+          background-color: rgba(249, 115, 22, 0.25) !important;
+          border: 2px solid #f97316 !important;
+          border-width: 2px !important;
+          border-style: solid !important;
+          border-color: #f97316 !important;
+          opacity: 1 !important;
+        }
+        
+        /* INAKTIVE MARKER - ORANGE OHNE RAHMEN - ÜBERSCHREIBT ALLES */
+        .wavesurfer-region:not(.active),
+        .wavesurfer-region:not(.active)[style*="background"],
+        .wavesurfer-region:not(.active)[style*="border"],
+        .wavesurfer-region:not(.active)[style*="color"] {
+          background: rgba(249, 115, 22, 0.2) !important;
+          background-color: rgba(249, 115, 22, 0.2) !important;
+          border: none !important;
+          border-width: 0 !important;
+          border-style: none !important;
+          border-color: transparent !important;
+          opacity: 0.7 !important;
+        }
+        
+        /* Alle Greifer standardmäßig verstecken */
+        .wavesurfer-region-handle {
+          display: none !important;
+        }
+        
+        /* Aktive Marker - orange mit Border und Greifern */
+        .wavesurfer-region.active {
           background: rgba(249, 115, 22, 0.25) !important;
           border: 2px solid #f97316 !important;
           border-radius: 4px !important;
+          opacity: 1 !important;
         }
         
-        .wavesurfer-region-handle {
+        /* Aktive Marker - Greifer anzeigen */
+        .wavesurfer-region.active .wavesurfer-region-handle {
+          display: block !important;
           width: 24px !important;
           height: 24px !important;
           background: #f97316 !important;
@@ -384,6 +632,35 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           position: absolute !important;
           top: 50% !important;
           transform: translateY(-50%) !important;
+        }
+        
+        /* Zusätzliche Spezifität für Greifer in aktiven Regionen */
+        .wavesurfer-region.active .wavesurfer-region-handle-left,
+        .wavesurfer-region.active .wavesurfer-region-handle-right {
+          display: block !important;
+          width: 24px !important;
+          height: 24px !important;
+          background: #f97316 !important;
+          border: none !important;
+          border-radius: 3px !important;
+          cursor: col-resize !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+          position: absolute !important;
+          top: 50% !important;
+          transform: translateY(-50%) !important;
+        }
+
+        /* Erweiterte Greiffläche für Fallback-Styles */
+        .wavesurfer-region-handle::before {
+          content: '' !important;
+          position: absolute !important;
+          top: -50px !important;
+          left: -10px !important;
+          width: 44px !important;
+          height: 100px !important;
+          background: transparent !important;
+          cursor: col-resize !important;
+          z-index: 10 !important;
         }
 
         /* Fallback-Positionierung für ältere Browser */
@@ -405,6 +682,25 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-container ::part(timeline-marker) {
           color: #6b7280 !important;
         }
+
+        /* Hide system media controls */
+        .wavesurfer-container audio {
+          display: none !important;
+        }
+        
+        .wavesurfer-container video {
+          display: none !important;
+        }
+        
+        /* Hide any media element controls */
+        .wavesurfer-container ::part(media) {
+          display: none !important;
+        }
+        
+        /* Ensure media element is hidden */
+        .wavesurfer-container audio[controls] {
+          display: none !important;
+        }
       `;
       document.head.appendChild(style);
       
@@ -414,6 +710,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         const newRegion = { start: r.start, end: r.end, id: r.id };
         setAllRegions(prev => [...prev, newRegion]);
         setSelection({ start: r.start, end: r.end });
+        
+        // Neue Region als aktiv (orange) setzen, alle anderen als inaktiv (grün)
+        console.log('🔍 DEBUG: Region created, will set active in 50ms:', r.id);
+        // Warte kurz bis die Region im DOM ist
+        setTimeout(() => {
+          console.log('🔍 DEBUG: About to set region active:', r.id);
+          setRegionActive(r.id);
+          console.log('🎯 New region set as active (orange):', r.id);
+        }, 50);
         
         // Verhindert Springen der Griffe nach Region-Erstellung
         setTimeout(() => {
@@ -433,6 +738,11 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           region.id === r.id ? { ...region, start: r.start, end: r.end } : region
         ));
         setSelection({ start: r.start, end: r.end });
+        
+        // Callback für Region-Update aufrufen
+        if (onRegionUpdate) {
+          onRegionUpdate({ start: r.start, end: r.end, id: r.id });
+        }
       });
       
       // Touch-optimierte Drag Selection
@@ -440,6 +750,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         e.stopPropagation();
         console.log('Region clicked (touch-friendly):', r);
         setSelection({ start: r.start, end: r.end });
+        
+        // Markiere diese Region als aktiv
+        setRegionActive(r.id);
+        
+        // Callback für Region-Click aufrufen
+        if (onRegionClick) {
+          onRegionClick({ start: r.start, end: r.end, id: r.id });
+        }
+        
         // Haptic Feedback für Touch
         if ('vibrate' in navigator) {
           navigator.vibrate(10);
@@ -454,6 +773,23 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
       ws.on('zoom', (minPxPerSec: number) => {
         setZoomLevel(minPxPerSec);
         console.log('Zoom changed to:', minPxPerSec, 'px/sec');
+        
+        // Force region visual update after zoom
+        setTimeout(() => {
+          forceRegionVisualUpdate();
+        }, 100); // Wait for WaveSurfer to complete zoom
+      });
+
+      // Error handling for zoom operations
+      ws.on('error', (error: any) => {
+        if (error && error.message && error.message.includes('No audio loaded')) {
+          addDebugLog('WaveSurfer zoom error - no audio loaded', { 
+            error: error.message,
+            isReady,
+            hasAudio: !!ws.getDuration() || ws.getDuration() > 0
+          });
+          console.warn('WaveSurfer zoom error - no audio loaded:', error);
+        }
       });
 
       // Play/Pause Event-Listener
@@ -479,6 +815,24 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         addDebugLog('WaveSurfer ready event fired', { duration, isFinite: isFinite(duration) });
         console.log('WaveSurfer: Ready, duration:', duration);
         
+        // Mobile-specific audio initialization
+        if (isMobile) {
+          addDebugLog('Mobile device detected, initializing audio for mobile playback');
+          // Ensure audio context is resumed for mobile devices
+          if (ws.getMediaElement()) {
+            const mediaElement = ws.getMediaElement();
+            if (mediaElement) {
+              mediaElement.setAttribute('playsinline', 'true');
+              mediaElement.setAttribute('webkit-playsinline', 'true');
+              addDebugLog('Mobile audio attributes set', { 
+                hasMediaElement: !!mediaElement,
+                playsinline: mediaElement.getAttribute('playsinline'),
+                webkitPlaysinline: mediaElement.getAttribute('webkit-playsinline')
+              });
+            }
+          }
+        }
+        
         // Behebe Infinity Duration Problem
         const validDuration = isFinite(duration) && duration > 0 ? duration : 0;
         if (!isFinite(duration) || duration <= 0) {
@@ -493,19 +847,41 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           // Zoom so einstellen, dass die gesamte Aufnahme sichtbar ist
           const containerWidth = container.offsetWidth;
           const pixelsPerSecond = containerWidth / validDuration;
-          ws.zoom(pixelsPerSecond);
-          setZoomLevel(pixelsPerSecond);
+          
+          // Safe zoom with error handling
+          try {
+            ws.zoom(pixelsPerSecond);
+            setZoomLevel(pixelsPerSecond);
+          } catch (error) {
+            addDebugLog('Initial zoom failed', { 
+              error: error.message || error,
+              pixelsPerSecond,
+              containerWidth,
+              validDuration
+            });
+            console.warn('Initial zoom failed:', error);
+            // Set a default zoom level
+            setZoomLevel(1);
+          }
           
           const initialRegion = regions.addRegion({
             start: 0,
             end: validDuration,
-            color: 'rgba(249, 115, 22, 0.25)',
-            border: '2px solid #f97316'
+            color: 'rgba(249, 115, 22, 0.2)',
+            // border: '2px solid #f97316' // Nicht unterstützt in dieser Version
           });
           console.log('Initial region created for entire duration:', validDuration);
           console.log('Zoom set to show entire audio:', pixelsPerSecond, 'px/sec');
           setAllRegions([{ start: 0, end: validDuration, id: initialRegion.id }]);
           setSelection({ start: 0, end: validDuration });
+          
+          // Erste Region als aktiv (orange) setzen
+          setTimeout(() => {
+            if (initialRegion && initialRegion.id) {
+              setRegionActive(initialRegion.id);
+              console.log('🎯 Initial region set as active (orange):', initialRegion.id);
+            }
+          }, 200);
           
           // Animation: Zeige dem User, dass die Markierung verschiebbar ist
           setTimeout(() => {
@@ -694,9 +1070,9 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         
         const loadPromise = new Promise<boolean>((resolve, reject) => {
           const timeout = setTimeout(() => {
-            addDebugLog('Audio validation timeout after 20 seconds');
+            addDebugLog('Audio validation timeout after 30 seconds');
             reject(new Error('Audio loading timeout'));
-          }, 20000);
+          }, 30000);
           
           audio.addEventListener('loadedmetadata', () => {
             clearTimeout(timeout);
@@ -885,10 +1261,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     const region = regionsRef.current.addRegion({
       start: s,
       end: e,
-      color: 'rgba(249, 115, 22, 0.4)', // Helleres Orange mit mehr Deckkraft
+      color: 'rgba(249, 115, 22, 0.2)', // Orange Farbe für inaktive Regionen
       drag: true,
       resize: true,
     });
+    
+    // Ensure region is properly bound to time coordinates
+    console.log('Created region with time coordinates:', { start: s, end: e, id: region.id });
+    
+    
     setSelection({ start: s, end: e });
     // Seek to start for immediate feedback
     wsRef.current.setTime(s);
@@ -917,13 +1298,24 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     const region = regionsRef.current.addRegion({
       start: s,
       end: e,
-      color: 'rgba(249, 115, 22, 0.4)', // Helleres Orange mit mehr Deckkraft
+      color: 'rgba(249, 115, 22, 0.2)', // Orange Farbe für inaktive Regionen
       drag: true,
       resize: true,
     });
     
-    console.log('Added new region:', { start: s, end: e, id: region.id });
+    // Ensure region is properly bound to time coordinates
+    console.log('Added new region with time coordinates:', { start: s, end: e, id: region.id });
+    
+    // Update regions state
+    setAllRegions(prev => [...prev, { start: s, end: e, id: region.id }]);
     setSelection({ start: s, end: e });
+    
+    // Neue Region als aktiv (orange) setzen, alle anderen als inaktiv (grün)
+    // Warte kurz bis die Region im DOM ist
+    setTimeout(() => {
+      setRegionActive(region.id);
+      console.log('🎯 New region set as active (orange):', region.id);
+    }, 100);
   }, [isReady, allRegions]);
 
   const removeRegion = useCallback((start: number, end: number) => {
@@ -961,13 +1353,151 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     }
   }, [isReady, duration, allRegions.length, addNewRegion]);
 
+  // Ensure all regions are inactive when component mounts or regions change
+  useEffect(() => {
+    if (isReady && allRegions.length > 0) {
+      // Set all regions as inactive (green) when regions change
+      setTimeout(() => {
+        setAllRegionsInactive();
+        console.log('🎯 All regions set to inactive (green) on mount/change');
+      }, 100);
+    }
+  }, [isReady, allRegions.length, setAllRegionsInactive]);
+
+  // MutationObserver to watch for new regions and immediately style them
+  useEffect(() => {
+    if (!isReady || !container) return;
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          console.log('🔍 DOM mutation detected:', mutation.addedNodes.length, 'nodes added');
+          mutation.addedNodes.forEach((node, index) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+              console.log(`🔍 Checking node ${index + 1}:`, {
+                tagName: element.tagName,
+                classList: Array.from(element.classList),
+                isRegion: element.classList.contains('wavesurfer-region')
+              });
+              
+              if (element.classList.contains('wavesurfer-region')) {
+                console.log('🎯 New region detected by MutationObserver!');
+                // New region detected, immediately style it as inactive (green)
+                setTimeout(() => {
+                  console.log('🎨 Styling new region as green...');
+                  element.style.background = 'rgba(34, 197, 94, 0.2)';
+                  element.style.border = 'none';
+                  element.style.outline = 'none';
+                  element.style.boxShadow = 'none';
+                  element.style.opacity = '0.7';
+                  element.classList.remove('active');
+                  element.setAttribute('data-status', 'inactive');
+                  
+                  // Hide handles
+                  const handles = element.querySelectorAll('.wavesurfer-region-handle');
+                  console.log('🔧 Found handles:', handles.length);
+                  handles.forEach((handle: any) => {
+                    handle.style.display = 'none';
+                  });
+                  
+                  console.log('✅ New region immediately styled as green (inactive)');
+                }, 10);
+              }
+            }
+          });
+        }
+      });
+    });
+
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    });
+
+    return () => observer.disconnect();
+  }, [isReady, container]);
+
+  // KONTINUIERLICHER MONITOR: Korrigiere nur wenn activeRegionId gesetzt ist
+  useEffect(() => {
+    if (!isReady || allRegions.length === 0 || !activeRegionId) return;
+
+    const interval = setInterval(() => {
+      const currentRegions = regionsRef.current?.getRegions() || [];
+      
+      currentRegions.forEach((region: any) => {
+        if (region.element) {
+          if (region.id === activeRegionId) {
+            // AKTIVE REGION - ORANGE
+            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('border', '2px solid #f97316', 'important');
+            region.element.style.setProperty('opacity', '1', 'important');
+            region.element.classList.add('active');
+          } else {
+            // INAKTIVE REGION - ORANGE OHNE RAHMEN
+            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('border', 'none', 'important');
+            region.element.style.setProperty('opacity', '0.7', 'important');
+            region.element.classList.remove('active');
+          }
+        }
+      });
+    }, 100); // ALLE 100ms korrigieren
+
+    return () => clearInterval(interval);
+  }, [isReady, allRegions.length, activeRegionId]);
+
   const zoom = useCallback((pxPerSec: number) => {
-    if (!wsRef.current) return;
-    wsRef.current.zoom(pxPerSec);
-  }, []);
+    if (!wsRef.current || !isReady) {
+      addDebugLog('Zoom called but WaveSurfer not ready', { 
+        hasWaveSurfer: !!wsRef.current, 
+        isReady,
+        pxPerSec 
+      });
+      return;
+    }
+      try {
+        wsRef.current.zoom(pxPerSec);
+        
+        // Force region visual update after manual zoom
+        setTimeout(() => {
+          forceRegionVisualUpdate();
+        }, 100);
+        
+      } catch (error) {
+        addDebugLog('Zoom failed', { error: error.message || error, pxPerSec });
+      console.warn('Zoom failed:', error);
+    }
+  }, [isReady]);
 
   const play = useCallback(() => {
-    wsRef.current?.play();
+    if (!wsRef.current) return;
+    
+    // Mobile-specific play handling
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                    window.innerWidth <= 768 || 
+                    ('ontouchstart' in window);
+    
+    if (isMobile) {
+      addDebugLog('Mobile play triggered, ensuring audio context is active');
+      // Resume audio context for mobile devices
+      if (wsRef.current.getMediaElement()) {
+        const mediaElement = wsRef.current.getMediaElement();
+        if (mediaElement) {
+          mediaElement.setAttribute('playsinline', 'true');
+          mediaElement.setAttribute('webkit-playsinline', 'true');
+          // Force play on mobile
+          mediaElement.play().catch(error => {
+            addDebugLog('Mobile audio play failed', { error: error.message });
+            console.warn('Mobile audio play failed:', error);
+          });
+        }
+      }
+    }
+    
+    wsRef.current.play();
     setCurrentPlayingRegionId(null); // Allgemeine Wiedergabe
   }, []);
 
@@ -977,10 +1507,32 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
   }, []);
 
   const playRegion = useCallback((region: { start: number; end: number; id: string }) => {
-    if (wsRef.current) {
-      wsRef.current.play(region.start, region.end);
-      setCurrentPlayingRegionId(region.id);
+    if (!wsRef.current) return;
+    
+    // Mobile-specific play handling
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                    window.innerWidth <= 768 || 
+                    ('ontouchstart' in window);
+    
+    if (isMobile) {
+      addDebugLog('Mobile region play triggered', { region: region.id, start: region.start, end: region.end });
+      // Resume audio context for mobile devices
+      if (wsRef.current.getMediaElement()) {
+        const mediaElement = wsRef.current.getMediaElement();
+        if (mediaElement) {
+          mediaElement.setAttribute('playsinline', 'true');
+          mediaElement.setAttribute('webkit-playsinline', 'true');
+          // Force play on mobile
+          mediaElement.play().catch(error => {
+            addDebugLog('Mobile region audio play failed', { error: error.message, region: region.id });
+            console.warn('Mobile region audio play failed:', error);
+          });
+        }
+      }
     }
+    
+    wsRef.current.play(region.start, region.end);
+    setCurrentPlayingRegionId(region.id);
   }, []);
 
   const pauseRegion = useCallback(() => {
@@ -1033,20 +1585,39 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
   }, []);
 
   const setZoom = useCallback((level: number) => {
-    if (wsRef.current) {
-      wsRef.current.zoom(level);
+    if (!wsRef.current || !isReady) {
+      addDebugLog('SetZoom called but WaveSurfer not ready', { 
+        hasWaveSurfer: !!wsRef.current, 
+        isReady,
+        level 
+      });
+      return;
     }
-  }, []);
+    try {
+      wsRef.current.zoom(level);
+    } catch (error) {
+      addDebugLog('SetZoom failed', { error: error.message || error, level });
+      console.warn('SetZoom failed:', error);
+    }
+  }, [isReady]);
 
   const zoomIn = useCallback(() => {
+    if (!isReady) {
+      addDebugLog('ZoomIn called but WaveSurfer not ready', { isReady, zoomLevel });
+      return;
+    }
     const newZoom = Math.min(zoomLevel + 100, 1000); // Fester Schritt +100
     setZoom(newZoom);
-  }, [zoomLevel, setZoom]);
+  }, [zoomLevel, setZoom, isReady]);
 
   const zoomOut = useCallback(() => {
+    if (!isReady) {
+      addDebugLog('ZoomOut called but WaveSurfer not ready', { isReady, zoomLevel });
+      return;
+    }
     const newZoom = Math.max(zoomLevel - 100, 1); // Fester Schritt -100
     setZoom(newZoom);
-  }, [zoomLevel, setZoom]);
+  }, [zoomLevel, setZoom, isReady]);
 
   return {
     wavesurfer: wsRef,
@@ -1057,10 +1628,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     zoomLevel,
     currentPlayingRegionId,
     isPlaying,
+    activeRegionId,
     addOrReplaceRegion,
     addNewRegion,
     removeRegion,
     removeRegionById,
+    updateRegionActiveState,
+    setRegionActive,
+    setAllRegionsInactive,
+    forceRemoveBorders,
     zoom,
     setZoom,
     zoomIn,

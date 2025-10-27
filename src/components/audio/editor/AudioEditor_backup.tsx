@@ -301,11 +301,11 @@ export default function AudioEditor({
   if (isFixingAudio) {
     return (
       <div className="space-y-4">
-        <div className="w-full h-32 rounded bg-orange-900/20 border border-orange-500/30 flex items-center justify-center">
+        <div className="w-full h-32 rounded bg-[#ff4e3a]/20 border border-[#ff4e3a]/30 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-orange-400 text-sm">Audio wird repariert...</p>
-            <p className="text-orange-300 text-xs mt-1">Bitte warten Sie einen Moment</p>
+            <div className="w-8 h-8 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <p className="text-[#ff4e3a] text-sm">Audio wird repariert...</p>
+            <p className="text-[#ff4e3a] text-xs mt-1">Bitte warten Sie einen Moment</p>
           </div>
         </div>
       </div>
@@ -357,9 +357,9 @@ export default function AudioEditor({
         >
           <button
             onClick={handleAddSegment}
-            className="px-4 py-2 rounded bg-orange-600 text-white text-sm hover:bg-orange-700 flex items-center justify-center gap-2"
+            className="px-4 py-2 rounded bg-[#ff4e3a] text-white text-sm hover:bg-[#ff4e3a] flex items-center justify-center gap-2"
           >
-            <Scissors size={16} />
+            <Scissors size={16} strokeWidth={2} />
             Segment hinzufügen
           </button>
           <button
@@ -388,7 +388,7 @@ export default function AudioEditor({
                   onClick={() => handleRemoveSegment(index)}
                   className="text-red-400 hover:text-red-300"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} strokeWidth={2} />
                 </button>
               </div>
             ))}
@@ -407,7 +407,7 @@ export default function AudioEditor({
         <button
           onClick={handleExport}
           disabled={!canExport || busy}
-          className="px-6 py-3 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-6 py-3 rounded-lg bg-gradient-to-r from-[#ff4e3a] to-red-500 text-white font-medium hover:from-[#ff4e3a] hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {busy ? (
             <>
@@ -416,9 +416,9 @@ export default function AudioEditor({
             </>
           ) : (
             <>
-              <Download size={20} />
+              <Download size={20} strokeWidth={2} />
               Exportieren
-              <ArrowRight size={20} />
+              <ArrowRight size={20} strokeWidth={2} />
             </>
           )}
         </button>

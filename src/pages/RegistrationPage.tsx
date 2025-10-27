@@ -226,7 +226,7 @@ export const RegistrationPage = () => {
                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary 
                                  hover:text-text-primary transition-colors duration-200"
                       >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        {showPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
                       </button>
                     </div>
                     {getFieldError('password') && (
@@ -257,7 +257,7 @@ export const RegistrationPage = () => {
                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary 
                                  hover:text-text-primary transition-colors duration-200"
                       >
-                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        {showConfirmPassword ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
                       </button>
                     </div>
                     {getFieldError('confirmPassword') && (
@@ -368,7 +368,7 @@ export const RegistrationPage = () => {
                     className="flex-1 py-3 bg-white/10 rounded-lg text-text-secondary font-medium 
                              hover:bg-white/20 transition-colors duration-200 flex items-center justify-center space-x-2"
                   >
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={18} strokeWidth={2} />
                     <span>Zurück</span>
                   </button>
                 )}
@@ -388,13 +388,13 @@ export const RegistrationPage = () => {
                     </>
                   ) : currentStep === 4 ? (
                     <>
-                      <Check size={18} />
+                      <Check size={18} strokeWidth={2} />
                       <span>Registrierung abschließen</span>
                     </>
                   ) : (
                     <>
                       <span>Weiter</span>
-                      <ArrowRight size={18} />
+                      <ArrowRight size={18} strokeWidth={2} />
                     </>
                   )}
                 </button>

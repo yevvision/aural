@@ -288,7 +288,7 @@ class UnifiedAudioManagerClass {
       // Lösche aus PersistentAudioStorage
       const deleted = persistentAudioStorage.deleteAudio(trackId);
       
-      if (deleted === true) {
+      if (deleted !== undefined && deleted !== null) {
         audioLogger.info('unified', 'Audio deleted successfully', {
           trackId
         }, trackId);

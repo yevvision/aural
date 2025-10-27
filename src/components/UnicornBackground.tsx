@@ -107,14 +107,6 @@ const UnicornBackground: React.FC<UnicornBackgroundProps> = ({ children, classNa
   );
 };
 
-// TypeScript declaration for UnicornStudio
-declare global {
-  interface Window {
-    UnicornStudio: {
-      init: () => Promise<any>;
-      destroy: () => void;
-    };
-  }
-}
+// UnicornStudio types are now defined globally in vite-env.d.ts
 
 export default UnicornBackground;

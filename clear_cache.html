@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache</title>
+</head>
+<body>
+    <h1>Clearing Cache...</h1>
+    <script>
+        // Lösche den localStorage Cache
+        localStorage.removeItem('aural-central-database');
+        localStorage.removeItem('aural-tracks-cache');
+        localStorage.removeItem('aural-tracks-cache-timestamp');
+        
+        console.log('✅ Cache cleared');
+        document.body.innerHTML = '<h1>✅ Cache Cleared!</h1><p>Now refresh the main page.</p>';
+    </script>
+</body>
+</html>
+
+
+
+

@@ -1,4 +1,4 @@
-import { Play, Pause, Heart, Clock, Bookmark, X } from 'lucide-react';
+import { Play, Pause, Heart, Bookmark } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -6,6 +6,7 @@ import { useUserStore } from '../../stores/userStore';
 import { useDatabase } from '../../hooks/useDatabase';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { Body } from '../ui/Typography';
+import { DynamicPlayIcon } from '../ui/DynamicPlayIcon';
 import { useEffect, useState, useRef } from 'react';
 
 interface MiniPlayerProps {
@@ -16,7 +17,7 @@ interface MiniPlayerProps {
 export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   const navigate = useNavigate();
   const { currentUser } = useUserStore();
-  const { currentTrack, isPlaying, currentTime, duration, isExpanded, setCurrentTrack, reset } = usePlayerStore();
+  const { currentTrack, isPlaying, currentTime, duration, isExpanded, isLoading, setCurrentTrack, reset } = usePlayerStore();
   const { tracks, toggleLike, toggleBookmark } = useDatabase(currentUser?.id);
   const { toggle, seek } = useAudioPlayer();
   
@@ -26,20 +27,13 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
   
   // Local state for progress and UI
   const [progressWidth, setProgressWidth] = useState(0);
-  const [displayDuration, setDisplayDuration] = useState('0:00');
   const [likeClicked, setLikeClicked] = useState(false);
   const [bookmarkClicked, setBookmarkClicked] = useState(false);
   
   const progressInterval = useRef<number | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const autoCloseTimeout = useRef<number | null>(null);
   
-  // Format duration to MM:SS
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
   
   // Calculate progress percentage
   const progressPercent = duration && duration > 0 && typeof currentTime === 'number' 
@@ -53,10 +47,6 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
       window.clearInterval(progressInterval.current);
     }
     
-    // Set initial duration display
-    if (updatedCurrentTrack?.duration) {
-      setDisplayDuration(formatTime(updatedCurrentTrack.duration));
-    }
     
     // Always update progress immediately based on store values first
     setProgressWidth(progressPercent);
@@ -90,6 +80,46 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
       }
     };
   }, [isPlaying, currentTime, duration, updatedCurrentTrack, tracks, progressPercent]);
+
+  // Debug logging for progress updates
+  useEffect(() => {
+    console.log('🎵 MiniPlayer Progress Debug:', {
+      isPlaying,
+      currentTime,
+      duration,
+      progressPercent,
+      progressWidth
+    });
+  }, [isPlaying, currentTime, duration, progressPercent, progressWidth]);
+
+  // Auto-close after 30 seconds when audio is finished
+  useEffect(() => {
+    // Clear any existing timeout
+    if (autoCloseTimeout.current) {
+      window.clearTimeout(autoCloseTimeout.current);
+      autoCloseTimeout.current = null;
+    }
+
+    // Check if audio is finished (duration reached and not playing)
+    const isAudioFinished = duration && currentTime && duration > 0 && currentTime >= duration && !isPlaying;
+    
+    if (isAudioFinished) {
+      console.log('🎵 Audio finished, starting 30-second auto-close timer');
+      // Set timeout to close player after 30 seconds
+      autoCloseTimeout.current = window.setTimeout(() => {
+        console.log('🎵 Auto-closing player after 30 seconds');
+        reset(); // This will stop audio and clear the current track
+      }, 30000); // 30 seconds
+    }
+
+    // Cleanup timeout on unmount or when conditions change
+    return () => {
+      if (autoCloseTimeout.current) {
+        window.clearTimeout(autoCloseTimeout.current);
+        autoCloseTimeout.current = null;
+      }
+    };
+  }, [duration, currentTime, isPlaying, reset]);
 
   if (!updatedCurrentTrack || isExpanded) return null;
 
@@ -144,10 +174,6 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
     setTimeout(() => setBookmarkClicked(false), 300);
   };
 
-  const handleClose = () => {
-    console.log('❌ MiniPlayer: Close button clicked');
-    reset(); // This will stop audio and clear the current track
-  };
 
   // Calculate thumb position based on progress width
   const thumbPosition = `calc(${progressWidth}% - 0px)`;
@@ -175,6 +201,18 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             className="h-full bg-red-500 rounded-full transition-all duration-100"
             style={{ width: `${Math.max(0, progressWidth)}%` }}
           />
+          
+          {/* Loading animation overlay - subtle shimmer effect */}
+          {isLoading && (
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="h-full w-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+              <div className="absolute inset-0 h-full w-12 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-bounce" 
+                   style={{ 
+                     animation: 'shimmer 1.5s ease-in-out infinite',
+                     animationDelay: '0.2s'
+                   }}></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -182,17 +220,59 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
         {/* Play/Pause button */}
         <motion.button
           onClick={toggle}
-          className={`w-8 h-8 rounded-full border border-white flex items-center justify-center 
-                   text-white flex-shrink-0 relative overflow-hidden`}
+          className="flex items-center justify-center flex-shrink-0 relative"
+          style={{ marginLeft: '10px' }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           transition={{ duration: 0.2 }}
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
-            <Pause size={14} className="text-white" strokeWidth={1.5} />
+            <svg 
+              version="1.1" 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 87.733 86.526" 
+              style={{ width: '32px', height: '32px' }}
+            >
+              <circle 
+                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
+                cx="43.866" 
+                cy="42.242" 
+                r="40.577"
+              />
+              <line 
+                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
+                x1="38" 
+                y1="25" 
+                x2="38" 
+                y2="60"
+              />
+              <line 
+                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
+                x1="49" 
+                y1="25" 
+                x2="49" 
+                y2="60"
+              />
+            </svg>
           ) : (
-            <Play size={14} className="text-white ml-0.5" strokeWidth={1.5} />
+            <svg 
+              version="1.1" 
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 87.733 86.526" 
+              style={{ width: '32px', height: '32px' }}
+            >
+              <circle 
+                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
+                cx="43.866" 
+                cy="42.242" 
+                r="40.577"
+              />
+              <path 
+                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
+                d="M51.459,25.293l-4.025-4.025c-4.387-4.387-11.5-4.387-15.887,0s-4.387,11.5,0,15.887l4.025,4.025l-4.025,4.025c-4.387,4.387-4.387,11.5,0,15.887s11.5,4.387,15.887,0l4.025-4.025L67.346,41.18L51.459,25.293z"
+              />
+            </svg>
           )}
         </motion.button>
 
@@ -206,14 +286,6 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             </div>
             <div className="flex items-center space-x-3 text-text-secondary">
               <span className="text-xs text-gray-400">{updatedCurrentTrack.user.username}</span>
-              <div className="flex items-center space-x-1">
-                <Heart size={12} className="text-gray-400" />
-                <span className="text-xs text-gray-400">{updatedCurrentTrack.likes}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Clock size={12} className="text-gray-400" />
-                <span className="text-xs text-gray-400">{displayDuration}</span>
-              </div>
             </div>
           </div>
         )}
@@ -228,6 +300,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
                 ? 'border border-red-500 bg-red-500/20' 
                 : 'border border-white hover:border-red-400'
             }`}
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             aria-label={updatedCurrentTrack.isLiked ? 'Unlike' : 'Like'}
@@ -257,6 +330,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
                 ? 'border border-yellow-500 bg-yellow-500/20' 
                 : 'border border-white hover:border-yellow-400'
             }`}
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             aria-label={updatedCurrentTrack.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
@@ -282,6 +356,7 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
           <motion.button
             onClick={handleExpand}
             className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
+            style={{ aspectRatio: '1/1', minWidth: '32px', minHeight: '32px', maxWidth: '32px', maxHeight: '32px' }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             aria-label="Expand player"
@@ -302,16 +377,6 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
             </svg>
           </motion.button>
 
-          {/* Close button */}
-          <motion.button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-full border border-white flex items-center justify-center"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            aria-label="Close player"
-          >
-            <X size={14} className="text-white" strokeWidth={1.5} />
-          </motion.button>
         </div>
       </div>
     </motion.div>

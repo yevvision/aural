@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache</title>
+</head>
+<body>
+    <h1>Cache leeren</h1>
+    <button onclick="clearCache()">Cache leeren</button>
+    <div id="result"></div>
+    
+    <script>
+        function clearCache() {
+            console.log('🧹 Cache leeren...');
+            
+            // Cache leeren
+            localStorage.removeItem('aural-tracks-cache');
+            localStorage.removeItem('aural-tracks-cache-timestamp');
+            localStorage.removeItem('aural-central-database');
+            localStorage.removeItem('aural-pending_uploads');
+            
+            // Aktuelle Daten prüfen
+            console.log('📊 Aktuelle Daten:');
+            console.log('localStorage keys:', Object.keys(localStorage));
+            
+            // Central Database prüfen
+            const centralDB = localStorage.getItem('aural-central-database');
+            if (centralDB) {
+                const data = JSON.parse(centralDB);
+                console.log('Central DB tracks:', data.tracks?.length || 0);
+                console.log('Central DB users:', data.users?.length || 0);
+            } else {
+                console.log('❌ Central DB nicht gefunden');
+            }
+            
+            // Tracks Cache prüfen
+            const tracksCache = localStorage.getItem('aural-tracks-cache');
+            if (tracksCache) {
+                const tracks = JSON.parse(tracksCache);
+                console.log('Tracks Cache:', tracks.length);
+            } else {
+                console.log('❌ Tracks Cache nicht gefunden');
+            }
+            
+            document.getElementById('result').innerHTML = '✅ Cache geleert! Prüfe die Konsole für Details.';
+            console.log('✅ Cache geleert!');
+        }
+    </script>
+</body>
+</html>

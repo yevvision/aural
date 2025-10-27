@@ -10,15 +10,42 @@ export const useDatabaseSync = () => {
 
   // Synchronisiere Datenbank mit Stores beim Laden
   useEffect(() => {
-    const syncData = () => {
-      // WICHTIG: Verwende nur Datenbank-Tracks für Konsistenz
-      const allTracks = centralDB.getAllTracks();
-      
-      console.log('useDatabaseSync: Lade Tracks aus Datenbank:', allTracks.length);
-      console.log('useDatabaseSync: Tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
-      
-      // Setze die synchronisierten Tracks (nur aus Datenbank)
-      setTracks(allTracks);
+    const syncData = async () => {
+      try {
+        // OPTION C: SYNCHRONISIERUNG - Server-first, dann lokal
+        console.log('🔄 useDatabaseSync: Lade Tracks server-first...');
+        
+        // Versuche Server-Daten zu laden
+        const { serverDatabaseService } = await import('../services/serverDatabaseService');
+        const serverTracks = await serverDatabaseService.getAllTracks();
+        
+        if (serverTracks && serverTracks.length > 0) {
+          console.log('🌐 useDatabaseSync: Loaded tracks from server:', serverTracks.length);
+          console.log('🌐 useDatabaseSync: Server tracks:', serverTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
+          
+          // Setze die Server-Tracks
+          setTracks(serverTracks);
+          
+          // WICHTIG: Keine lokale Synchronisation mehr!
+          // upload.php speichert bereits auf dem Server, UploadPage synchronisiert lokal
+          // Hier würden wir nur Duplikate erstellen
+          console.log('✅ useDatabaseSync: Server tracks geladen - keine lokale Synchronisation nötig');
+        } else {
+          // Fallback zu lokaler Datenbank
+          const allTracks = centralDB.getAllTracks();
+          console.log('📱 useDatabaseSync: Fallback to local database:', allTracks.length);
+          console.log('📱 useDatabaseSync: Local tracks:', allTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
+          
+          // Setze die lokalen Tracks
+          setTracks(allTracks);
+        }
+      } catch (error) {
+        console.error('❌ useDatabaseSync: Server load failed, using local database:', error);
+        // Fallback zu lokaler Datenbank
+        const allTracks = centralDB.getAllTracks();
+        console.log('📱 useDatabaseSync: Fallback to local database:', allTracks.length);
+        setTracks(allTracks);
+      }
     };
 
     syncData();
@@ -93,9 +120,9 @@ export const useDatabaseSync = () => {
     return centralDB.getStats();
   };
 
-  const addTrackToDatabase = (track: AudioTrack) => {
-    console.log('useDatabaseSync: Füge Track zur Datenbank hinzu:', track.id, track.title);
-    console.log('useDatabaseSync: Track-Details:', {
+  const addTrackToDatabase = async (track: AudioTrack) => {
+    console.log('🔄 useDatabaseSync: OPTION C - Synchronisiere Track:', track.id, track.title);
+    console.log('🔄 useDatabaseSync: Track-Details:', {
       id: track.id,
       title: track.title,
       user: track.user.username,
@@ -103,29 +130,22 @@ export const useDatabaseSync = () => {
       fileSize: track.fileSize
     });
     
-    // Erstelle eine Datei-Eintrag für den Track
-    const file = {
-      id: `file-${track.id}`,
-      filename: track.filename || `${track.title.toLowerCase().replace(/\s+/g, '_')}.wav`,
-      path: `/uploads/${track.user.username}/${track.filename || `${track.title.toLowerCase().replace(/\s+/g, '_')}.wav`}`,
-      size: track.fileSize || 0,
-      uploadedAt: track.createdAt,
-      userId: track.user.id
-    };
+    // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits gespeichert, nur lokal synchronisieren
+    console.log('🔄 useDatabaseSync: upload.php hat bereits gespeichert, synchronisiere lokal...');
     
-    // Füge Track zur Datenbank hinzu
+    // Lokal hinzufügen für sofortige Anzeige (upload.php hat bereits auf Server gespeichert)
     centralDB.addTrack(track);
     
-    // WICHTIG: Prüfe, ob Track wirklich in der Datenbank ist
+    // WICHTIG: Prüfe, ob Track wirklich in der lokalen Datenbank ist
     const allTracks = centralDB.getAllTracks();
     const addedTrack = allTracks.find(t => t.id === track.id);
-    console.log('useDatabaseSync: Track in Datenbank gefunden:', !!addedTrack);
-    console.log('useDatabaseSync: Alle Tracks in Datenbank:', allTracks.length);
+    console.log('✅ useDatabaseSync: Track in lokaler Datenbank gefunden:', !!addedTrack);
+    console.log('✅ useDatabaseSync: Alle Tracks in lokaler Datenbank:', allTracks.length);
     
-    // Synchronisiere FeedStore mit der Datenbank
+    // Synchronisiere FeedStore mit der lokalen Datenbank
     setTracks(allTracks);
     
-    console.log('useDatabaseSync: Track zur Datenbank hinzugefügt, FeedStore synchronisiert');
+    console.log('✅ useDatabaseSync: Track lokal synchronisiert - upload.php hat bereits auf Server gespeichert');
     return true;
   };
 

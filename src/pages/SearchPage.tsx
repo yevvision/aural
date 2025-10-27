@@ -17,7 +17,6 @@ import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
 // Gender filters for audio content
 const genderFilters = [
   { type: 'all', label: 'All' },
-  { type: 'couples', label: 'Couples' },
   { type: 'females', label: 'Females' },
   { type: 'males', label: 'Males' },
   { type: 'diverse', label: 'Diverse' },
@@ -71,11 +70,6 @@ export const SearchPage = () => {
     
     if (selectedGenderFilter === 'all') {
       return activeTracks; // Show all active tracks
-    } else if (selectedGenderFilter === 'couples') {
-      return activeTracks.filter(track => 
-        track.gender === 'Couple' || 
-        (track.tags && track.tags.includes('Couple'))
-      );
     } else if (selectedGenderFilter === 'females') {
       return activeTracks.filter(track => 
         track.gender === 'Female' || 
@@ -208,7 +202,7 @@ export const SearchPage = () => {
                       <TabsTrigger
                         key={filter.type}
                         value={filter.type}
-                        className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-orange-500 data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
+                        className="text-[11px] text-white/70 font-normal data-[state=active]:!bg-[#ff4e3a] data-[state=active]:!text-white data-[state=active]:!font-semibold rounded-full transition-all duration-300 h-[45px] flex items-center justify-center hover:text-white hover:bg-white/20"
                       >
                         {filter.label}
                       </TabsTrigger>
@@ -280,8 +274,9 @@ export const SearchPage = () => {
                         onClick={() => handleTagClick(tag)}
                         className="px-3 py-1.5 bg-white/5 text-text-secondary border border-white/30 rounded-full
                                  hover:bg-white/10 hover:text-text-primary hover:border-white/40 
-                                 transition-all duration-200 text-sm font-medium min-h-[32px]"
+                                 transition-all duration-200 text-sm font-medium min-h-[32px] flex items-center gap-1"
                       >
+                        <span className="text-text-tertiary">#</span>
                         {tag}
                       </button>
                     ))}

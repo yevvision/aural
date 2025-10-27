@@ -96,7 +96,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   value="recording"
                   checked={reportType === 'recording'}
                   onChange={(e) => setReportType(e.target.value as 'recording')}
-                  className="mr-3 text-orange-500 focus:ring-orange-500 focus:ring-2"
+                  className="mr-3 text-[#ff4e3a] focus:ring-[#ff4e3a] focus:ring-2"
                 />
                 <span className="text-sm text-white">The recording itself</span>
               </label>
@@ -107,7 +107,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   value="description"
                   checked={reportType === 'description'}
                   onChange={(e) => setReportType(e.target.value as 'description')}
-                  className="mr-3 text-orange-500 focus:ring-orange-500 focus:ring-2"
+                  className="mr-3 text-[#ff4e3a] focus:ring-[#ff4e3a] focus:ring-2"
                 />
                 <span className="text-sm text-white">The description</span>
               </label>
@@ -119,7 +119,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   checked={reportType === 'comment'}
                   onChange={(e) => setReportType(e.target.value as 'comment')}
                   disabled={comments.length === 0}
-                  className="mr-3 text-orange-500 focus:ring-orange-500 focus:ring-2"
+                  className="mr-3 text-[#ff4e3a] focus:ring-[#ff4e3a] focus:ring-2"
                 />
                     <span className={`text-sm ${comments.length === 0 ? 'text-gray-500' : 'text-white'}`}>
                   A comment {comments.length === 0 && '(no comments available)'}
@@ -137,7 +137,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <select
                 value={selectedCommentId}
                 onChange={(e) => setSelectedCommentId(e.target.value)}
-                    className="w-full p-3 bg-black border border-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"
+                    className="w-full p-3 bg-black border border-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff4e3a] text-white"
               >
                 <option value="">Choose a comment...</option>
                 {comments.map((comment) => (
@@ -160,7 +160,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Please provide more details about why you're reporting this content..."
-                  className="w-full p-3 bg-black border border-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-24 resize-none text-white placeholder-gray-400"
+                  className="w-full p-3 bg-black border border-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff4e3a] h-24 resize-none text-white placeholder-gray-400"
               maxLength={500}
             />
             <div className="text-xs text-gray-400 mt-1">
@@ -180,7 +180,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           <button
             onClick={handleSubmit}
             disabled={reportType === 'comment' && !selectedCommentId}
-            className="px-6 py-3 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full transition-all duration-200"
+            className="px-6 py-3 text-sm font-medium text-white bg-[#ff4e3a] hover:bg-[#ff4e3a] disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full transition-all duration-200"
           >
             Submit Report
           </button>

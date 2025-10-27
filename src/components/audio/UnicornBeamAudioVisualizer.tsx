@@ -8,21 +8,7 @@ interface UnicornBeamAudioVisualizerProps {
   size?: 'small' | 'medium' | 'large';
 }
 
-// TypeScript declaration for UnicornStudio
-declare global {
-  interface Window {
-    UnicornStudio?: {
-      isInitialized: boolean;
-      init: () => Promise<any>;
-      destroy: () => void;
-      setParameter?: (parameter: string, value: any) => void;
-      setAnimationSpeed?: (speed: number) => void;
-      setColor?: (color: string) => void;
-      setIntensity?: (intensity: number) => void;
-    };
-    unicornScenes?: any;
-  }
-}
+// UnicornStudio types are now defined globally in vite-env.d.ts
 
 export const UnicornBeamAudioVisualizer: React.FC<UnicornBeamAudioVisualizerProps> = ({
   frequencies = [],

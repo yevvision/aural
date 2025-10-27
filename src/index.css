@@ -15,16 +15,18 @@
 
 /* True Black Cards with No Shadow */
 .true-black-card {
-  background-color: #000000;
+  background-color: #0f0f0f;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: none;
   overflow: hidden;
   box-shadow: none; /* No shadow */
-  padding: 1.25rem;
+  padding: 1.25rem 1.25rem 1.6875rem 1.25rem; /* top right bottom left - increased bottom padding by 15px */
   height: 100%;
   display: flex;
   flex-direction: column;
-  margin-bottom: 10px;
+  /* margin-bottom: 10px; */
 }
 
 /* Transparent Navigation Bar */
@@ -196,6 +198,38 @@
   height: 48px;
   border-radius: 50%;
   border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Brand Orange Color */
+.bg-brand-orange {
+  background-color: var(--brand-orange);
+}
+
+.text-brand-orange {
+  color: var(--brand-orange);
+}
+
+.border-brand-orange {
+  border-color: var(--brand-orange);
+}
+
+/* Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+    opacity: 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
 }
 
 /* Primary Gradient Utilities */
@@ -422,6 +456,16 @@
   background: linear-gradient(135deg, var(--gradient-strong), var(--gradient-deep));
 }
 
+/* Hide scrollbar for horizontal scroll navigation */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
 /* Safe area padding for mobile */
 .safe-area-padding {
   padding-left: env(safe-area-inset-left);
@@ -577,6 +621,11 @@
   .mobile-record-layout main {
     padding-bottom: 0 !important; /* Entfernt Standard-Padding für Record-Seite */
   }
+
+  /* Audio-Editor-Seite: Keine vertikale Zentrierung - Inhalt soll oben stehen */
+  .audio-editor-page-background main {
+    justify-content: flex-start !important; /* Inhalt oben statt zentriert */
+  }
 }
 
 /* Record Page and Player Page Black Background */
@@ -610,9 +659,7 @@
   min-height: 100vh;
 }
 
-.upload-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Komponenten brauchen sichtbare Hintergründe */
 
 /* Audio Editor Page specific styles */
 .audio-editor-page-background {
@@ -620,9 +667,7 @@
   min-height: 100vh;
 }
 
-.audio-editor-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Waveform braucht sichtbaren Hintergrund */
 
 /* Upload Success Page specific styles */
 .upload-success-page-background {
@@ -630,9 +675,7 @@
   min-height: 100vh;
 }
 
-.upload-success-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Komponenten brauchen sichtbare Hintergründe */
 
 /* Security Check Page specific styles */
 .security-check-page-background {
@@ -640,9 +683,7 @@
   min-height: 100vh;
 }
 
-.security-check-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Komponenten brauchen sichtbare Hintergründe */
 
 /* News Page specific styles */
 .news-page-background {
@@ -650,9 +691,7 @@
   min-height: 100vh;
 }
 
-.news-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Komponenten brauchen sichtbare Hintergründe */
 
 /* Search Page specific styles */
 .search-page-background {
@@ -660,9 +699,7 @@
   min-height: 100vh;
 }
 
-.search-page-background * {
-  background-color: transparent !important;
-}
+/* Entfernt die problematische transparent * Regel - Komponenten brauchen sichtbare Hintergründe */
 
 /* Player Page specific styles */
 .player-page-background {
@@ -1124,6 +1161,7 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --brand-orange: #ff4e3a;
 }
 
 .dark {
@@ -1167,4 +1205,9 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+button, .touch-target {
+  min-height: 22px;
+  min-width: 22px;
 }

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import DatabaseService from '../services/databaseService';
 import type { AudioTrack, ContentReport } from '../types';
 
-// Custom Hook für Datenbank-Zugriff
-// Alle Komponenten verwenden DIESEN Hook
+// Custom Hook für Datenbank-Zugriff - Server-first für Kern-Funktionalität
+// Nur Tracks und Pending Uploads sind server-first, Rest bleibt lokal
 export const useDatabase = (currentUserId?: string) => {
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -16,54 +16,95 @@ export const useDatabase = (currentUserId?: string) => {
   // Ref um den aktuellen tracks.length Wert zu tracken ohne infinite loops
   const tracksLengthRef = useRef(0);
 
-  // Tracks und Benutzer von der Datenbank laden
-  const loadData = useCallback(() => {
+  // Tracks und Benutzer von der Datenbank laden - MIT CACHING
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      // Lade aus zentraler Datenbank (bereits mit Like/Bookmark-Daten angereichert)
-      const dbTracks = DatabaseService.getTracks(currentUserId);
+      // CACHE-CHECK: Nur laden wenn noch nicht gecacht
+      const cacheKey = 'aural-tracks-cache';
+      const cachedTracks = localStorage.getItem(cacheKey);
+      const cacheTimestamp = localStorage.getItem(`${cacheKey}-timestamp`);
+      const now = Date.now();
+      const CACHE_DURATION = 30 * 1000; // 30 Sekunden Cache (reduziert für bessere UX)
       
-      // Lade auch aus localStorage als Backup (zentrale DB verwendet 'aural-central-database')
-      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
-      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
+      if (cachedTracks && cacheTimestamp && (now - parseInt(cacheTimestamp)) < CACHE_DURATION) {
+        console.log('✅ useDatabase: Using cached tracks (fast!)');
+        const allTracks = JSON.parse(cachedTracks);
+        setTracks(allTracks);
+        setIsLoading(false);
+        return;
+      }
       
-      // Bereichere localStorage-Tracks mit aktuellen Like/Bookmark-Daten
-      const enrichedLocalTracks = localTracks.map(track => {
-        const trackLikes = new Set(centralDBData.likes?.find((l: any) => l.trackId === track.id)?.userIds || []);
-        const trackBookmarks = new Set(centralDBData.bookmarks?.find((b: any) => b.trackId === track.id)?.userIds || []);
+      console.log('🔄 useDatabase: Lade Tracks server-first...');
+      
+      let allTracks: AudioTrack[] = [];
+      
+      try {
+        // Versuche Server-Daten zu laden
+        const { serverDatabaseService } = await import('../services/serverDatabaseService');
+        const serverTracks = await serverDatabaseService.getAllTracks();
         
-        // Berechne commentsCount aus den Kommentaren im Track
-        const commentsCount = track.comments ? track.comments.length : 0;
-        const plays = centralDBData.playsMap?.[track.id] || 0;
+        if (serverTracks && serverTracks.length > 0) {
+          console.log('🌐 useDatabase: Loaded tracks from server:', serverTracks.length);
+          
+          // Setze die Server-Tracks
+          allTracks = serverTracks;
+          
+  // CACHE SPEICHERN
+  localStorage.setItem(cacheKey, JSON.stringify(allTracks));
+  localStorage.setItem(`${cacheKey}-timestamp`, now.toString());
+  console.log('✅ useDatabase: Tracks cached for 30 seconds');
+        } else {
+          // Fallback zu lokaler Datenbank
+          console.log('📱 useDatabase: Fallback to local database');
+          allTracks = DatabaseService.getTracks(currentUserId);
+        }
+      } catch (error) {
+        console.error('❌ useDatabase: Server load failed, using local database:', error);
+        // Fallback zu lokaler Datenbank
+        allTracks = DatabaseService.getTracks(currentUserId);
+      }
+      
+      // Nur wenn keine Server-Tracks vorhanden sind, lade aus localStorage als Backup
+      if (allTracks.length === 0) {
+        console.log('📱 useDatabase: Keine Server-Tracks, lade aus localStorage...');
+        const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+        const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
         
-        return {
-          ...track,
-          isLiked: currentUserId ? trackLikes.has(currentUserId) : false,
-          isBookmarked: currentUserId ? trackBookmarks.has(currentUserId) : false,
-          likes: trackLikes.size,
-          commentsCount,
-          plays
-        };
+        // Bereichere localStorage-Tracks mit aktuellen Like/Bookmark-Daten
+        const enrichedLocalTracks = localTracks.map(track => {
+          const trackLikes = new Set(centralDBData.likes?.find((l: any) => l.trackId === track.id)?.userIds || []);
+          const trackBookmarks = new Set(centralDBData.bookmarks?.find((b: any) => b.trackId === track.id)?.userIds || []);
+          
+          // Berechne commentsCount aus den Kommentaren im Track
+          const commentsCount = track.comments ? track.comments.length : 0;
+          const plays = centralDBData.playsMap?.[track.id] || 0;
+          
+          return {
+            ...track,
+            isLiked: currentUserId ? trackLikes.has(currentUserId) : false,
+            isBookmarked: currentUserId ? trackBookmarks.has(currentUserId) : false,
+            likes: trackLikes.size,
+            commentsCount,
+            plays
+          };
+        });
+        
+        allTracks = enrichedLocalTracks;
+      }
+      
+      // WICHTIG: Dedupliziere Tracks basierend auf ID
+      const uniqueTracksMap = new Map();
+      allTracks.forEach(track => {
+        if (!uniqueTracksMap.has(track.id)) {
+          uniqueTracksMap.set(track.id, track);
+        }
       });
-      
-      // Kombiniere und dedupliziere Tracks
-      const allTracksMap = new Map();
-      
-      // Füge DB-Tracks hinzu (bereits angereichert)
-      dbTracks.forEach(track => {
-        allTracksMap.set(track.id, track);
-      });
-      
-      // Füge angereicherte localStorage-Tracks hinzu (überschreibt DB-Tracks)
-      enrichedLocalTracks.forEach(track => {
-        allTracksMap.set(track.id, track);
-      });
-      
-      const allTracks = Array.from(allTracksMap.values());
+      allTracks = Array.from(uniqueTracksMap.values());
       
       const allUsers = DatabaseService.getUsers();
-      const allComments = DatabaseService.getComments();
+      const allComments = await DatabaseService.getComments();
       const allActivities = currentUserId ? DatabaseService.getUserActivities(currentUserId) : [];
       const allNotifications = currentUserId ? DatabaseService.getUserNotifications(currentUserId) : [];
       
@@ -95,9 +136,11 @@ export const useDatabase = (currentUserId?: string) => {
       }
       const allReports = DatabaseService.getReports();
       
+      console.log('🔄 useDatabase: Finale Tracks:', allTracks.length);
+      
       setTracks(allTracks);
       setUsers(allUsers);
-      setComments(allComments);
+      setComments(await allComments);
       setActivities(finalActivities);
       setNotifications(finalNotifications);
       setReports(allReports);
@@ -118,14 +161,23 @@ export const useDatabase = (currentUserId?: string) => {
     }
   }, [currentUserId]); // currentUserId als Dependency
 
+  // Cache leeren nach Upload
+  const clearCache = useCallback(() => {
+    const cacheKey = 'aural-tracks-cache';
+    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(`${cacheKey}-timestamp`);
+    console.log('🗑️ useDatabase: Cache cleared, will reload data');
+    loadData();
+  }, [loadData]);
+
   // Beim ersten Laden und bei Änderungen
   useEffect(() => {
     loadData();
 
-    // Listener für Datenbank-Änderungen
-    const removeListener = DatabaseService.addListener(() => {
-      loadData();
-    });
+    // Database Listener DEAKTIVIERT - verursacht UI-Flash beim Track-Wechsel
+    // const removeListener = DatabaseService.addListener(() => {
+    //   loadData();
+    // });
 
     // Event Listener für Track Approval
     const handleTrackApproved = () => {
@@ -136,48 +188,33 @@ export const useDatabase = (currentUserId?: string) => {
 
     // Cleanup
     return () => {
-      removeListener();
+      // removeListener(); // DEAKTIVIERT
       window.removeEventListener('trackApproved', handleTrackApproved);
     };
-  }, [currentUserId]); // Nur currentUserId als dependency
+  }, [currentUserId, loadData]); // loadData als dependency hinzufügen
 
-  // Separater useEffect für Polling - ohne tracks.length dependency
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const centralDBData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
-      const localTracks = Array.isArray(centralDBData.tracks) ? centralDBData.tracks : [];
-      const dbTracks = DatabaseService.getTracks(currentUserId);
-      
-      // Prüfe auf neue Tracks in localStorage oder DB
-      // Verwende ref um den aktuellen Wert zu bekommen ohne infinite loops
-      const currentTracksLength = tracksLengthRef.current;
-      if (localTracks.length > currentTracksLength || dbTracks.length > currentTracksLength) {
-        console.log('🔄 useDatabase: Neue Tracks erkannt, lade Daten neu...');
-        loadData();
-      }
-    }, 10000); // Erhöhe Intervall auf 10 Sekunden um infinite loops zu vermeiden
-
-    return () => clearInterval(interval);
-  }, [currentUserId]); // Nur currentUserId als dependency
+  // Polling DEAKTIVIERT - verursacht UI-Flash beim Track-Wechsel
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     const currentTracksLength = tracksLengthRef.current;
+  //     if (currentTracksLength === 0) {
+  //       console.log('🔄 useDatabase: Keine Tracks vorhanden, lade Daten neu...');
+  //       loadData();
+  //     }
+  //   }, 30000);
+  //   return () => clearInterval(interval);
+  // }, [currentUserId, loadData]);
 
   // =============================================================================
   // TRACK OPERATIONEN
   // =============================================================================
 
-  const addTrack = (track: AudioTrack): boolean => {
-    return DatabaseService.addTrack(track);
-  };
-
-  const deleteTrack = (trackId: string): boolean => {
-    return DatabaseService.deleteTrack(trackId);
-  };
-
-  const updateTrack = (trackId: string, updates: Partial<AudioTrack>): boolean => {
-    return DatabaseService.updateTrack(trackId, updates);
-  };
-
-  const addCommentToTrack = (trackId: string, comment: any): boolean => {
-    const success = DatabaseService.addCommentToTrack(trackId, comment);
+  const addTrack = async (track: AudioTrack): Promise<boolean> => {
+    // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits gespeichert, nur lokal synchronisieren
+    console.log('🔄 useDatabase: OPTION C - Synchronisiere Track:', track.id, track.title);
+    
+    // Lokal hinzufügen für sofortige Anzeige (upload.php hat bereits auf Server gespeichert)
+    const success = await DatabaseService.addTrack(track);
     if (success) {
       // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
       loadData();
@@ -185,11 +222,38 @@ export const useDatabase = (currentUserId?: string) => {
     return success;
   };
 
-  const deleteCommentFromTrack = (trackId: string, commentId: string): boolean => {
-    const success = DatabaseService.deleteCommentFromTrack(trackId, commentId);
+  const deleteTrack = async (trackId: string): Promise<boolean> => {
+    const success = await DatabaseService.deleteTrack(trackId);
+    if (success) {
+      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
+      loadData();
+    }
+    return success;
+  };
+
+  const updateTrack = (trackId: string, updates: Partial<AudioTrack>): boolean => {
+    const success = DatabaseService.updateTrack(trackId, updates);
+    if (success) {
+      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
+      loadData();
+    }
+    return success;
+  };
+
+  const addCommentToTrack = async (trackId: string, comment: any): Promise<boolean> => {
+    const success = await DatabaseService.addCommentToTrack(trackId, comment);
+    if (success) {
+      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
+      loadData();
+    }
+    return success;
+  };
+
+  const deleteCommentFromTrack = async (trackId: string, commentId: string): Promise<boolean> => {
+    const success = await DatabaseService.deleteCommentFromTrack(trackId, commentId);
     if (success) {
       // Nur die Kommentare aktualisieren, nicht alle Daten neu laden
-      const updatedComments = DatabaseService.getComments();
+      const updatedComments = await DatabaseService.getComments();
       setComments(updatedComments);
     }
     return success;
@@ -199,8 +263,8 @@ export const useDatabase = (currentUserId?: string) => {
   // LIKES & BOOKMARKS
   // =============================================================================
 
-  const toggleLike = (trackId: string, userId: string): boolean => {
-    const success = DatabaseService.toggleLike(trackId, userId);
+  const toggleLike = async (trackId: string, userId: string): Promise<boolean> => {
+    const success = await DatabaseService.toggleLike(trackId, userId);
     if (success) {
       // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
       loadData();
@@ -208,8 +272,8 @@ export const useDatabase = (currentUserId?: string) => {
     return success;
   };
 
-  const toggleBookmark = (trackId: string, userId: string): boolean => {
-    const success = DatabaseService.toggleBookmark(trackId, userId);
+  const toggleBookmark = async (trackId: string, userId: string): Promise<boolean> => {
+    const success = await DatabaseService.toggleBookmark(trackId, userId);
     if (success) {
       // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
       loadData();
@@ -217,36 +281,36 @@ export const useDatabase = (currentUserId?: string) => {
     return success;
   };
 
-  const getUserLikedTracks = (userId: string): AudioTrack[] => {
-    return DatabaseService.getUserLikedTracks(userId);
+  const getUserLikedTracks = async (userId: string): Promise<AudioTrack[]> => {
+    return await DatabaseService.getUserLikedTracks(userId);
   };
 
-  const getUserBookmarkedTracks = (userId: string): AudioTrack[] => {
-    return DatabaseService.getUserBookmarkedTracks(userId);
+  const getUserBookmarkedTracks = async (userId: string): Promise<AudioTrack[]> => {
+    return await DatabaseService.getUserBookmarkedTracks(userId);
   };
 
   // =============================================================================
   // COMMENT LIKES
   // =============================================================================
 
-  const toggleCommentLike = (commentId: string, userId: string): boolean => {
-    return DatabaseService.toggleCommentLike(commentId, userId);
+  const toggleCommentLike = async (commentId: string, userId: string): Promise<boolean> => {
+    return await DatabaseService.toggleCommentLike(commentId, userId);
   };
 
-  const isCommentLikedByUser = (commentId: string, userId: string): boolean => {
-    return DatabaseService.isCommentLikedByUser(commentId, userId);
+  const isCommentLikedByUser = async (commentId: string, userId: string): Promise<boolean> => {
+    return await DatabaseService.isCommentLikedByUser(commentId, userId);
   };
 
-  const getCommentLikeCount = (commentId: string): number => {
-    return DatabaseService.getCommentLikeCount(commentId);
+  const getCommentLikeCount = async (commentId: string): Promise<number> => {
+    return await DatabaseService.getCommentLikeCount(commentId);
   };
 
   // =============================================================================
   // FOLLOW OPERATIONS
   // =============================================================================
 
-  const toggleFollow = (followerId: string, targetUserId: string): boolean => {
-    const success = DatabaseService.toggleFollow(followerId, targetUserId);
+  const toggleFollow = async (followerId: string, targetUserId: string): Promise<boolean> => {
+    const success = await DatabaseService.toggleFollow(followerId, targetUserId);
     if (success) {
       loadData();
     }
@@ -348,8 +412,8 @@ export const useDatabase = (currentUserId?: string) => {
     // Debug method - logs removed for performance
   };
 
-  const incrementPlay = (trackId: string): boolean => {
-    const success = DatabaseService.incrementPlay(trackId);
+  const incrementPlay = async (trackId: string): Promise<boolean> => {
+    const success = await DatabaseService.incrementPlay(trackId);
     if (success) {
       loadData();
     }
@@ -417,6 +481,7 @@ export const useDatabase = (currentUserId?: string) => {
     
     // Utility
     loadData,
+    clearCache,
     debug,
     
     // Additional utility functions

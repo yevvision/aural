@@ -17,6 +17,7 @@ interface PlayerStore extends PlaybackState {
   expand: () => void;
   collapse: () => void;
   setLoading: (loading: boolean) => void;
+  setFinished: (finished: boolean) => void;
   reset: () => void;
   
   // German spec: Advanced playback controls
@@ -43,6 +44,7 @@ const initialState: PlaybackState = {
   volume: 1,
   isExpanded: false,
   isLoading: false,
+  isFinished: false,
   // German spec: Additional state
   playlist: [],
   currentIndex: -1,
@@ -76,14 +78,16 @@ export const usePlayerStore = create<PlayerStore>()(
             currentIndex: index,
             currentTime: 0, 
             duration: 0,
-            isLoading: true 
+            isLoading: true,
+            isFinished: false
           });
         } else {
           set({ 
             currentTrack: track, 
             currentTime: 0, 
             duration: 0,
-            isLoading: true 
+            isLoading: true,
+            isFinished: false
           });
         }
       },
@@ -92,7 +96,10 @@ export const usePlayerStore = create<PlayerStore>()(
         set((state) => {
           // Log the toggle action for debugging
           // Toggling play state
-          return { isPlaying: !state.isPlaying };
+          return { 
+            isPlaying: !state.isPlaying
+            // Don't reset isFinished here - let it persist until a new track is loaded
+          };
         });
       },
       
@@ -119,6 +126,10 @@ export const usePlayerStore = create<PlayerStore>()(
       
       setLoading: (loading) => {
         set({ isLoading: loading });
+      },
+      
+      setFinished: (finished) => {
+        set({ isFinished: finished });
       },
       
       reset: () => {

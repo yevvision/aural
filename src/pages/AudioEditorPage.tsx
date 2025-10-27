@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageTransition, RevealOnScroll } from '../components/ui';
 import { Heading, Body } from '../components/ui/Typography';
 import AudioEditor from '../components/audio/editor/AudioEditor';
+import WaveformVisualizer from '../components/audio/editor/WaveformVisualizer';
 import { AudioUrlManager } from '../services/audioUrlManager';
 type EncodeFormat = 'mp3' | 'aac';
 
@@ -12,6 +13,9 @@ export const AudioEditorPage = () => {
   const navigate = useNavigate();
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [enableFfmpeg, setEnableFfmpeg] = useState(false);
+  const [waveformSelection, setWaveformSelection] = useState<{ start: number; end: number } | null>(null);
+  const [waveformRegions, setWaveformRegions] = useState<{ start: number; end: number; id: string }[]>([]);
+  const [removeRegionFn, setRemoveRegionFn] = useState<((start: number, end: number) => void) | null>(null);
 
   // Load recording from sessionStorage
   useEffect(() => {
@@ -252,13 +256,23 @@ export const AudioEditorPage = () => {
 
         {/* Mobile-optimized Title */}
         <Heading level={1} className="text-3xl sm:text-4xl mb-4 sm:mb-6">
-          Sounds good!
+          Sounds good!<br />Time to polish it up?
         </Heading>
+        <div className="mb-6"></div>
 
-        {/* Mobile-optimized Description */}
-        <Body color="secondary" className="mb-6 sm:mb-8 leading-snug text-sm sm:text-base font-light">
-          Would you like to edit your recording? Create markers, trim sections, and export your audio with precision
-        </Body>
+        {/* Waveform Visualizer - positioned right after description */}
+        {recordingBlob && recordingBlob.size > 0 && (
+          <div className="mb-6">
+            <WaveformVisualizer
+              blob={recordingBlob}
+              onSelectionChange={setWaveformSelection}
+              onDurationChange={() => {}}
+              onRegionsChange={setWaveformRegions}
+              onRemoveRegionReady={setRemoveRegionFn}
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* Audio Editor with mobile optimizations */}
         {recordingBlob ? (
@@ -267,13 +281,16 @@ export const AudioEditorPage = () => {
               recordingBlob={recordingBlob}
               onDone={handleEditorDone}
               enableFfmpeg={enableFfmpeg}
+              waveformSelection={waveformSelection}
+              waveformRegions={waveformRegions}
+              removeRegionFn={removeRegionFn}
             />
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center px-4">
               <motion.div
-                className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+                className="w-8 h-8 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin mx-auto mb-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}

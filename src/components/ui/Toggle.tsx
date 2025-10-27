@@ -7,7 +7,7 @@ import { LiquidGlassEffect } from './LiquidGlassEffect';
 type ToggleVariant = 'default' | 'pill' | 'segmented';
 type ToggleSize = 'sm' | 'md' | 'lg';
 
-interface ToggleProps extends Omit<HTMLMotionProps<'button'>, 'size'> {
+interface ToggleProps extends Omit<HTMLMotionProps<'button'>, 'size' | 'onToggle'> {
   variant?: ToggleVariant;
   size?: ToggleSize;
   children: React.ReactNode;

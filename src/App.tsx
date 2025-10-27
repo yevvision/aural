@@ -27,13 +27,6 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import UnicornStudioPage from './pages/UnicornStudioPage';
 import { UnicornVisualizerDemoPage } from './pages/UnicornVisualizerDemoPage';
 import { AudioEditTestPage } from './pages/AudioEditTestPage';
-import { DemoWorkflowPage } from './pages/DemoWorkflowPage';
-import { DemoMainPage } from './pages/DemoMainPage';
-import { DemoFeedPage } from './pages/DemoFeedPage';
-import { DemoRecordPage } from './pages/DemoRecordPage';
-import { DemoAudioEditorPage } from './pages/DemoAudioEditorPage';
-import { DemoUploadPage } from './pages/DemoUploadPage';
-import { DemoUploadSharePage } from './pages/DemoUploadSharePage';
 import { audioPersistenceManager } from './services/audioPersistenceManager';
 import './App.css';
 
@@ -62,12 +55,6 @@ function App() {
           <Route path="test" element={<TestPage />} />
           <Route path="report" element={<ReportPage />} />
           <Route path="audio-edit-test" element={<AudioEditTestPage />} />
-          <Route path="demo-workflow" element={<DemoWorkflowPage />} />
-          <Route path="demo" element={<DemoMainPage />} />
-          <Route path="demo-feed" element={<DemoFeedPage />} />
-          <Route path="demo-record" element={<DemoRecordPage />} />
-          <Route path="demo-audio-editor" element={<DemoAudioEditorPage />} />
-          <Route path="demo-upload" element={<DemoUploadPage />} />
           <Route path="unicorn" element={<UnicornStudioPage />} />
           <Route path="unicorn-visualizer-demo" element={<UnicornVisualizerDemoPage />} />
         </Route>
@@ -83,7 +70,6 @@ function App() {
           <Route path="test-news" element={<TestNewsPage />} />
           <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="audio-edit-test" element={<AudioEditTestPage />} />
-          <Route path="demo-workflow" element={<DemoWorkflowPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="player" element={<PlayerPage />} />
@@ -107,7 +93,6 @@ function App() {
           <Route path="test-news" element={<TestNewsPage />} />
           <Route path="audio-editor" element={<AudioEditorPage />} />
           <Route path="audio-edit-test" element={<AudioEditTestPage />} />
-          <Route path="demo-workflow" element={<DemoWorkflowPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="profile/:id" element={<ProfilePage />} />
           <Route path="player" element={<PlayerPage />} />
@@ -128,13 +113,6 @@ function App() {
         <Route path="/aural/admin" element={<AdminPage />} />
         <Route path="/aural/record/recorder" element={<RecorderPage />} />
         
-        {/* Demo Pages - Outside AppLayout for pure black background */}
-        <Route path="/demo" element={<DemoMainPage />} />
-        <Route path="/demo-feed" element={<DemoFeedPage />} />
-        <Route path="/demo-record" element={<DemoRecordPage />} />
-        <Route path="/demo-audio-editor" element={<DemoAudioEditorPage />} />
-        <Route path="/demo-upload" element={<DemoUploadPage />} />
-        <Route path="/demo-upload-share" element={<DemoUploadSharePage />} />
         
         {/* Legal Pages */}
         <Route path="/datenschutz" element={<DatenschutzPage />} />
