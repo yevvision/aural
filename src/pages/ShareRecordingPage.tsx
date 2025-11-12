@@ -528,7 +528,7 @@ export const ShareRecordingPage = () => {
       
       try {
         // Use uploadWithProgress for better UX
-        response = await uploadWithProgress('https://goaural.com/upload.php', formData, {
+        response = await uploadWithProgress('/upload.php', formData, {
           onProgress: (progress) => {
             setUploadProgress(progress);
           },

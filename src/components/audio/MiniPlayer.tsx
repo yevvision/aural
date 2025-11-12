@@ -221,68 +221,32 @@ export const MiniPlayer = ({ displayMode = 'fixed' }: MiniPlayerProps) => {
         <motion.button
           onClick={toggle}
           className="flex items-center justify-center flex-shrink-0 relative"
-          style={{ marginLeft: '10px' }}
+          style={{ marginLeft: '10px', width: '37px', height: '37px' }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           transition={{ duration: 0.2 }}
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? (
-            <svg 
-              version="1.1" 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 87.733 86.526" 
-              style={{ width: '32px', height: '32px' }}
-            >
-              <circle 
-                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
-                cx="43.866" 
-                cy="42.242" 
-                r="40.577"
-              />
-              <line 
-                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
-                x1="38" 
-                y1="25" 
-                x2="38" 
-                y2="60"
-              />
-              <line 
-                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
-                x1="49" 
-                y1="25" 
-                x2="49" 
-                y2="60"
-              />
-            </svg>
-          ) : (
-            <svg 
-              version="1.1" 
-              xmlns="http://www.w3.org/2000/svg" 
-              viewBox="0 0 87.733 86.526" 
-              style={{ width: '32px', height: '32px' }}
-            >
-              <circle 
-                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
-                cx="43.866" 
-                cy="42.242" 
-                r="40.577"
-              />
-              <path 
-                style={{fill:"none",stroke:"white",strokeWidth:"3.1",strokeMiterlimit:"10"}} 
-                d="M51.459,25.293l-4.025-4.025c-4.387-4.387-11.5-4.387-15.887,0s-4.387,11.5,0,15.887l4.025,4.025l-4.025,4.025c-4.387,4.387-4.387,11.5,0,15.887s11.5,4.387,15.887,0l4.025-4.025L67.346,41.18L51.459,25.293z"
-              />
-            </svg>
-          )}
+          <DynamicPlayIcon
+            isCurrentTrack={true}
+            isPlaying={isPlaying}
+            isFinished={false}
+            className="w-[37px] h-[37px] text-white"
+            variant="white-outline"
+          />
         </motion.button>
 
         {/* Track info with enhanced typography - only in fixed mode */}
         {displayMode === 'fixed' && (
           <div className="flex-1 min-w-0 mx-4 overflow-hidden">
             <div className="whitespace-nowrap">
-              <div className="text-white text-sm font-medium truncate">
+              <button
+                onClick={handleExpand}
+                className="text-white text-sm font-medium truncate cursor-pointer hover:text-gray-300 transition-colors text-left w-full"
+                aria-label={`Open ${updatedCurrentTrack.title} details`}
+              >
                 {updatedCurrentTrack.title}
-              </div>
+              </button>
             </div>
             <div className="flex items-center space-x-3 text-text-secondary">
               <span className="text-xs text-gray-400">{updatedCurrentTrack.user.username}</span>

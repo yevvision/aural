@@ -126,6 +126,15 @@ export const TopNavigation = () => {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
+      style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        height: '72px',
+        overflow: 'visible'
+      }}
     >
       {/* Transparent navigation background */}
       <div className="transparent-nav">
@@ -177,17 +186,17 @@ export const TopNavigation = () => {
                           <g>
                             <g>
                               <circle 
-                                style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '5.15625', strokeMiterlimit: '10' }} 
+                                style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '3.8739', strokeMiterlimit: '10' }} 
                                 cx="43.866" 
                                 cy="42.242" 
                                 r="40.577"
                               />
                             </g>
                             <path 
-                              style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '4.6875', strokeMiterlimit: '10' }} 
-                              d="M51.459,25.293l-4.025-4.025
-                                c-4.387-4.387-11.5-4.387-15.887,0s-4.387,11.5,0,15.887l4.025,4.025l-4.025,4.025c-4.387,4.387-4.387,11.5,0,15.887
-                                s11.5,4.387,15.887,0l4.025-4.025L67.346,41.18L51.459,25.293z"
+                              style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '3.8739', strokeMiterlimit: '10' }} 
+                              d="M50.971,27.415l-3.488-3.488
+			c-3.801-3.801-9.964-3.801-13.765,0c-3.801,3.801-3.801,9.964,0,13.765l3.488,3.488l-3.488,3.488
+			c-3.801,3.801-3.801,9.964,0,13.765c3.801,3.801,9.964,3.801,13.765,0l3.488-3.488L64.736,41.18L50.971,27.415z"
                             />
                           </g>
                         </g>
@@ -307,12 +316,27 @@ export const TopNavigation = () => {
 
               {/* Record icon - red when on record page, red bubble as CTA on other pages */}
               <motion.div
-                className="flex items-center justify-center w-9 h-9 relative z-10 ml-1"
+                className="flex items-center justify-center relative z-10 ml-1"
+                style={{ width: '52px', height: '52px' }}
                 transition={{ duration: 0.2 }}
               >
-                {/* Red circle background - only visible as CTA when NOT on record page */}
+                {/* Red circle background with radial gradient - only visible as CTA when NOT on record page */}
                 {!isOnRecordPage && (
-                  <div className="absolute inset-0 bg-red-500 rounded-full opacity-80"></div>
+                  <motion.div
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(239, 68, 68, 1) 0%, rgba(239, 68, 68, 0.5) 25%, rgba(239, 68, 68, 0.1) 45%, transparent 65%)',
+                    }}
+                    animate={{
+                      scale: [1, 1.15, 1],
+                      opacity: [0.9, 1, 0.9],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
                 )}
                 
                 <Link

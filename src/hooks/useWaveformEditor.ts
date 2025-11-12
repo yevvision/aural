@@ -102,8 +102,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         if (region.element) {
           if (region.id === regionId) {
             // Set as active (orange with border and handles)
-            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.25)', 'important');
-            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('background', 'rgba(255, 78, 58, 0.25)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(255, 78, 58, 0.25)', 'important');
             region.element.style.setProperty('border', '2px solid #f97316', 'important');
             region.element.style.setProperty('opacity', '1', 'important');
             region.element.classList.add('active');
@@ -130,8 +130,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
             }
           } else {
             // Set as inactive (orange without border and handles)
-            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
-            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('background', 'rgba(255, 78, 58, 0.2)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(255, 78, 58, 0.2)', 'important');
             region.element.style.setProperty('border', 'none', 'important');
             region.element.style.setProperty('opacity', '0.7', 'important');
             region.element.classList.remove('active');
@@ -163,8 +163,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     currentRegions.forEach((region: any) => {
       if (region.element) {
         // RADIKALE Überschreibung
-        region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
-        region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+        region.element.style.setProperty('background', 'rgba(255, 78, 58, 0.2)', 'important');
+        region.element.style.setProperty('background-color', 'rgba(255, 78, 58, 0.2)', 'important');
         region.element.style.setProperty('border', 'none', 'important');
         region.element.style.setProperty('border-width', '0', 'important');
         region.element.style.setProperty('border-style', 'none', 'important');
@@ -400,14 +400,100 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           height: 120px !important;
           width: 100% !important;
           position: relative !important;
-          overflow: hidden !important;
+          overflow: visible !important;
         }
 
-        /* Cursor Styling - rot */
+        /* Waveform Container selbst - overflow visible für Cursor-Extension */
+        .wavesurfer-container {
+          overflow: visible !important;
+          position: relative !important;
+        }
+
+        /* Alle internen WaveSurfer Container - overflow visible, keine Scrollbar */
+        .wavesurfer-container > *,
+        .wavesurfer-container > * > *,
+        .wavesurfer-container > * > * > *,
+        .wavesurfer-container > * > * > * > *,
+        .wavesurfer-container [class*="scroll"],
+        .wavesurfer-container [style*="overflow"],
+        .wavesurfer-container [class*="viewport"],
+        .wavesurfer-container [class*="wave"],
+        .wavesurfer-container [class*="canvas"],
+        .wavesurfer-container div[role="region"],
+        .wavesurfer-container svg {
+          overflow: visible !important;
+        }
+
+        /* Viewport Container spezifisch */
+        .wavesurfer-container ::part(viewport),
+        .wavesurfer-container ::part(view),
+        .wavesurfer-container ::part(wave) {
+          overflow: visible !important;
+        }
+
+        /* Scrollbar verstecken */
+        .wavesurfer-container ::part(scroll)::-webkit-scrollbar,
+        .wavesurfer-container ::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+
+        .wavesurfer-container ::part(scroll),
+        .wavesurfer-container [class*="scroll"] {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+
+        /* Cursor Styling - rot, 63px nach oben verschoben */
         .wavesurfer-container ::part(cursor) {
-          height: 120px !important;
+          height: 63px !important;
           width: 3px;
           background: #c9242c;
+          position: relative;
+          z-index: 100 !important;
+          pointer-events: auto !important;
+          margin-top: -63px !important;
+        }
+
+        /* Cursor-Verlängerung nach oben - ragt über Waveform hinaus */
+        .wavesurfer-container ::part(cursor)::before {
+          content: '' !important;
+          position: absolute !important;
+          bottom: 100% !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          width: 3px !important;
+          height: 63px !important;
+          background: #c9242c !important;
+          z-index: 100 !important;
+          pointer-events: auto !important;
+        }
+
+        /* Greifbarer Kreis ganz oben am Cursor - über allem */
+        .wavesurfer-container ::part(cursor)::after {
+          content: '' !important;
+          position: absolute !important;
+          bottom: calc(100% + 63px) !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          width: 13px !important;
+          height: 13px !important;
+          background: #c9242c !important;
+          border-radius: 50% !important;
+          border: none !important;
+          cursor: grab !important;
+          z-index: 101 !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+          pointer-events: auto !important;
+        }
+
+        /* Cursor aktiv beim Greifen */
+        .wavesurfer-container ::part(cursor):active::after,
+        .wavesurfer-container ::part(cursor):hover::after {
+          cursor: grabbing !important;
+          transform: translateX(-50%) scale(1.15) !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
         }
 
         /* Region-Markierung - ENTFERNT - wird durch .wavesurfer-region CSS gesteuert */
@@ -420,7 +506,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-container ::part(region-handle-right) {
           width: 24px !important;
           height: 24px !important;
-          background: #f97316 !important;
+          background: #ff4e3a !important;
           border: none !important;
           border-radius: 3px !important;
           cursor: col-resize !important;
@@ -459,8 +545,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         /* Hover-Effekte für Handles - orange */
         .wavesurfer-container ::part(region-handle-left):hover,
         .wavesurfer-container ::part(region-handle-right):hover {
-          background: #f97316 !important;
-          box-shadow: 0 4px 8px rgba(249, 115, 22, 0.4) !important;
+          background: #ff4e3a !important;
+          box-shadow: 0 4px 8px rgba(255, 78, 58, 0.4) !important;
         }
 
         /* Active/Click-Zustand - verhindert Springen, orange */
@@ -468,7 +554,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-container ::part(region-handle-right):active {
           top: 50% !important;
           transform: translateY(-50%) !important;
-          background: #f97316 !important;
+          background: #ff4e3a !important;
         }
 
         /* Focus-Zustand - verhindert Springen */
@@ -554,11 +640,20 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           transform: scale(1.05) !important;
         }
 
-        /* Scrollbar Styling - blau */
+        /* Scrollbar Styling - versteckt, overflow visible */
         .wavesurfer-container ::part(scroll) {
           background: transparent !important;
           height: 100% !important;
           border-radius: 4px !important;
+          overflow: visible !important;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+
+        .wavesurfer-container ::part(scroll)::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
         }
 
         /* RADIKALE LÖSUNG: Überschreibe ALLE WaveSurfer-Styles */
@@ -566,8 +661,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-region[style*="background"],
         .wavesurfer-region[style*="border"],
         .wavesurfer-region[style*="color"] {
-          background: rgba(249, 115, 22, 0.2) !important;
-          background-color: rgba(249, 115, 22, 0.2) !important;
+          background: rgba(255, 78, 58, 0.2) !important;
+          background-color: rgba(255, 78, 58, 0.2) !important;
           border: none !important;
           border-width: 0 !important;
           border-style: none !important;
@@ -576,6 +671,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           opacity: 0.7 !important;
           outline: none !important;
           box-shadow: none !important;
+          z-index: 10 !important;
+          pointer-events: auto !important;
         }
         
         /* AKTIVE MARKER - ORANGE */
@@ -583,13 +680,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-region.active[style*="background"],
         .wavesurfer-region.active[style*="border"],
         .wavesurfer-region.active[style*="color"] {
-          background: rgba(249, 115, 22, 0.25) !important;
-          background-color: rgba(249, 115, 22, 0.25) !important;
-          border: 2px solid #f97316 !important;
-          border-width: 2px !important;
+          background: rgba(255, 78, 58, 0.25) !important;
+          background-color: rgba(255, 78, 58, 0.25) !important;
+          border: 1px solid #ff4e3a !important;
+          border-width: 1px !important;
           border-style: solid !important;
-          border-color: #f97316 !important;
+          border-color: #ff4e3a !important;
           opacity: 1 !important;
+          z-index: 10 !important;
+          pointer-events: auto !important;
         }
         
         /* INAKTIVE MARKER - ORANGE OHNE RAHMEN - ÜBERSCHREIBT ALLES */
@@ -597,8 +696,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         .wavesurfer-region:not(.active)[style*="background"],
         .wavesurfer-region:not(.active)[style*="border"],
         .wavesurfer-region:not(.active)[style*="color"] {
-          background: rgba(249, 115, 22, 0.2) !important;
-          background-color: rgba(249, 115, 22, 0.2) !important;
+          background: rgba(255, 78, 58, 0.2) !important;
+          background-color: rgba(255, 78, 58, 0.2) !important;
           border: none !important;
           border-width: 0 !important;
           border-style: none !important;
@@ -613,8 +712,8 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         
         /* Aktive Marker - orange mit Border und Greifern */
         .wavesurfer-region.active {
-          background: rgba(249, 115, 22, 0.25) !important;
-          border: 2px solid #f97316 !important;
+          background: rgba(255, 78, 58, 0.25) !important;
+          border: 1px solid #ff4e3a !important;
           border-radius: 4px !important;
           opacity: 1 !important;
         }
@@ -624,7 +723,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           display: block !important;
           width: 24px !important;
           height: 24px !important;
-          background: #f97316 !important;
+          background: #ff4e3a !important;
           border: none !important;
           border-radius: 3px !important;
           cursor: col-resize !important;
@@ -640,7 +739,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           display: block !important;
           width: 24px !important;
           height: 24px !important;
-          background: #f97316 !important;
+          background: #ff4e3a !important;
           border: none !important;
           border-radius: 3px !important;
           cursor: col-resize !important;
@@ -672,15 +771,28 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           right: -12px !important;
         }
 
-        /* Timeline Styling */
+        /* Timeline Styling - versteckt */
         .wavesurfer-container ::part(timeline) {
-          color: #9ca3af !important;
-          font-size: 12px !important;
-          font-family: monospace !important;
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
         
         .wavesurfer-container ::part(timeline-marker) {
-          color: #6b7280 !important;
+          display: none !important;
+          visibility: hidden !important;
+        }
+
+        /* Timeline komplett ausblenden */
+        .wavesurfer-container [class*="timeline"],
+        .wavesurfer-container [data-name="timeline"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
 
         /* Hide system media controls */
@@ -769,9 +881,13 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         setAllRegions(prev => prev.filter(region => region.id !== r.id));
       });
 
+      // Zoom-Level Referenz für Cursor-Drag
+      let currentZoomLevelRef = zoomLevel;
+      
       // Zoom-Event-Listener für Schieberegler
       ws.on('zoom', (minPxPerSec: number) => {
         setZoomLevel(minPxPerSec);
+        currentZoomLevelRef = minPxPerSec; // Update Referenz für Cursor-Drag
         console.log('Zoom changed to:', minPxPerSec, 'px/sec');
         
         // Force region visual update after zoom
@@ -867,7 +983,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
           const initialRegion = regions.addRegion({
             start: 0,
             end: validDuration,
-            color: 'rgba(249, 115, 22, 0.2)',
+            color: 'rgba(255, 78, 58, 0.2)',
             // border: '2px solid #f97316' // Nicht unterstützt in dieser Version
           });
           console.log('Initial region created for entire duration:', validDuration);
@@ -1000,6 +1116,185 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
             }
             lastTap = currentTime;
           }, { passive: true });
+          
+          // Cursor Drag-Funktionalität
+          let isDraggingCursor = false;
+          
+          // Hilfsfunktion: Berechne Zeit aus X-Position (funktioniert auch außerhalb des Containers)
+          const getTimeFromX = (x: number): number => {
+            if (!ws || !container) return 0;
+            
+            const rect = container.getBoundingClientRect();
+            const viewport = container.querySelector('[part="viewport"]') as HTMLElement;
+            if (!viewport) return 0;
+            
+            // X-Position kann auch außerhalb des Containers sein (z.B. beim Kreis oben)
+            // Verwende relative Position zum Container
+            const relativeX = x - rect.left;
+            const scrollLeft = viewport.scrollLeft || 0;
+            // Auch negative Werte sind erlaubt (außerhalb des Containers links)
+            // Positive Werte über Container-Breite sind auch erlaubt (außerhalb rechts)
+            const absoluteX = Math.max(0, relativeX) + scrollLeft;
+            
+            // Konvertiere Pixel zu Zeit basierend auf Zoom-Level
+            const pixelsPerSecond = currentZoomLevelRef;
+            const scrollTime = ws.getScroll(); // Start-Zeit des sichtbaren Bereichs
+            const time = scrollTime + (absoluteX / pixelsPerSecond);
+            
+            const duration = ws.getDuration();
+            return Math.max(0, Math.min(duration, time));
+          };
+          
+          const handleCursorDragStart = (e: MouseEvent | TouchEvent) => {
+            if (!ws || !container) return;
+            
+            const rect = container.getBoundingClientRect();
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+            const currentTime = ws.getCurrentTime();
+            const duration = ws.getDuration();
+            
+            if (duration <= 0) return;
+            
+            // Container hat paddingTop: 73px (angepasst für 63px Cursor + etwas Spielraum)
+            // Der Kreis liegt bei etwa Y = -73px relativ zum Container-Top
+            // Berücksichtige das Padding: clickYRelative kann negativ sein
+            const paddingTop = 73; // Entspricht paddingTop im WaveformVisualizer (angepasst für 63px Cursor)
+            const clickYRelative = clientY - (rect.top - paddingTop); // Berücksichtige Padding für Bereich oberhalb
+            const clickXRelative = clientX - rect.left;
+            
+            // Berechne die Zeit an der Klick-Position
+            const clickedTime = getTimeFromX(clientX);
+            
+            // Prüfe, ob der Klick nahe am Cursor ist (innerhalb von 0.2 Sekunden)
+            const timeDifference = Math.abs(clickedTime - currentTime);
+            
+            // Berechne die X-Position des Cursors
+            const viewport = container.querySelector('[part="viewport"]') as HTMLElement;
+            if (!viewport) return;
+            
+            const scrollTime = ws.getScroll();
+            const pixelsPerSecond = currentZoomLevelRef;
+            const cursorPixelX = (currentTime - scrollTime) * pixelsPerSecond;
+            const viewportScrollLeft = viewport.scrollLeft || 0;
+            const cursorAbsoluteX = cursorPixelX + viewportScrollLeft;
+            const cursorXInContainer = cursorAbsoluteX;
+            const distanceXFromCursor = Math.abs(clickXRelative - cursorXInContainer);
+            
+            // Bedingungen prüfen
+            const isNearCursorInTime = timeDifference <= 0.3; // Etwas größere Toleranz
+            const isNearCursorInXForStrich = distanceXFromCursor <= 10; // Toleranz für Strich
+            const isNearCursorInXForKreis = distanceXFromCursor <= 25; // Größere Toleranz für Kreis (13px + etwas Spielraum)
+            
+            // Bereich des roten Kreises: ganz oben, außerhalb des sichtbaren Containers
+            // Der Kreis ist bei Y = -73px bis -60px relativ zum Container (63px über Cursor-Ende)
+            // Mit Padding-Berücksichtigung: clickYRelative sollte zwischen -83 und -60 liegen
+            const isInKreisArea = clickYRelative >= -83 && clickYRelative <= -60;
+            
+            // Bereich des Cursor-Strichs: oberhalb der Waveform aber innerhalb des sichtbaren Bereichs
+            // Cursor beginnt bei Y = -63px und geht bis Y = 0px (dann beginnt Waveform)
+            const isInStrichArea = clickYRelative >= -73 && clickYRelative < 80 && !isInKreisArea;
+            
+            // Für den Kreis: prüfe nur ob X nahe ist (größere Toleranz) UND Y ganz oben
+            // Für den Strich: prüfe ob X nahe ist (kleinere Toleranz) UND Y im Strich-Bereich
+            const canDragKreis = isNearCursorInTime && isNearCursorInXForKreis && isInKreisArea;
+            const canDragStrich = isNearCursorInTime && isNearCursorInXForStrich && isInStrichArea;
+            
+            // Debug für Kreis-Erkennung
+            if (isInKreisArea && distanceXFromCursor <= 50) {
+              console.log('Kreis-Klick erkannt:', {
+                clickYRelative,
+                clickXRelative,
+                cursorXInContainer,
+                distanceXFromCursor,
+                timeDifference,
+                isNearCursorInTime,
+                isNearCursorInXForKreis,
+                canDragKreis
+              });
+            }
+            
+            if (canDragKreis || canDragStrich) {
+              isDraggingCursor = true;
+              
+              console.log('Drag gestartet!', {
+                canDragKreis,
+                canDragStrich,
+                isDraggingCursor,
+                clickYRelative,
+                clickXRelative
+              });
+              
+              // Verhindere Text-Selektion und andere Drag-Events
+              e.preventDefault();
+              e.stopPropagation();
+              
+              // Verhindere, dass WaveSurfer's Click-Handler den Cursor verschiebt
+              e.stopImmediatePropagation();
+              
+              // Haptic Feedback
+              if ('vibrate' in navigator) {
+                navigator.vibrate(10);
+              }
+            }
+          };
+          
+          const handleCursorDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDraggingCursor || !ws || !container) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const duration = ws.getDuration();
+            
+            if (duration <= 0) return;
+            
+            // Berechne die neue Zeit direkt aus der Mausposition
+            // Wichtig: Diese Funktion muss auch außerhalb des Containers funktionieren
+            const newTime = getTimeFromX(clientX);
+            
+            // Debug-Ausgabe beim Drag
+            console.log('Cursor-Drag:', {
+              clientX,
+              newTime,
+              duration,
+              isDraggingCursor
+            });
+            
+            // Setze die neue Zeit
+            ws.setTime(newTime);
+          };
+          
+          const handleCursorDragEnd = (e: MouseEvent | TouchEvent) => {
+            if (isDraggingCursor) {
+              isDraggingCursor = false;
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          };
+          
+          // Finde Parent-Element, das auch den Bereich oberhalb abdeckt (mit paddingTop)
+          const parentElement = container.parentElement;
+          
+          // Mouse Events für Desktop - auf Parent-Element für Bereich oberhalb
+          if (parentElement) {
+            parentElement.addEventListener('mousedown', handleCursorDragStart, { capture: true });
+          } else {
+            container.addEventListener('mousedown', handleCursorDragStart, { capture: true });
+          }
+          window.addEventListener('mousemove', handleCursorDrag);
+          window.addEventListener('mouseup', handleCursorDragEnd);
+          
+          // Touch Events für Mobile - auf Parent-Element für Bereich oberhalb
+          if (parentElement) {
+            parentElement.addEventListener('touchstart', handleCursorDragStart, { passive: false, capture: true });
+          } else {
+            container.addEventListener('touchstart', handleCursorDragStart, { passive: false, capture: true });
+          }
+          window.addEventListener('touchmove', handleCursorDrag, { passive: false });
+          window.addEventListener('touchend', handleCursorDragEnd, { passive: false });
         }
       });
 
@@ -1261,7 +1556,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     const region = regionsRef.current.addRegion({
       start: s,
       end: e,
-      color: 'rgba(249, 115, 22, 0.2)', // Orange Farbe für inaktive Regionen
+      color: 'rgba(255, 78, 58, 0.2)', // Orange Farbe für inaktive Regionen
       drag: true,
       resize: true,
     });
@@ -1298,7 +1593,7 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
     const region = regionsRef.current.addRegion({
       start: s,
       end: e,
-      color: 'rgba(249, 115, 22, 0.2)', // Orange Farbe für inaktive Regionen
+      color: 'rgba(255, 78, 58, 0.2)', // Orange Farbe für inaktive Regionen
       drag: true,
       resize: true,
     });
@@ -1429,15 +1724,15 @@ export function useWaveformEditor({ container, audioBlob, barWidth = 2, height =
         if (region.element) {
           if (region.id === activeRegionId) {
             // AKTIVE REGION - ORANGE
-            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.25)', 'important');
-            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.25)', 'important');
+            region.element.style.setProperty('background', 'rgba(255, 78, 58, 0.25)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(255, 78, 58, 0.25)', 'important');
             region.element.style.setProperty('border', '2px solid #f97316', 'important');
             region.element.style.setProperty('opacity', '1', 'important');
             region.element.classList.add('active');
           } else {
             // INAKTIVE REGION - ORANGE OHNE RAHMEN
-            region.element.style.setProperty('background', 'rgba(249, 115, 22, 0.2)', 'important');
-            region.element.style.setProperty('background-color', 'rgba(249, 115, 22, 0.2)', 'important');
+            region.element.style.setProperty('background', 'rgba(255, 78, 58, 0.2)', 'important');
+            region.element.style.setProperty('background-color', 'rgba(255, 78, 58, 0.2)', 'important');
             region.element.style.setProperty('border', 'none', 'important');
             region.element.style.setProperty('opacity', '0.7', 'important');
             region.element.classList.remove('active');

@@ -53,6 +53,15 @@ function generateId() {
     return uniqid() . '_' . substr(md5(microtime()), 0, 8);
 }
 
+// Build base URL dynamically (supports local dev and production)
+function getBaseUrl() {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+               (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+    $scheme = $isHttps ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $scheme . '://' . $host;
+}
+
 // Handle different request types
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? 'upload';
@@ -102,12 +111,13 @@ try {
             
             // Create track data
             $trackId = generateId();
+            $baseUrl = getBaseUrl();
             $track = [
                 'id' => $trackId,
                 'title' => $title,
                 'description' => $description,
                 'filename' => $filename,
-                'url' => 'https://goaural.com/' . $uploadPath,
+                'url' => $baseUrl . '/' . $uploadPath,
                 'duration' => 0, // Will be calculated by client
                 'user' => [
                     'id' => $userId,
@@ -142,7 +152,7 @@ try {
                     'username' => $username,
                     'duration' => 0,
                     'filename' => $filename,
-                    'url' => 'https://goaural.com/' . $uploadPath,
+                    'url' => $baseUrl . '/' . $uploadPath,
                     'createdAt' => date('c')
                 ];
                 $db['pendingUploads'][] = $pendingUpload;
@@ -168,7 +178,9 @@ try {
                     'uploadedAt' => date('c'),
                     'requiresReview' => $requiresReview,
                     'autoApproved' => $requiresReview && $autoApproveActive,
-                    'autoApproveActive' => $autoApproveActive
+                    'autoApproveActive' => $autoApproveActive,
+                    // Convenience fields for client
+                    'url' => $baseUrl . '/' . $uploadPath
                 ]
             ]);
             break;

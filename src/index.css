@@ -22,7 +22,7 @@
   border: none;
   overflow: hidden;
   box-shadow: none; /* No shadow */
-  padding: 1.25rem 1.25rem 1.6875rem 1.25rem; /* top right bottom left - increased bottom padding by 15px */
+  padding: calc(1.25rem + 5px) 1.25rem 1.6875rem 1.25rem; /* top right bottom left - increased top padding by 5px, bottom padding by 15px */
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -89,7 +89,6 @@
 /* Survey Question Style */
 .survey-heading {
   font-size: 2.5rem;
-  font-weight: bold;
   color: white;
   line-height: 1.2;
   margin-bottom: 2rem;
@@ -110,7 +109,6 @@
 .survey-card-title {
   color: white;
   font-size: 0.875rem;
-  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1.4;
@@ -480,8 +478,15 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Mobile optimizations */
+/* Prevent navigation from moving when keyboard is shown on mobile */
 @media (max-width: 768px) {
+  nav.fixed {
+    position: fixed !important;
+    top: 0 !important;
+    height: 72px !important;
+    z-index: 9999 !important;
+  }
+  
   /* Prevent zoom on input focus */
   input, textarea, select {
     font-size: 16px;
@@ -581,15 +586,16 @@
 
   /* Mobile-specific: Upload Div - absolute position, transparent, unten positioniert */
   .mobile-record-layout .upload-hint-container {
-    position: absolute;
-    bottom: 55px; /* Nochmal 20px höher (35px + 20px = 55px) */
-    left: 1rem;
-    right: 1rem;
+    position: sticky;
+    bottom: 15px; /* 15px über unteren Viewport-Rand */
     background: transparent; /* Transparenter Hintergrund */
     text-align: center;
     padding: 1rem;
     /* Kein Border, kein Backdrop-Filter */
     z-index: 10; /* Über anderen Inhalten */
+    margin-top: auto; /* Schiebt es nach unten */
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Mobile-specific: Upload Button Abstand */
@@ -599,14 +605,15 @@
 
   /* Mobile-specific: Recording Controls - 15px über unteren Viewport-Rand */
   .mobile-record-layout .recording-controls-container {
-    position: fixed;
+    position: sticky;
     bottom: 15px; /* 15px über unteren Viewport-Rand */
-    left: 1rem;
-    right: 1rem;
     background: transparent;
     text-align: center;
     padding: 1rem;
     z-index: 10;
+    margin-top: auto; /* Schiebt es nach unten */
+    width: 100%;
+    max-width: 100%;
   }
 
   /* Mobile-specific: Footer Position anpassen */
@@ -899,20 +906,17 @@
 /* Typography System */
 .text-headline {
   font-size: 28px;
-  font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 .text-body {
   font-size: 16px;
-  font-weight: 500;
   line-height: 1.5;
 }
 
 .text-label {
   font-size: 12px;
-  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }

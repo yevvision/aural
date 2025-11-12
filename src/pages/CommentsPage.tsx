@@ -14,6 +14,7 @@ import { MultiToggle } from '../components/ui/Toggle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
 import type { AudioTrack, NotificationActivity } from '../types';
+import { VoidOfSoundIcon } from '../components/icons/VoidOfSoundIcon';
 
 export const CommentsPage = () => {
   const navigate = useNavigate();
@@ -331,20 +332,14 @@ export const CommentsPage = () => {
           <div className="space-y-1">
             {groupedActivities.length === 0 ? (
               <RevealOnScroll direction="up" delay={0.1}>
-                <div className="text-center py-12">
-                  <MessageCircle size={48} className="text-text-secondary mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-text-primary mb-2">
-                    {viewMode === 'my_activity' ? 'No recent activities' : 'No recent notifications'}
+                <div className="text-center py-16">
+                  <div className="mb-6 flex items-center justify-center">
+                    <VoidOfSoundIcon size={96} color="#ffffff" />
+                  </div>
+                  <h3 className="text-white text-xl font-normal mb-2">
+                    {viewMode === 'my_activity' ? 'No recent activity' : 'No recent notifications'}
                   </h3>
-                  <p className="text-text-secondary">
-                    {viewMode === 'my_activity' 
-                      ? 'When you like, comment, bookmark or upload tracks, you\'ll see it here'
-                      : 'When others interact with your recordings, you\'ll see it here'
-                    }
-                  </p>
-                  <p className="text-text-secondary text-sm mt-2">
-                    Only activities from the last 6 months are shown
-                  </p>
+                  {/* Subline intentionally removed per design */}
                 </div>
               </RevealOnScroll>
             ) : (

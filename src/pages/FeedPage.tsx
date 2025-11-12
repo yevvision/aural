@@ -19,13 +19,15 @@ import { MultiToggle } from '../components/ui/Toggle';
 import { LiquidGlassHeader } from '../components/ui/LiquidGlassHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { LiquidGlassEffect } from '../components/ui/LiquidGlassEffect';
+import { AllGendersIcon, FemalesIcon, MalesIcon, DiverseIcon } from '../components/icons/GenderIcons';
+import { VoidOfSoundIcon } from '../components/icons/VoidOfSoundIcon';
 
 // Gender filters for audio content
 const genderFilters = [
-  { type: 'all', label: 'All genders', icon: Circle },
-  { type: 'females', label: 'Females', icon: User },
-  { type: 'males', label: 'Males', icon: UserCheck },
-  { type: 'diverse', label: 'Diverse', icon: Users2 },
+  { type: 'all', label: 'All genders', icon: AllGendersIcon },
+  { type: 'females', label: 'Females', icon: FemalesIcon },
+  { type: 'males', label: 'Males', icon: MalesIcon },
+  { type: 'diverse', label: 'Diverse', icon: DiverseIcon },
 ];
 
 // Feed categories - wie im Screenshot
@@ -84,6 +86,8 @@ export const FeedPage = () => {
   const [isClearingSearch, setIsClearingSearch] = useState(false);
   const isClearingSearchRef = useRef(false);
   const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const headlineRef = useRef<HTMLDivElement>(null);
 
   // Simplified initialization - NUR EINMAL beim Mount
   useEffect(() => {
@@ -138,6 +142,43 @@ export const FeedPage = () => {
 
   const handleCategoryFilterChange = (value: string) => {
     setSelectedCategoryFilter(value);
+  };
+
+  // Funktion zum automatischen Scrollen beim Fokus auf die Suchleiste
+  const scrollToSearchOnMobile = () => {
+    // Verwende doppeltes requestAnimationFrame für zuverlässiges Timing beim ersten Laden
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (searchInputRef.current && headlineRef.current) {
+          const headlineElement = headlineRef.current;
+          const searchElement = searchInputRef.current;
+          
+          // Warte noch einen Frame für bessere Position-Erkennung beim ersten Laden
+          setTimeout(() => {
+            const headlineRect = headlineElement.getBoundingClientRect();
+            const searchRect = searchElement.getBoundingClientRect();
+            const currentScrollY = window.pageYOffset || window.scrollY;
+            
+            // Berechne absolute Positionen im Dokument
+            const headlineBottom = headlineRect.bottom + currentScrollY;
+            const searchTop = searchRect.top + currentScrollY;
+            
+            // Ziel: Scroll so weit, dass die Headline komplett außerhalb des Viewports ist
+            // Die Suchleiste soll dabei gut sichtbar sein (mit 20px Padding oben)
+            // Scroll mindestens so weit, dass headlineBottom oberhalb des Viewports ist
+            const targetScroll = Math.max(
+              searchTop - 20, // Position der Suchleiste mit etwas Abstand oben
+              headlineBottom + 20 // Mindestens Headline-Höhe + Padding
+            );
+            
+            window.scrollTo({
+              top: targetScroll - 10, // 10px weniger scrollen
+              behavior: 'smooth'
+            });
+          }, 50); // Kurze Verzögerung für zuverlässige Position beim ersten Laden
+        }
+      });
+    });
   };
 
   const handleTagToggle = (tag: string) => {
@@ -273,15 +314,15 @@ export const FeedPage = () => {
       <div className="max-w-md mx-auto px-4 py-6 pb-24">
         {/* Main Headline - ohne Kasten */}
         <RevealOnScroll direction="up" className="mb-8">
-          <div className="text-center">
+          <div ref={headlineRef} className="text-center">
             <h1 className="text-3xl text-white leading-tight mb-1" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-              Hear desire, live fantasy
+              See less. Feel more.
             </h1>
             <h2 className="text-3xl text-white leading-tight mb-1" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-              the platform
+              Real and anonymous
             </h2>
             <h3 className="text-3xl text-white leading-tight" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>
-              for erotic audio
+              erotic audio
             </h3>
           </div>
         </RevealOnScroll>
@@ -305,7 +346,11 @@ export const FeedPage = () => {
                     onClick={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
                     className={`flex items-center gap-2 px-4 py-3 rounded-full text-white hover:bg-white/10 transition-all duration-200 w-full h-12 ${isSearchFocused ? 'justify-center' : ''}`}
                   >
-                    <User size={16} />
+                    {(() => {
+                      const selectedFilter = genderFilters.find(f => f.type === selectedGenderFilter);
+                      const FilterIcon = selectedFilter?.icon || AllGendersIcon;
+                      return <FilterIcon size={20} />;
+                    })()}
                     {!isSearchFocused && (
                       <span className="text-sm">
                         {genderFilters.find(f => f.type === selectedGenderFilter)?.label || 'All genders'}
@@ -318,21 +363,24 @@ export const FeedPage = () => {
                 {/* Dropdown Menu */}
                 {isGenderDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden z-50">
-                    {genderFilters.map((filter) => (
-                      <button
-                        key={filter.type}
-                        onClick={() => {
-                          handleGenderFilterChange(filter.type);
-                          setIsGenderDropdownOpen(false);
-                        }}
-                        className={`w-full px-4 py-3 text-left text-sm flex items-center gap-2 hover:bg-white/10 transition-colors duration-200 ${
-                          selectedGenderFilter === filter.type ? 'text-white bg-white/5' : 'text-white/70'
-                        }`}
-                      >
-                        <filter.icon size={16} />
-                        {filter.label}
-                      </button>
-                    ))}
+                    {genderFilters.map((filter) => {
+                      const FilterIcon = filter.icon;
+                      return (
+                        <button
+                          key={filter.type}
+                          onClick={() => {
+                            handleGenderFilterChange(filter.type);
+                            setIsGenderDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left text-sm flex items-center gap-2 hover:bg-white/10 transition-colors duration-200 ${
+                            selectedGenderFilter === filter.type ? 'text-white bg-white/5' : 'text-white/70'
+                          }`}
+                        >
+                          <FilterIcon size={20} />
+                          {filter.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -350,10 +398,14 @@ export const FeedPage = () => {
                   <div className="relative">
                     <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70" />
                     <input
+                      ref={searchInputRef}
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => setIsSearchFocused(true)}
+                      onFocus={() => {
+                        setIsSearchFocused(true);
+                        scrollToSearchOnMobile();
+                      }}
                       onBlur={() => {
                         setTimeout(() => {
                           if (!isClearingSearchRef.current && searchQuery.trim()) {
@@ -438,14 +490,17 @@ export const FeedPage = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: index * 0.03 }}
                         onClick={() => handleTagToggle(tag)}
-                        className={`shrink-0 px-4 py-2 h-12 rounded-full text-sm whitespace-nowrap transition-all duration-200 hover:scale-105 flex items-center ${
+                        className={`shrink-0 px-4 py-2 h-12 rounded-full text-sm whitespace-nowrap transition-all duration-200 hover:scale-105 flex items-center gap-2 ${
                           isSelected 
                             ? 'text-orange-400' 
                             : 'text-white/80 hover:text-white'
                         }`}
                         style={{ backgroundColor: '#0f0f0f' }}
                       >
-                        {isManual ? `"${tag}"` : `#${tag}`}
+                        <span>{isManual ? `"${tag}"` : `#${tag}`}</span>
+                        {isSelected && (
+                          <X size={14} className="shrink-0" />
+                        )}
                       </motion.button>
                     );
                   });
@@ -518,18 +573,11 @@ export const FeedPage = () => {
               if (!selectedCategory || categoryTracks.length === 0) {
                 return (
                   <StaggerItem>
-                    <div className="text-center py-12">
-                      <div className="mb-4">
-                        <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
-                          <span className="text-2xl">🎵</span>
-                        </div>
+                    <div className="text-center py-16 -mt-[50px]">
+                      <div className="mb-6 flex items-center justify-center">
+                        <VoidOfSoundIcon size={96} color="#ffffff" />
                       </div>
-                      <Heading level={2} className="mb-2 text-white text-[11px]">
-                        No tracks in {selectedCategory?.name || 'this category'}
-                      </Heading>
-                      <Body color="secondary" className="mb-6 text-[11px]">
-                        Be the first to share your voice in this category.
-                      </Body>
+                      <h3 className="text-white text-xl font-normal mb-2">Void of sound. No audio yet.</h3>
                     </div>
                   </StaggerItem>
                 );
@@ -591,29 +639,15 @@ export const FeedPage = () => {
         {/* Empty State */}
         {!isLoading && tracks && tracks.length === 0 && (
           <motion.div 
-            className="text-center py-12"
+            className="text-center py-16"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="mb-4">
-              <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
-                <span className="text-2xl">🎵</span>
-              </div>
+            <div className="mb-6 flex items-center justify-center">
+              <VoidOfSoundIcon size={96} color="#ffffff" />
             </div>
-            <Heading level={2} className="mb-2 text-white text-[11px]">
-              No tracks yet
-            </Heading>
-            <Body color="secondary" className="mb-6 text-[11px]">
-              Be the first to share your voice and start the conversation.
-            </Body>
-            <Button
-              variant="primary"
-              onClick={() => navigate('/record')}
-              className="mx-auto"
-            >
-              Start Recording
-            </Button>
+            <h3 className="text-white text-xl font-normal mb-2">Void of sound. No audio yet.</h3>
           </motion.div>
         )}
       </div>

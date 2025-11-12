@@ -94,22 +94,45 @@ class CentralDatabaseSimple {
 
   // Hilfsmethode: Track mit User-spezifischen Daten bereichern
   private enrichTrackWithUserData(track: AudioTrack, userId: string): AudioTrack {
-    const trackLikes = this.data.likes.get(track.id) || new Set();
+    // WICHTIG: Hole Like-Daten direkt aus der Map (Quelle der Wahrheit)
+    const trackLikes = this.data.likes.get(track.id);
+    const likesSet = trackLikes || new Set<string>();
+    const likesCount = likesSet.size;
+    
     const trackBookmarks = this.data.bookmarks.get(track.id) || new Set();
     const playCount = this.data.playsMap.get(track.id) || 0;
     
-    const isLiked = trackLikes.has(userId);
+    const isLiked = likesSet.has(userId);
     const isBookmarked = trackBookmarks.has(userId);
-    const likesCount = trackLikes.size;
     
     // Berechne commentsCount aus den Kommentaren im Track
     const commentsCount = track.comments ? track.comments.length : 0;
+    
+    // WICHTIG: Stelle sicher, dass likes IMMER aus der Map kommt, nicht aus track.likes!
+    const finalLikesCount = likesCount || 0;
+    
+    // Debug: Log nur bei Unterschieden oder wenn Likes vorhanden sind
+    if (likesCount > 0 || track.likes !== likesCount || isLiked) {
+      console.log(`📊 CentralDB: enrichTrackWithUserData für Track ${track.id} (${track.title?.substring(0, 20) || 'N/A'}):`, {
+        trackId: track.id,
+        likesInMap: likesCount,
+        likesInTrackProperty: track.likes,
+        finalLikesCount,
+        isLiked,
+        userId,
+        userIdInMap: likesSet.has(userId),
+        allUserIdsInMap: Array.from(likesSet),
+        hasLikesMapEntry: this.data.likes.has(track.id),
+        // Warnung wenn track.likes !== likesCount
+        mismatch: track.likes !== likesCount ? `WARNUNG: track.likes (${track.likes}) !== likesCount (${likesCount})` : 'OK'
+      });
+    }
     
     return {
       ...track,
       isLiked,
       isBookmarked,
-      likes: likesCount,
+      likes: finalLikesCount, // WICHTIG: IMMER aus Map, niemals aus track.likes!
       commentsCount,
       plays: playCount
     };
@@ -257,8 +280,34 @@ class CentralDatabaseSimple {
       track.userId = track.user.id;
     }
 
-    // Füge Track hinzu
-    this.data.tracks.push(track);
+    // WICHTIG: Entferne dynamische Werte vor dem Hinzufügen!
+    // Diese werden aus Maps berechnet und sollten NICHT im Track gespeichert werden
+    const { 
+      likes: _likes, 
+      isLiked: _isLiked, 
+      isBookmarked: _isBookmarked, 
+      plays: _plays,
+      commentsCount: _commentsCount,
+      ...trackWithoutDynamicData 
+    } = track;
+    
+    const cleanTrack = {
+      ...trackWithoutDynamicData,
+      userId: track.userId || track.user.id
+    };
+    
+    // Warnung wenn dynamische Werte vorhanden waren
+    if (_likes !== undefined || _isLiked !== undefined || _isBookmarked !== undefined || _plays !== undefined) {
+      console.warn('⚠️ CentralDB: Track hatte dynamische Werte - wurden entfernt:', {
+        hadLikes: _likes !== undefined,
+        hadIsLiked: _isLiked !== undefined,
+        hadIsBookmarked: _isBookmarked !== undefined,
+        hadPlays: _plays !== undefined
+      });
+    }
+
+    // Füge Track hinzu (OHNE dynamische Werte!)
+    this.data.tracks.push(cleanTrack as AudioTrack);
     
     // Upload-Aktivität wird erst nach Freigabe erstellt (nicht hier)
     // Das passiert in der Admin-Freigabe-Funktion
@@ -327,7 +376,33 @@ class CentralDatabaseSimple {
       return false;
     }
 
-    this.data.tracks[trackIndex] = { ...this.data.tracks[trackIndex], ...updates };
+    // WICHTIG: Entferne dynamische Werte aus updates!
+    // Diese werden aus Maps berechnet und sollten NICHT im Track gespeichert werden
+    const { 
+      likes: _likes, 
+      isLiked: _isLiked, 
+      isBookmarked: _isBookmarked, 
+      plays: _plays,
+      commentsCount: _commentsCount,
+      ...cleanUpdates 
+    } = updates;
+    
+    // Warnung wenn dynamische Werte in updates vorhanden waren
+    if (_likes !== undefined || _isLiked !== undefined || _isBookmarked !== undefined || _plays !== undefined) {
+      console.warn('⚠️ CentralDB: updateTrack() hat dynamische Werte erhalten - werden ignoriert:', {
+        hadLikes: _likes !== undefined,
+        hadIsLiked: _isLiked !== undefined,
+        hadIsBookmarked: _isBookmarked !== undefined,
+        hadPlays: _plays !== undefined
+      });
+    }
+
+    // Aktualisiere Track (OHNE dynamische Werte!)
+    this.data.tracks[trackIndex] = { 
+      ...this.data.tracks[trackIndex], 
+      ...cleanUpdates 
+    };
+    
     this.saveToStorage();
     
     return true;
@@ -335,8 +410,11 @@ class CentralDatabaseSimple {
 
   // ADD: Kommentar zu Track hinzufügen
   addCommentToTrack(trackId: string, comment: any): boolean {
+    console.log('💬 CentralDB.addCommentToTrack: Start für Track', trackId, 'Kommentar:', comment.content?.substring(0, 50));
+    
     const trackIndex = this.data.tracks.findIndex(track => track.id === trackId);
     if (trackIndex === -1) {
+      console.error('❌ CentralDB.addCommentToTrack: Track nicht gefunden:', trackId);
       return false;
     }
 
@@ -345,6 +423,7 @@ class CentralDatabaseSimple {
     // Initialisiere comments Array falls es nicht existiert
     if (!track.comments) {
       track.comments = [];
+      console.log('💬 CentralDB: Kommentar-Array initialisiert für Track', trackId);
     }
     
     // Füge neuen Kommentar hinzu
@@ -352,6 +431,13 @@ class CentralDatabaseSimple {
     
     // Aktualisiere commentsCount
     track.commentsCount = track.comments.length;
+    
+    console.log('💬 CentralDB: Kommentar hinzugefügt:', {
+      trackId,
+      commentsCount: track.comments.length,
+      commentId: comment.id,
+      commentContent: comment.content?.substring(0, 30)
+    });
     
     // Speichere User-Aktivität (eigener Kommentar)
     const userActivity: UserActivity = {
@@ -386,7 +472,23 @@ class CentralDatabaseSimple {
       console.log('🔔 CentralDB: Benachrichtigung (Comment) gespeichert für User:', track.user.id);
     }
     
+    // WICHTIG: Verifiziere vor dem Speichern
+    const trackBeforeSave = this.data.tracks.find(t => t.id === trackId);
+    console.log('💾 CentralDB: Vor saveToStorage - Track Kommentare:', {
+      trackId,
+      commentsLength: trackBeforeSave?.comments?.length || 0,
+      commentsCount: trackBeforeSave?.commentsCount
+    });
+    
     this.saveToStorage();
+    
+    // WICHTIG: Verifiziere nach dem Speichern
+    const trackAfterSave = this.data.tracks.find(t => t.id === trackId);
+    console.log('💾 CentralDB: Nach saveToStorage - Track Kommentare:', {
+      trackId,
+      commentsLength: trackAfterSave?.comments?.length || 0,
+      commentsCount: trackAfterSave?.commentsCount
+    });
     
     return true;
   }
@@ -425,6 +527,7 @@ class CentralDatabaseSimple {
   toggleLike(trackId: string, userId: string): boolean {
     const track = this.data.tracks.find(t => t.id === trackId);
     if (!track) {
+      console.error('❌ CentralDB: Track nicht gefunden für toggleLike:', trackId);
       return false;
     }
 
@@ -435,13 +538,16 @@ class CentralDatabaseSimple {
     
     const trackLikes = this.data.likes.get(trackId)!;
     const wasLiked = trackLikes.has(userId);
+    const oldLikesCount = trackLikes.size;
     
     if (wasLiked) {
       // Unlike
       trackLikes.delete(userId);
+      console.log(`❤️ CentralDB: Unlike für Track ${trackId} - Vorher: ${oldLikesCount} Likes, Jetzt: ${trackLikes.size} Likes`);
     } else {
       // Like
       trackLikes.add(userId);
+      console.log(`❤️ CentralDB: Like für Track ${trackId} - Vorher: ${oldLikesCount} Likes, Jetzt: ${trackLikes.size} Likes`);
       
       // Speichere User-Aktivität in der zentralen Datenbank
       const userActivity: UserActivity = {
@@ -475,7 +581,65 @@ class CentralDatabaseSimple {
       }
     }
     
+    // WICHTIG: Verifiziere, dass der Like in der Map ist, bevor wir speichern
+    const verifyLikes = this.data.likes.get(trackId);
+    console.log(`🔍 CentralDB: Verifiziere Like-Daten vor Speicherung für Track ${trackId}:`, {
+      trackId,
+      likesInMap: verifyLikes?.size || 0,
+      userIdInMap: verifyLikes?.has(userId) || false,
+      allUserIds: verifyLikes ? Array.from(verifyLikes) : []
+    });
+    
+    // WICHTIG: Speichere sofort und verifiziere synchron
     this.saveToStorage();
+    console.log(`💾 CentralDB: Daten gespeichert - Track ${trackId} hat jetzt ${trackLikes.size} Likes`);
+    
+    // Verifiziere SOFORT nach dem Speichern (synchron, nicht async!)
+    try {
+      const savedData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+      const savedLikes = savedData.likes || [];
+      const trackLikeData = savedLikes.find((l: any) => l.trackId === trackId);
+      
+      const verification = {
+        trackId,
+        foundInSaved: !!trackLikeData,
+        savedLikeCount: trackLikeData?.userIds?.length || 0,
+        expectedCount: trackLikes.size,
+        savedUserIds: trackLikeData?.userIds || [],
+        expectedUserId: userId,
+        userIdInSaved: trackLikeData?.userIds?.includes(userId) || false,
+        match: trackLikeData?.userIds?.length === trackLikes.size && trackLikeData?.userIds?.includes(userId)
+      };
+      
+      console.log(`🔍 CentralDB: Verifiziere gespeicherte Likes für Track ${trackId}:`, verification);
+      
+      // WICHTIG: Wenn der Like NICHT korrekt gespeichert wurde, speichere nochmal!
+      if (!verification.match || !verification.userIdInSaved) {
+        console.error(`❌ CentralDB: Like wurde NICHT korrekt gespeichert für Track ${trackId}!`, {
+          erwartet: { count: trackLikes.size, userId },
+          gespeichert: { count: verification.savedLikeCount, userIds: verification.savedUserIds }
+        });
+        
+        // Nochmal speichern - vielleicht war es eine Race Condition
+        console.log(`🔄 CentralDB: Speichere nochmal für Track ${trackId}...`);
+        this.saveToStorage();
+        
+        // Verifiziere nochmal
+        const retryData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+        const retryLikes = retryData.likes || [];
+        const retryTrackLike = retryLikes.find((l: any) => l.trackId === trackId);
+        console.log(`🔍 CentralDB: Nach erneutem Speichern für Track ${trackId}:`, {
+          found: !!retryTrackLike,
+          count: retryTrackLike?.userIds?.length || 0,
+          userIdInSaved: retryTrackLike?.userIds?.includes(userId) || false
+        });
+      } else {
+        console.log(`✅ CentralDB: Like korrekt gespeichert für Track ${trackId}`);
+      }
+    } catch (error) {
+      console.error('❌ CentralDB: Fehler beim Verifizieren der gespeicherten Likes:', error);
+    }
+    
     return true;
   }
 
@@ -688,7 +852,7 @@ class CentralDatabaseSimple {
       totalUsers: this.data.users.length,
       totalTracks: this.data.tracks.length,
       totalComments: totalComments,
-      totalLikes: this.data.tracks.reduce((sum, track) => sum + track.likes, 0),
+      totalLikes: Array.from(this.data.likes.values()).reduce((sum, userIds) => sum + userIds.size, 0),
       totalFileSize: this.data.tracks.reduce((sum, track) => sum + (track.fileSize || 0), 0),
       totalReports: this.data.reports.length,
       pendingReports: this.data.reports.filter(r => r.status === 'pending').length
@@ -703,6 +867,12 @@ class CentralDatabaseSimple {
         trackId,
         userIds: Array.from(userIds)
       }));
+      
+      // Debug: Zeige alle Likes vor dem Speichern
+      console.log('💾 CentralDB: Speichere Likes:', {
+        totalLikesEntries: likesArray.length,
+        likesArray: likesArray.map(l => ({ trackId: l.trackId, count: l.userIds.length, userIds: l.userIds }))
+      });
       
       const bookmarksArray = Array.from(this.data.bookmarks.entries()).map(([trackId, userIds]) => ({
         trackId,
@@ -719,9 +889,24 @@ class CentralDatabaseSimple {
         count
       }));
 
+      // WICHTIG: Entferne likes, isLiked, isBookmarked, plays, commentsCount aus Tracks beim Speichern!
+      // Diese Werte werden dynamisch aus den Maps berechnet und sollten NICHT in Tracks gespeichert werden
+      // plays kommt aus playsMap, commentsCount wird aus track.comments.length berechnet
+      const tracksToSave = this.data.tracks.map(track => {
+        const { 
+          likes: _likes, 
+          isLiked: _isLiked, 
+          isBookmarked: _isBookmarked, 
+          plays: _plays,
+          commentsCount: _commentsCount,
+          ...trackWithoutDynamicData 
+        } = track;
+        return trackWithoutDynamicData;
+      });
+
       const dataToSave = {
-        // Collections
-        tracks: this.data.tracks,
+        // Collections (Tracks OHNE likes/isLiked/isBookmarked!)
+        tracks: tracksToSave,
         users: this.data.users,
         comments: this.data.comments,
         reports: this.data.reports,
@@ -754,8 +939,28 @@ class CentralDatabaseSimple {
         timestamp: new Date().toISOString()
       };
       
+      // WICHTIG: Speichere synchron und verifiziere sofort
       localStorage.setItem('aural-central-database', JSON.stringify(dataToSave));
-      console.log('💾 CentralDB Simple: Daten gespeichert - UserActivities:', this.data.userActivities.length, 'Notifications:', this.data.notificationActivities.length);
+      console.log('💾 CentralDB Simple: Daten gespeichert - UserActivities:', this.data.userActivities.length, 'Notifications:', this.data.notificationActivities.length, 'Likes:', likesArray.length);
+      
+      // Debug: Verifiziere SOFORT, dass Likes gespeichert wurden
+      try {
+        const savedData = JSON.parse(localStorage.getItem('aural-central-database') || '{}');
+        const savedLikesCount = savedData.likes?.length || 0;
+        console.log('💾 CentralDB: Verifizierung - Gespeicherte Likes:', {
+          savedLikesCount,
+          expectedLikesCount: likesArray.length,
+          match: savedLikesCount === likesArray.length,
+          savedLikes: savedData.likes?.slice(0, 5) || []
+        });
+        
+        // Prüfe, ob alle Likes wirklich gespeichert wurden
+        if (savedLikesCount !== likesArray.length) {
+          console.error(`❌ CentralDB: Like-Anzahl stimmt nicht überein! Erwartet: ${likesArray.length}, Gespeichert: ${savedLikesCount}`);
+        }
+      } catch (error) {
+        console.error('❌ CentralDB: Fehler bei Verifizierung:', error);
+      }
     } catch (error) {
       console.error('❌ CentralDB Simple: Fehler beim Speichern:', error);
     }
@@ -809,9 +1014,32 @@ class CentralDatabaseSimple {
         });
       }
 
+      // WICHTIG: Entferne dynamische Werte aus geladenen Tracks!
+      const cleanedTracks = Array.isArray(data.tracks) 
+        ? data.tracks.map(track => {
+            const { 
+              likes: _likes, 
+              isLiked: _isLiked, 
+              isBookmarked: _isBookmarked, 
+              plays: _plays,
+              commentsCount: _commentsCount,
+              ...cleanTrack 
+            } = track;
+            return cleanTrack;
+          })
+        : [];
+      
+      // Warnung wenn Tracks dynamische Werte hatten
+      if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+        const firstTrack = data.tracks[0];
+        if ('likes' in firstTrack || 'isLiked' in firstTrack || 'isBookmarked' in firstTrack || 'plays' in firstTrack) {
+          console.warn('⚠️ CentralDB: Tracks aus Datei hatten dynamische Werte - wurden entfernt');
+        }
+      }
+      
       this.data = {
-        // Collections
-        tracks: Array.isArray(data.tracks) ? data.tracks : [],
+        // Collections (Tracks OHNE dynamische Werte!)
+        tracks: cleanedTracks,
         users: Array.isArray(data.users) ? data.users : [],
         comments: Array.isArray(data.comments) ? data.comments : [],
         reports: Array.isArray(data.reports) ? data.reports : [],
@@ -846,96 +1074,148 @@ class CentralDatabaseSimple {
 
   public loadFromStorage(): void {
     try {
-      // Immer aus der lokalen Datei laden (Development-Modus)
+      // 1) Versuche zuerst localStorage (persistierte Nutzer-Änderungen)
+      const raw = localStorage.getItem('aural-central-database');
+      if (raw) {
+        console.log('📥 CentralDB: Loading data from localStorage...');
+        const parsed = JSON.parse(raw);
+
+        // Konvertiere Arrays zurück zu Maps
+        const likesMap = new Map<string, Set<string>>();
+        if (parsed.likes && Array.isArray(parsed.likes)) {
+          console.log('📥 CentralDB: Lade Likes aus localStorage:', {
+            likesArrayLength: parsed.likes.length,
+            firstFewLikes: parsed.likes.slice(0, 5)
+          });
+          let loadedCount = 0;
+          parsed.likes.forEach((item: { trackId: string; userIds: string[] }) => {
+            if (item && item.trackId && Array.isArray(item.userIds)) {
+              likesMap.set(item.trackId, new Set(item.userIds));
+              loadedCount++;
+            } else {
+              console.warn('⚠️ CentralDB: Ungültiges Like-Item:', item);
+            }
+          });
+          console.log('📥 CentralDB: Likes Map erstellt:', {
+            mapSize: likesMap.size,
+            loadedItems: loadedCount,
+            totalItemsInArray: parsed.likes.length,
+            firstFewEntries: Array.from(likesMap.entries()).slice(0, 5).map(([trackId, userIds]) => ({
+              trackId,
+              count: userIds.size,
+              userIds: Array.from(userIds)
+            }))
+          });
+          
+          // WICHTIG: Verifiziere, dass alle Likes geladen wurden
+          if (loadedCount !== parsed.likes.length) {
+            console.error(`❌ CentralDB: Nicht alle Likes wurden geladen! Erwartet: ${parsed.likes.length}, Geladen: ${loadedCount}`);
+          }
+        } else {
+          console.warn('⚠️ CentralDB: Keine Likes gefunden oder nicht als Array:', parsed.likes);
+        }
+        
+        const bookmarksMap = new Map<string, Set<string>>();
+        if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
+          parsed.bookmarks.forEach((item: { trackId: string; userIds: string[] }) => {
+            if (item && item.trackId && Array.isArray(item.userIds)) {
+              bookmarksMap.set(item.trackId, new Set(item.userIds));
+            }
+          });
+        }
+
+        const commentLikesMap = new Map<string, Set<string>>();
+        if (parsed.commentLikesMap && Array.isArray(parsed.commentLikesMap)) {
+          parsed.commentLikesMap.forEach((item: { commentId: string; userIds: string[] }) => {
+            if (item && item.commentId && Array.isArray(item.userIds)) {
+              commentLikesMap.set(item.commentId, new Set(item.userIds));
+            }
+          });
+        }
+
+        const playsMap = new Map<string, number>();
+        if (parsed.playsMap && Array.isArray(parsed.playsMap)) {
+          parsed.playsMap.forEach((item: { trackId: string; count: number }) => {
+            if (item && item.trackId && typeof item.count === 'number') {
+              playsMap.set(item.trackId, item.count);
+            }
+          });
+        }
+
+        // WICHTIG: Entferne dynamische Werte aus geladenen Tracks!
+        const cleanedTracks = Array.isArray(parsed.tracks) 
+          ? parsed.tracks.map(track => {
+              const { 
+                likes: _likes, 
+                isLiked: _isLiked, 
+                isBookmarked: _isBookmarked, 
+                plays: _plays,
+                commentsCount: _commentsCount,
+                ...cleanTrack 
+              } = track;
+              return cleanTrack;
+            })
+          : [];
+        
+        // Warnung wenn Tracks dynamische Werte hatten
+        if (Array.isArray(parsed.tracks) && parsed.tracks.length > 0) {
+          const firstTrack = parsed.tracks[0];
+          if ('likes' in firstTrack || 'isLiked' in firstTrack || 'isBookmarked' in firstTrack || 'plays' in firstTrack) {
+            console.warn('⚠️ CentralDB: Geladene Tracks hatten dynamische Werte - wurden entfernt');
+          }
+        }
+        
+        this.data = {
+          // Collections (Tracks OHNE dynamische Werte!)
+          tracks: cleanedTracks,
+          users: Array.isArray(parsed.users) ? parsed.users : [],
+          comments: Array.isArray(parsed.comments) ? parsed.comments : [],
+          reports: Array.isArray(parsed.reports) ? parsed.reports : [],
+          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+          pendingUploads: Array.isArray(parsed.pendingUploads) ? parsed.pendingUploads : [],
+          follows: Array.isArray(parsed.follows) ? parsed.follows : [],
+          commentLikes: Array.isArray(parsed.commentLikes) ? parsed.commentLikes : [],
+          plays: Array.isArray(parsed.plays) ? parsed.plays : [],
+          
+          // Maps
+          likes: likesMap,
+          bookmarks: bookmarksMap,
+          commentLikesMap: commentLikesMap,
+          playsMap: playsMap,
+          
+          // User Activities & Notifications (Dates re-hydrated)
+          userActivities: Array.isArray(parsed.userActivities) ? parsed.userActivities.map((activity: any) => ({
+            ...activity,
+            createdAt: new Date(activity.createdAt)
+          })) : [],
+          notificationActivities: Array.isArray(parsed.notificationActivities) ? parsed.notificationActivities.map((notification: any) => ({
+            ...notification,
+            createdAt: new Date(notification.createdAt)
+          })) : [],
+          
+          // Cache
+          topTags: Array.isArray(parsed.topTags) ? parsed.topTags : [],
+          
+          // Metadata
+          timestamp: parsed.timestamp || new Date().toISOString()
+        };
+        console.log('✅ CentralDB: Loaded from localStorage');
+        return;
+      }
+
+      // 2) Fallback: aus lokaler JSON-Datei laden und danach in localStorage persistieren
       console.log('🔧 CentralDB: Loading data from local file...');
-      this.loadFromLocalFile();
+      this.loadFromLocalFile().then(() => {
+        // Seed localStorage, damit Nutzer-Änderungen ab jetzt persistieren
+        this.saveToStorage();
+      }).catch((e) => {
+        console.error('❌ CentralDB: Error loading from local file:', e);
+      });
     } catch (error) {
       console.error('❌ CentralDB: Error loading from storage:', error);
     }
   }
-      
-      // Konvertiere Arrays zurück zu Maps
-      const likesMap = new Map<string, Set<string>>();
-      if (parsed.likes && Array.isArray(parsed.likes)) {
-        parsed.likes.forEach((item: { trackId: string; userIds: string[] }) => {
-          if (item && item.trackId && Array.isArray(item.userIds)) {
-            likesMap.set(item.trackId, new Set(item.userIds));
-          }
-        });
-      }
-      
-      const bookmarksMap = new Map<string, Set<string>>();
-      if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-        parsed.bookmarks.forEach((item: { trackId: string; userIds: string[] }) => {
-          if (item && item.trackId && Array.isArray(item.userIds)) {
-            bookmarksMap.set(item.trackId, new Set(item.userIds));
-          }
-        });
-      }
-
-      const commentLikesMap = new Map<string, Set<string>>();
-      if (parsed.commentLikesMap && Array.isArray(parsed.commentLikesMap)) {
-        parsed.commentLikesMap.forEach((item: { commentId: string; userIds: string[] }) => {
-          if (item && item.commentId && Array.isArray(item.userIds)) {
-            commentLikesMap.set(item.commentId, new Set(item.userIds));
-          }
-        });
-      }
-
-      const playsMap = new Map<string, number>();
-      if (parsed.playsMap && Array.isArray(parsed.playsMap)) {
-        parsed.playsMap.forEach((item: { trackId: string; count: number }) => {
-          if (item && item.trackId && typeof item.count === 'number') {
-            playsMap.set(item.trackId, item.count);
-          }
-        });
-      }
-
-      this.data = {
-        // Collections
-        tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
-        users: Array.isArray(parsed.users) ? parsed.users : [],
-        comments: Array.isArray(parsed.comments) ? parsed.comments : [],
-        reports: Array.isArray(parsed.reports) ? parsed.reports : [],
-        notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-        pendingUploads: Array.isArray(parsed.pendingUploads) ? parsed.pendingUploads : [],
-        follows: Array.isArray(parsed.follows) ? parsed.follows : [],
-        commentLikes: Array.isArray(parsed.commentLikes) ? parsed.commentLikes : [],
-        plays: Array.isArray(parsed.plays) ? parsed.plays : [],
-        
-        // Maps
-        likes: likesMap,
-        bookmarks: bookmarksMap,
-        commentLikesMap: commentLikesMap,
-        playsMap: playsMap,
-        
-        // User Activities & Notifications
-        userActivities: Array.isArray(parsed.userActivities) ? parsed.userActivities.map(activity => ({
-          ...activity,
-          createdAt: new Date(activity.createdAt)
-        })) : [],
-        notificationActivities: Array.isArray(parsed.notificationActivities) ? parsed.notificationActivities.map(notification => ({
-          ...notification,
-          createdAt: new Date(notification.createdAt)
-        })) : [],
-        
-        // Cache
-        topTags: Array.isArray(parsed.topTags) ? parsed.topTags : [],
-        
-        // Metadata
-        timestamp: parsed.timestamp || new Date().toISOString()
-      };
-      
-      console.log('📥 CentralDB Simple: Daten geladen - UserActivities:', this.data.userActivities.length, 'Notifications:', this.data.notificationActivities.length);
-    } catch (error) {
-      console.error('❌ CentralDB Simple: Fehler beim Laden:', error);
-      this.data = { 
-        tracks: [], users: [], comments: [], reports: [], notifications: [], pendingUploads: [], follows: [], commentLikes: [], plays: [],
-        likes: new Map(), bookmarks: new Map(), commentLikesMap: new Map(), playsMap: new Map(),
-        userActivities: [], notificationActivities: [], topTags: [], timestamp: new Date().toISOString()
-      };
-    }
-  }
+  
 
   // DEMO-DATEN
   private initializeDefaultData(): void {
@@ -944,7 +1224,21 @@ class CentralDatabaseSimple {
       tracks: this.data.tracks.length,
       users: this.data.users.length,
       userActivities: this.data.userActivities.length,
-      notifications: this.data.notificationActivities.length
+      notifications: this.data.notificationActivities.length,
+      likesMapSize: this.data.likes.size,
+      bookmarksMapSize: this.data.bookmarks.size
+    });
+    
+    // WICHTIG: BEHALTE die geladenen Likes-Maps! Überschreibe sie NICHT!
+    // Die Likes-Map wurde bereits von loadFromStorage() geladen und sollte NICHT überschrieben werden!
+    const likesMapBeforeInit = new Map(this.data.likes);
+    const bookmarksMapBeforeInit = new Map(this.data.bookmarks);
+    const playsMapBeforeInit = new Map(this.data.playsMap);
+    const commentLikesMapBeforeInit = new Map(this.data.commentLikesMap);
+    
+    console.log('🔔 Likes-Map vor Initialisierung:', {
+      size: likesMapBeforeInit.size,
+      entries: Array.from(likesMapBeforeInit.entries()).slice(0, 3)
     });
     
     // Prüfe ob Demo-Daten bereits existieren
@@ -964,6 +1258,11 @@ class CentralDatabaseSimple {
     // Das verhindert, dass Demo-Daten echte Aktivitäten überschreiben
     if (hasActivities && hasNotifications && hasHollaTracks) {
       console.log('🔔 Aktivitäten, Benachrichtigungen und Holla-Tracks bereits vorhanden, überspringe Demo-Daten');
+      // WICHTIG: Stelle sicher, dass die Likes-Map BEHALTEN wird!
+      this.data.likes = likesMapBeforeInit;
+      this.data.bookmarks = bookmarksMapBeforeInit;
+      this.data.playsMap = playsMapBeforeInit;
+      this.data.commentLikesMap = commentLikesMapBeforeInit;
       return;
     }
 
@@ -1349,13 +1648,35 @@ class CentralDatabaseSimple {
       }
     ];
 
+    // WICHTIG: Bereinige Demo-Tracks von dynamischen Werten!
+    const cleanedDemoTracks = demoTracks.map(track => {
+      const { 
+        likes: _likes, 
+        isLiked: _isLiked, 
+        isBookmarked: _isBookmarked, 
+        plays: _plays,
+        commentsCount: _commentsCount,
+        ...cleanTrack 
+      } = track;
+      
+      // Bereinige auch Kommentare innerhalb der Tracks
+      if (cleanTrack.comments) {
+        cleanTrack.comments = cleanTrack.comments.map((comment: any) => {
+          const { likes: _cLikes, isLiked: _cIsLiked, ...cleanComment } = comment;
+          return cleanComment;
+        });
+      }
+      
+      return cleanTrack;
+    });
+    
     // Daten hinzufügen (nur wenn sie noch nicht existieren)
     if (!hasTracks) {
       this.data.users = [hollaUser, currentUser];
-      this.data.tracks = demoTracks;
+      this.data.tracks = cleanedDemoTracks as AudioTrack[];
       this.data.comments = [];
       this.data.reports = [];
-      console.log('🔔 Tracks und Users hinzugefügt');
+      console.log('🔔 Tracks und Users hinzugefügt (bereinigt von dynamischen Werten)');
     } else if (!hasHollaTracks) {
       // Füge holladiewaldfee Tracks hinzu, auch wenn andere Tracks bereits vorhanden sind
       console.log('🔔 Füge holladiewaldfee Tracks zu bestehenden Tracks hinzu');
@@ -1367,9 +1688,9 @@ class CentralDatabaseSimple {
         console.log('🔔 holladiewaldfee Benutzer hinzugefügt');
       }
       
-      // Füge alle holladiewaldfee Tracks hinzu
-      this.data.tracks.push(...demoTracks);
-      console.log('🔔 holladiewaldfee Tracks hinzugefügt:', demoTracks.length);
+      // Füge alle holladiewaldfee Tracks hinzu (bereinigt!)
+      this.data.tracks.push(...(cleanedDemoTracks as AudioTrack[]));
+      console.log('🔔 holladiewaldfee Tracks hinzugefügt (bereinigt):', cleanedDemoTracks.length);
     }
     
     if (!hasActivities) {
@@ -1382,14 +1703,43 @@ class CentralDatabaseSimple {
       console.log('🔔 Demo-Benachrichtigungen hinzugefügt:', demoNotifications.length);
     }
     
+    // WICHTIG: Stelle sicher, dass die Likes-Map BEHALTEN wird!
+    // Unabhängig davon, ob neue Daten hinzugefügt wurden oder nicht,
+    // die Likes-Map sollte NIEMALS überschrieben werden!
+    this.data.likes = likesMapBeforeInit;
+    this.data.bookmarks = bookmarksMapBeforeInit;
+    this.data.playsMap = playsMapBeforeInit;
+    this.data.commentLikesMap = commentLikesMapBeforeInit;
+    
     console.log('🔔 Finale Daten nach Initialisierung:', {
       tracks: this.data.tracks.length,
       users: this.data.users.length,
       userActivities: this.data.userActivities.length,
-      notifications: this.data.notificationActivities.length
+      notifications: this.data.notificationActivities.length,
+      likesMapSize: this.data.likes.size,
+      bookmarksMapSize: this.data.bookmarks.size
     });
     
-    this.saveToStorage();
+    console.log('🔔 Likes-Map nach Initialisierung:', {
+      size: this.data.likes.size,
+      entries: Array.from(this.data.likes.entries()).slice(0, 3)
+    });
+    
+    // WICHTIG: Speichere NICHT sofort, wenn keine neuen Daten hinzugefügt wurden
+    // Das verhindert unnötige Speichervorgänge
+    // Aber wenn Daten hinzugefügt wurden, speichere sofort
+    const dataWasAdded = (!hasTracks && this.data.tracks.length > 0) || 
+                         (!hasHollaTracks && this.data.tracks.length > hollaTracks.length) ||
+                         (!hasActivities && this.data.userActivities.length > 0) ||
+                         (!hasNotifications && this.data.notificationActivities.length > 0);
+    
+    if (dataWasAdded) {
+      this.saveToStorage();
+      console.log('🔔 CentralDB Simple: initializeDefaultData() - Daten gespeichert');
+    } else {
+      console.log('🔔 CentralDB Simple: initializeDefaultData() - Keine neuen Daten, Überspringen Speicherung');
+    }
+    
     console.log('🔔 CentralDB Simple: initializeDefaultData() - Abgeschlossen');
   }
 
@@ -2004,8 +2354,30 @@ class CentralDatabaseSimple {
         }
       ];
 
+      // WICHTIG: Bereinige neue Tracks von dynamischen Werten!
+      const cleanedNewTracks = newTracks.map(track => {
+        const { 
+          likes: _likes, 
+          isLiked: _isLiked, 
+          isBookmarked: _isBookmarked, 
+          plays: _plays,
+          commentsCount: _commentsCount,
+          ...cleanTrack 
+        } = track;
+        
+        // Bereinige auch Kommentare innerhalb der Tracks
+        if (cleanTrack.comments) {
+          cleanTrack.comments = cleanTrack.comments.map((comment: any) => {
+            const { likes: _cLikes, isLiked: _cIsLiked, ...cleanComment } = comment;
+            return cleanComment;
+          });
+        }
+        
+        return cleanTrack;
+      });
+      
       // Füge nur die neuen Tracks hinzu, die noch nicht vorhanden sind
-      const tracksToAdd = newTracks.filter(newTrack => 
+      const tracksToAdd = cleanedNewTracks.filter(newTrack => 
         !this.data.tracks.some(existingTrack => existingTrack.id === newTrack.id)
       );
 
@@ -2017,9 +2389,9 @@ class CentralDatabaseSimple {
           console.log('🔔 FORCE: holladiewaldfee Benutzer hinzugefügt');
         }
 
-        // Füge neue Tracks hinzu
-        this.data.tracks.push(...tracksToAdd);
-        console.log('🔔 FORCE: Neue Holla-Tracks hinzugefügt:', tracksToAdd.length);
+        // Füge neue Tracks hinzu (bereinigt!)
+        this.data.tracks.push(...(tracksToAdd as AudioTrack[]));
+        console.log('🔔 FORCE: Neue Holla-Tracks hinzugefügt (bereinigt):', tracksToAdd.length);
         
         // Speichere in localStorage
         this.saveToStorage();
@@ -2209,8 +2581,113 @@ class CentralDatabaseSimple {
 
   // Save complete database
   saveDatabase(data: any): void {
+    // WICHTIG: BEHALTE die Maps, auch wenn data neue Maps hat!
+    // Speichere existierende Maps vor dem Überschreiben
+    const savedLikes = new Map(this.data.likes);
+    const savedBookmarks = new Map(this.data.bookmarks);
+    const savedPlaysMap = new Map(this.data.playsMap);
+    const savedCommentLikesMap = new Map(this.data.commentLikesMap);
+    
+    console.log('💾 CentralDB: saveDatabase - Vor Merge:', {
+      existingLikes: savedLikes.size,
+      existingBookmarks: savedBookmarks.size,
+      existingPlays: savedPlaysMap.size,
+      dataLikesIsMap: data.likes instanceof Map,
+      dataBookmarksIsMap: data.bookmarks instanceof Map
+    });
+    
+    // Prüfe, ob data.likes eine Map ist (von getDatabase) oder ein Objekt (von außen)
+    if (data.likes instanceof Map) {
+      // data.likes ist eine Map - merge mit existierenden Likes
+      if (savedLikes.size > 0) {
+        data.likes.forEach((userIds: Set<string>, trackId: string) => {
+          if (savedLikes.has(trackId)) {
+            // Merge: Behalte existierende Set und füge neue UserIDs hinzu
+            const existingSet = savedLikes.get(trackId)!;
+            const newSet = new Set(existingSet);
+            userIds.forEach(userId => newSet.add(userId));
+            // WICHTIG: Verwende die merged Set (behält aktuelle Updates)
+            data.likes.set(trackId, newSet);
+          }
+        });
+        
+        // Füge auch alle existierenden Likes hinzu, die nicht in data.likes sind
+        savedLikes.forEach((userIds: Set<string>, trackId: string) => {
+          if (!data.likes.has(trackId)) {
+            data.likes.set(trackId, new Set(userIds));
+          }
+        });
+      }
+    } else if (data.likes) {
+      // data.likes ist KEINE Map (Array oder undefined) - verwende existierende Map
+      console.warn('⚠️ CentralDB: saveDatabase - data.likes ist keine Map, behalte existierende Map');
+      data.likes = savedLikes;
+    } else {
+      // data.likes ist undefined - verwende existierende Map
+      data.likes = savedLikes;
+    }
+    
+    if (data.bookmarks instanceof Map) {
+      // data.bookmarks ist eine Map - merge mit existierenden Bookmarks
+      if (savedBookmarks.size > 0) {
+        data.bookmarks.forEach((userIds: Set<string>, trackId: string) => {
+          if (savedBookmarks.has(trackId)) {
+            const existingSet = savedBookmarks.get(trackId)!;
+            const newSet = new Set(existingSet);
+            userIds.forEach(userId => newSet.add(userId));
+            data.bookmarks.set(trackId, newSet);
+          }
+        });
+        
+        savedBookmarks.forEach((userIds: Set<string>, trackId: string) => {
+          if (!data.bookmarks.has(trackId)) {
+            data.bookmarks.set(trackId, new Set(userIds));
+          }
+        });
+      }
+    } else if (data.bookmarks) {
+      // data.bookmarks ist KEINE Map - verwende existierende Map
+      console.warn('⚠️ CentralDB: saveDatabase - data.bookmarks ist keine Map, behalte existierende Map');
+      data.bookmarks = savedBookmarks;
+    } else {
+      // data.bookmarks ist undefined - verwende existierende Map
+      data.bookmarks = savedBookmarks;
+    }
+    
+    // Stelle auch playsMap und commentLikesMap sicher
+    if (!(data.playsMap instanceof Map)) {
+      data.playsMap = savedPlaysMap;
+    } else {
+      // Merge playsMap
+      savedPlaysMap.forEach((count: number, trackId: string) => {
+        if (!data.playsMap.has(trackId)) {
+          data.playsMap.set(trackId, count);
+        }
+      });
+    }
+    
+    if (!(data.commentLikesMap instanceof Map)) {
+      data.commentLikesMap = savedCommentLikesMap;
+    } else {
+      // Merge commentLikesMap
+      savedCommentLikesMap.forEach((userIds: Set<string>, commentId: string) => {
+        if (!data.commentLikesMap.has(commentId)) {
+          data.commentLikesMap.set(commentId, new Set(userIds));
+        }
+      });
+    }
+    
+    // Überschreibe jetzt die Daten
     this.data = data;
+    
+    console.log('💾 CentralDB: saveDatabase nach Merge:', {
+      likes: this.data.likes.size,
+      bookmarks: this.data.bookmarks.size,
+      plays: this.data.playsMap.size
+    });
+    
     this.saveToStorage();
+    console.log('💾 CentralDB: saveDatabase aufgerufen - Likes:', this.data.likes.size, 'Bookmarks:', this.data.bookmarks.size);
   }
 
   // Get pending uploads

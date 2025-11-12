@@ -1,9 +1,10 @@
-import { Clock, Heart, Trash2, User, Play, Calendar, ExternalLink, Bookmark } from 'lucide-react';
+import { Clock, Heart, Trash2, User, Play, ExternalLink, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useOutletContext, useLocation } from 'react-router-dom';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useUserStore } from '../../stores/userStore';
 import { useDatabase } from '../../hooks/useDatabase';
+import { useFeedStore } from '../../stores/feedStore';
 import { formatDuration, sanitizeAudioTrack, sanitizeUser } from '../../utils';
 import { debugAudioPlayback } from '../../utils/audioDebug';
 import { audioPlaybackFixer } from '../../utils/audioPlaybackFix';
@@ -58,8 +59,12 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
   const { currentUser } = useUserStore();
   const { toggleLike, toggleBookmark } = useDatabase(currentUser?.id); // Verwende aktuellen User für toggleLike und toggleBookmark
   
-  // Verwende den übergebenen Track direkt, um Duplikate zu vermeiden
-  const currentTrackData = track;
+  // WICHTIG: Hole die neuesten Track-Daten aus dem feedStore, um sicherzustellen, dass Like-Updates angezeigt werden
+  const feedStoreTracks = useFeedStore(state => state.tracks);
+  const updatedTrackFromStore = feedStoreTracks.find(t => t.id === track.id);
+  
+  // Verwende den aktualisierten Track aus dem Store, falls vorhanden, sonst den ursprünglichen Prop
+  const currentTrackData = updatedTrackFromStore || track;
   const navigate = useNavigate();
   const location = useLocation();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -105,19 +110,6 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
 
   // Check if we're on a profile page using URL
   const isOnProfilePageByURL = location.pathname.startsWith('/profile');
-  
-  // Debug: Log when on profile page
-  if (isOnProfilePageByURL) {
-    console.log('🗓️ AudioCard on profile page:', {
-      trackId: safeTrack.id,
-      title: safeTrack.title,
-      createdAt: safeTrack.createdAt,
-      formattedDate: safeTrack.createdAt ? formatDate(safeTrack.createdAt) : 'NO DATE',
-      isOnProfilePageByURL,
-      pathname: location.pathname,
-      username: safeUser.username
-    });
-  }
 
   // Initialize Intersection Observer and handle visibility
   useEffect(() => {
@@ -367,34 +359,44 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
               </div>
               
               <div 
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (currentUser?.id) {
-                    toggleLike(safeTrack.id, currentUser.id);
+                    console.log('❤️ AudioCard: Like clicked for track:', safeTrack.id, 'Current likes:', safeTrack.likes, 'isLiked:', safeTrack.isLiked);
+                    const success = await toggleLike(safeTrack.id, currentUser.id);
+                    console.log('❤️ AudioCard: Like toggle result:', success);
+                    // Force re-render by updating local state
+                    if (success) {
+                      // Der feedStore sollte bereits aktualisiert sein, aber wir können einen kleinen Delay hinzufügen
+                      setTimeout(() => {
+                        console.log('❤️ AudioCard: Checking updated track after like...');
+                      }, 100);
+                    }
                   }
                 }}
                 className="flex items-center gap-1 hover:scale-105 transition-transform cursor-pointer"
                 title={safeTrack.isLiked ? 'Unlike' : 'Like'}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
+                onKeyDown={async (e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     e.stopPropagation();
                     if (currentUser?.id) {
-                      toggleLike(safeTrack.id, currentUser.id);
+                      console.log('❤️ AudioCard: Like clicked (keyboard) for track:', safeTrack.id);
+                      await toggleLike(safeTrack.id, currentUser.id);
                     }
                   }
                 }}
               >
                 <Heart 
                   size={12} strokeWidth={2} 
-                  className="text-gray-400"
-                  fill="none"
+                  className={`transition-all ${safeTrack.isLiked ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
+                  fill={safeTrack.isLiked ? 'currentColor' : 'none'}
                 />
                 <span className="text-gray-400">
-                  {safeTrack.likes}
+                  {safeTrack.likes || 0}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -402,13 +404,6 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <span className="tabular-nums">{formatDuration(safeTrack.duration)}</span>
               </div>
               
-              {/* Date as last element on profile page */}
-              {isOnProfilePageByURL && safeTrack.createdAt && (
-                <div className="flex items-center gap-1">
-                  <Calendar size={12} strokeWidth={2} />
-                  <span>{formatDate(safeTrack.createdAt)}</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -453,10 +448,12 @@ export const AudioCard = ({ track, index = 0, showDeleteButton = false, onDelete
                 <div className="flex items-center space-x-2">
                   {/* Like button with enhanced visual feedback */}
                   <motion.button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       if (currentUser?.id) {
-                        toggleLike(safeTrack.id, currentUser.id);
+                        console.log('❤️ AudioCard (expanded): Like clicked for track:', safeTrack.id, 'Current likes:', safeTrack.likes);
+                        const success = await toggleLike(safeTrack.id, currentUser.id);
+                        console.log('❤️ AudioCard (expanded): Like toggle result:', success);
                       }
                     }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${

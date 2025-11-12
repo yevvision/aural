@@ -17,6 +17,16 @@ interface TopAccount {
   isVerified?: boolean;
 }
 
+// Funktion zur Generierung unterschiedlicher Gradienten im Stil des Hintergrunds
+const getAccountGradient = (index: number): string => {
+  // Lineare Verläufe mit verschiedenen Winkeln
+  // #c97046 nur zu 5-10%, dann schnell zu #83061c und hauptsächlich #0f0f0f
+  const angles = [135, 180, 225, 90, 45, 270, 315, 0, 120, 150];
+  const angle = angles[index % angles.length];
+  
+  return `linear-gradient(${angle}deg, #c97046 0%, #83061c 20%, #0f0f0f 60%, #0f0f0f 100%)`;
+};
+
 export const TopAccountsCarousel = () => {
   const { currentUser } = useUserStore();
   const { tracks, users } = useDatabase(currentUser?.id);
@@ -175,11 +185,12 @@ export const TopAccountsCarousel = () => {
           {Array.from({ length: 5 }).map((_, index) => (
             <div key={index} className="flex-shrink-0">
               <div 
-                className="bg-gray-800 animate-pulse"
+                className="animate-pulse"
                 style={{ 
                   width: '104px', 
                   height: '104px', 
-                  borderRadius: '50%' 
+                  borderRadius: '50%',
+                  background: getAccountGradient(index)
                 }}
               />
             </div>
@@ -230,13 +241,14 @@ export const TopAccountsCarousel = () => {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleAccountClick(account)}
                 >
-                  {/* Dunkelgrauer Kreis mit Username */}
+                  {/* Kreis mit warmem Gradient-Verlauf */}
                   <div 
-                    className="relative overflow-hidden true-black-card border border-white/10 group-hover:border-white/20 transition-all duration-200 flex items-center justify-center"
+                    className="relative overflow-hidden transition-all duration-200 flex items-center justify-center"
                     style={{ 
                       width: '104px', 
                       height: '104px', 
-                      borderRadius: '50%' 
+                      borderRadius: '50%',
+                      background: getAccountGradient(index)
                     }}
                   >
                     {/* Avatar oder Username */}
@@ -249,12 +261,13 @@ export const TopAccountsCarousel = () => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center px-2">
                         <span 
-                          className="text-white font-bold text-sm text-center leading-tight" 
+                          className="text-white font-normal text-sm text-center leading-tight" 
                           style={{ 
                             fontFamily: 'Poppins, sans-serif',
                             wordBreak: 'break-all',
                             whiteSpace: 'normal',
-                            lineHeight: '1.1'
+                            lineHeight: '1.1',
+                            textShadow: '0 2px 8px rgba(0, 0, 0, 0.8), 0 1px 4px rgba(0, 0, 0, 0.9)'
                           }}
                         >
                           {account.username}

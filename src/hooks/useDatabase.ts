@@ -28,7 +28,21 @@ export const useDatabase = (currentUserId?: string) => {
       const now = Date.now();
       const CACHE_DURATION = 30 * 1000; // 30 Sekunden Cache (reduziert für bessere UX)
       
-      if (cachedTracks && cacheTimestamp && (now - parseInt(cacheTimestamp)) < CACHE_DURATION) {
+      // Prüfe, ob die zentrale DB aktueller ist als der Cache
+      const centralRaw = localStorage.getItem('aural-central-database');
+      let isCentralNewerThanCache = false;
+      try {
+        if (centralRaw) {
+          const central = JSON.parse(centralRaw);
+          const centralTs = new Date(central.timestamp || 0).getTime();
+          const cacheTsNum = cacheTimestamp ? parseInt(cacheTimestamp) : 0;
+          if (centralTs && centralTs > cacheTsNum) {
+            isCentralNewerThanCache = true;
+          }
+        }
+      } catch {}
+
+      if (!isCentralNewerThanCache && cachedTracks && cacheTimestamp && (now - parseInt(cacheTimestamp)) < CACHE_DURATION) {
         console.log('✅ useDatabase: Using cached tracks (fast!)');
         const allTracks = JSON.parse(cachedTracks);
         setTracks(allTracks);
@@ -161,6 +175,15 @@ export const useDatabase = (currentUserId?: string) => {
     }
   }, [currentUserId]); // currentUserId als Dependency
 
+  // Interne Cache-Invalidierung für Trackliste
+  const invalidateTracksCache = () => {
+    try {
+      const cacheKey = 'aural-tracks-cache';
+      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(`${cacheKey}-timestamp`);
+    } catch {}
+  };
+
   // Cache leeren nach Upload
   const clearCache = useCallback(() => {
     const cacheKey = 'aural-tracks-cache';
@@ -241,20 +264,117 @@ export const useDatabase = (currentUserId?: string) => {
   };
 
   const addCommentToTrack = async (trackId: string, comment: any): Promise<boolean> => {
+    console.log('💬 useDatabase.addCommentToTrack: Start für Track', trackId, 'Kommentar:', comment.content?.substring(0, 50));
+    
     const success = await DatabaseService.addCommentToTrack(trackId, comment);
+    console.log('💬 useDatabase.addCommentToTrack: DatabaseService Result:', success);
+    
     if (success) {
-      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
-      loadData();
+      // Cache invalidieren
+      invalidateTracksCache();
+      
+      // WICHTIG: Warte kurz, damit die Datenbank Zeit hat zu speichern
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // WICHTIG: Aktualisiere feedStore direkt mit den korrekten Daten aus der Datenbank
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const { centralDB } = await import('../database/centralDatabase_simple');
+        
+        // WICHTIG: Hole Track DIREKT aus centralDB, nicht über DatabaseService.getTracks()
+        // Das stellt sicher, dass wir die neuesten Kommentare bekommen
+        const dbData = centralDB.getDatabase();
+        const trackInDb = dbData.tracks.find((t: any) => t.id === trackId);
+        
+        if (trackInDb && trackInDb.comments && Array.isArray(trackInDb.comments)) {
+          const commentsCount = trackInDb.comments.length;
+          const comments = trackInDb.comments;
+          
+          console.log('🔍 useDatabase: Track aus DB gefunden:', {
+            trackId,
+            commentsCount,
+            commentsLength: comments.length,
+            allComments: comments.map(c => ({ id: c.id, content: c.content?.substring(0, 30) }))
+          });
+          
+          // WICHTIG: Stelle sicher, dass comments ein neues Array ist (nicht Referenz)
+          const commentsCopy = [...comments];
+          
+          // Update den spezifischen Track im feedStore mit KOPIE der Kommentare
+          useFeedStore.getState().updateTrack(trackId, {
+            comments: commentsCopy,
+            commentsCount: commentsCount
+          });
+          
+          // WICHTIG: Aktualisiere auch currentTrack im playerStore, falls es derselbe Track ist
+          try {
+            const { usePlayerStore } = await import('../stores/playerStore');
+            const playerStore = usePlayerStore.getState();
+            if (playerStore.currentTrack?.id === trackId) {
+              playerStore.setCurrentTrack({
+                ...playerStore.currentTrack,
+                comments: commentsCopy,
+                commentsCount: commentsCount
+              });
+              console.log('✅ useDatabase: currentTrack im playerStore aktualisiert');
+            }
+          } catch (error) {
+            console.warn('⚠️ useDatabase: Fehler beim Aktualisieren des playerStore:', error);
+          }
+          
+          // Prüfe nach dem Update, ob die Kommentare wirklich gesetzt wurden
+          const afterUpdate = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          console.log('✅ useDatabase: FeedStore Track nach Kommentar aktualisiert:', {
+            trackId,
+            commentsCount,
+            commentsLength: comments.length,
+            afterUpdateCommentsCount: afterUpdate?.comments?.length || 0,
+            afterUpdateCommentsCountProp: afterUpdate?.commentsCount,
+            erfolgreich: (afterUpdate?.comments?.length || 0) === comments.length
+          });
+          
+          if ((afterUpdate?.comments?.length || 0) !== comments.length) {
+            console.error('❌ useDatabase: Kommentare wurden NICHT korrekt aktualisiert!', {
+              erwartet: comments.length,
+              erhalten: afterUpdate?.comments?.length || 0,
+              afterUpdateTrack: afterUpdate
+            });
+          }
+        } else {
+          console.warn('⚠️ useDatabase: Track nicht in DB gefunden oder hat keine Kommentare:', {
+            trackId,
+            trackExists: !!trackInDb,
+            hasComments: trackInDb?.comments ? 'ja' : 'nein'
+          });
+          
+          // Fallback: Verwende DatabaseService.getTracks()
+          const { DatabaseService } = await import('../services/databaseService');
+          const updatedTracks = DatabaseService.getTracks(currentUserId);
+          const updatedTrack = updatedTracks.find(t => t.id === trackId);
+          
+          if (updatedTrack) {
+            useFeedStore.getState().updateTrack(trackId, {
+              comments: updatedTrack.comments || [],
+              commentsCount: updatedTrack.commentsCount || (updatedTrack.comments?.length || 0)
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ useDatabase: Fehler beim Aktualisieren des feedStore nach Kommentar:', error);
+        // Fallback: Lade alle Daten neu
+        loadData();
+      }
     }
+    
     return success;
   };
 
   const deleteCommentFromTrack = async (trackId: string, commentId: string): Promise<boolean> => {
     const success = await DatabaseService.deleteCommentFromTrack(trackId, commentId);
     if (success) {
-      // Nur die Kommentare aktualisieren, nicht alle Daten neu laden
-      const updatedComments = await DatabaseService.getComments();
-      setComments(updatedComments);
+      // Cache invalidieren, dann neu laden
+      invalidateTracksCache();
+      loadData();
     }
     return success;
   };
@@ -264,20 +384,327 @@ export const useDatabase = (currentUserId?: string) => {
   // =============================================================================
 
   const toggleLike = async (trackId: string, userId: string): Promise<boolean> => {
-    const success = await DatabaseService.toggleLike(trackId, userId);
-    if (success) {
-      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
-      loadData();
+    console.log('🔄 useDatabase.toggleLike: Start für Track', trackId, 'User', userId);
+    
+    // Optimistisches Update für sofortige UI-Reaktion
+    try {
+      const { useFeedStore } = await import('../stores/feedStore');
+      const feedStore = useFeedStore.getState();
+      const currentTrack = feedStore.tracks.find(t => t.id === trackId);
+      
+      if (currentTrack) {
+        const newIsLiked = !currentTrack.isLiked;
+        const newLikesCount = currentTrack.likes + (newIsLiked ? 1 : -1);
+        
+        console.log('📝 useDatabase: Optimistisches Update:', {
+          trackId,
+          oldLikes: currentTrack.likes,
+          newLikes: newLikesCount,
+          oldIsLiked: currentTrack.isLiked,
+          newIsLiked
+        });
+        
+        // Optimistisches Update
+        feedStore.updateTrack(trackId, {
+          isLiked: newIsLiked,
+          likes: Math.max(0, newLikesCount) // Stelle sicher, dass likes nicht negativ wird
+        });
+        
+        console.log('✅ useDatabase: Optimistisches Update abgeschlossen');
+      } else {
+        console.warn('⚠️ useDatabase: Track nicht im feedStore gefunden:', trackId);
+      }
+    } catch (error) {
+      console.error('❌ useDatabase: Fehler beim optimistischen Update:', error);
     }
+    
+    const success = await DatabaseService.toggleLike(trackId, userId);
+    console.log('🔄 useDatabase.toggleLike: DatabaseService Result:', success);
+    
+    if (success) {
+      // Cache invalidieren
+      invalidateTracksCache();
+      
+      // WICHTIG: Warte länger, damit die Datenbank-Zeit hat, den Like zu speichern
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Aktualisiere feedStore mit den korrekten Daten aus der Datenbank
+      // WICHTIG: Hole die Daten DIREKT aus centralDB, nicht über loadData()
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const { centralDB } = await import('../database/centralDatabase_simple');
+        
+        // WICHTIG: Prüfe zuerst direkt in der Datenbank-Map, bevor wir getAllTracks aufrufen
+        // Verwende eine Hilfsmethode, um auf die Likes-Map zuzugreifen
+        let trackLikes: Set<string> | undefined;
+        let likesInMap = 0;
+        let isLikedInMap = false;
+        
+        try {
+          // Verwende DatabaseService.getDatabase() für direkten Zugriff auf Maps
+          const dbData = DatabaseService.getDatabase();
+          if (dbData && dbData.likes && typeof dbData.likes.get === 'function') {
+            trackLikes = dbData.likes.get(trackId);
+            if (trackLikes) {
+              likesInMap = trackLikes.size || 0;
+              isLikedInMap = trackLikes.has(userId) || false;
+            }
+          }
+        } catch (error) {
+          console.error('❌ useDatabase: Fehler beim Zugriff auf Datenbank-Map:', error);
+          // Ignoriere den Fehler und verwende getAllTracks als Fallback
+        }
+        
+        console.log('🔍 useDatabase: Prüfe Like-Daten direkt in Map:', {
+          trackId,
+          likesInMap: `${likesInMap}`,
+          isLikedInMap: `${isLikedInMap}`,
+          userId,
+          hasLikesSet: !!trackLikes,
+          allUserIds: trackLikes ? Array.from(trackLikes) : []
+        });
+        console.log(`📊 useDatabase: Map-Daten für Track ${trackId}: likes=${likesInMap}, isLiked=${isLikedInMap}`);
+        
+        // Hole die aktualisierte Like-Zählung direkt aus der Datenbank
+        // getAllTracks bereichert die Tracks bereits mit Like-Daten aus der Map
+        const updatedTracks = DatabaseService.getTracks(userId);
+        const updatedTrack = updatedTracks.find(t => t.id === trackId);
+        
+        // Debug: Prüfe Like-Daten für diesen Track
+        if (updatedTrack) {
+          console.log('🔍 useDatabase: Prüfe Like-Daten in Datenbank für Track:', {
+            trackId,
+            likes: `${updatedTrack.likes}`,
+            isLiked: `${updatedTrack.isLiked}`,
+            userId,
+            mapLikes: `${likesInMap}`,
+            mapIsLiked: `${isLikedInMap}`,
+            // Detaillierter Vergleich
+            matchLikes: updatedTrack.likes === likesInMap,
+            matchIsLiked: updatedTrack.isLiked === isLikedInMap
+          });
+          console.log(`📊 useDatabase: getAllTracks-Daten für Track ${trackId}: likes=${updatedTrack.likes}, isLiked=${updatedTrack.isLiked}`);
+        } else {
+          console.warn('⚠️ useDatabase: Track nicht in getAllTracks gefunden:', trackId);
+        }
+        
+        if (updatedTrack) {
+          // WICHTIG: Wenn getAllTracks falsche Daten zurückgibt, verwende die Map-Daten direkt
+          // Oder wenn Map-Daten verfügbar sind und getAllTracks 0 zeigt, verwende Map-Daten
+          let finalLikes = updatedTrack.likes;
+          let finalIsLiked = updatedTrack.isLiked;
+          
+          // Wenn Map-Daten verfügbar sind und von getAllTracks abweichen, bevorzuge Map
+          if (likesInMap > 0 || isLikedInMap) {
+            if (updatedTrack.likes === 0 && likesInMap > 0) {
+              finalLikes = likesInMap;
+              finalIsLiked = isLikedInMap;
+              console.warn('⚠️ useDatabase: getAllTracks zeigt likes: 0, aber Map zeigt likes:', likesInMap, '- verwende Map-Daten');
+            } else if (updatedTrack.isLiked !== isLikedInMap && isLikedInMap) {
+              finalIsLiked = isLikedInMap;
+              console.warn('⚠️ useDatabase: getAllTracks zeigt isLiked falsch, verwende Map-Daten');
+            }
+          }
+          
+          console.log('🔄 useDatabase: Aktualisiere Track mit korrekten Like-Daten:', {
+            trackId,
+            isLiked: `${finalIsLiked}`,
+            likes: `${finalLikes}`,
+            quelle: likesInMap > 0 ? 'Map' : 'getAllTracks'
+          });
+          console.log(`📊 useDatabase: Finale Daten für Track ${trackId}: likes=${finalLikes}, isLiked=${finalIsLiked} (Quelle: ${likesInMap > 0 ? 'Map' : 'getAllTracks'})`);
+          
+          // WICHTIG: Prüfe, ob die Daten wirklich anders sind als im FeedStore
+          const currentFeedTrack = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          if (currentFeedTrack) {
+            console.log('🔍 useDatabase: Vergleich FeedStore vs Final-Daten:', {
+              feedStore: { isLiked: currentFeedTrack.isLiked, likes: currentFeedTrack.likes },
+              final: { isLiked: finalIsLiked, likes: finalLikes },
+              aenderungErforderlich: currentFeedTrack.likes !== finalLikes || currentFeedTrack.isLiked !== finalIsLiked
+            });
+          }
+          
+          // Update den spezifischen Track im feedStore mit korrekten Daten
+          useFeedStore.getState().updateTrack(trackId, {
+            isLiked: finalIsLiked,
+            likes: finalLikes
+          });
+          
+          // Prüfe nach dem Update, ob es wirklich gesetzt wurde
+          const afterUpdate = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          console.log('✅ useDatabase: FeedStore Track aktualisiert:', {
+            trackId,
+            isLiked: `${afterUpdate?.isLiked}`,
+            likes: `${afterUpdate?.likes}`,
+            erfolgreich: afterUpdate?.likes === finalLikes && afterUpdate?.isLiked === finalIsLiked
+          });
+          console.log(`📊 useDatabase: FeedStore nach Update für Track ${trackId}: likes=${afterUpdate?.likes}, isLiked=${afterUpdate?.isLiked}, erfolgreich=${afterUpdate?.likes === finalLikes && afterUpdate?.isLiked === finalIsLiked}`);
+          
+          // WICHTIG: NICHT loadData() oder loadTracksFromDatabase() aufrufen!
+          // Das würde die Like-Daten überschreiben
+        } else {
+          console.warn('⚠️ useDatabase: Aktualisierter Track nicht in Datenbank gefunden:', trackId);
+          // Fallback: Verwende Map-Daten direkt
+          if (likesInMap > 0 || isLikedInMap) {
+            console.log('🔧 useDatabase: Verwende Map-Daten als Fallback');
+            useFeedStore.getState().updateTrack(trackId, {
+              isLiked: isLikedInMap,
+              likes: likesInMap
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ useDatabase: Fehler beim Aktualisieren des feedStore:', error);
+        // Fallback: Versuche es nochmal mit loadTracksFromDatabase
+        try {
+          const { useFeedStore } = await import('../stores/feedStore');
+          useFeedStore.getState().loadTracksFromDatabase();
+        } catch (fallbackError) {
+          console.error('❌ useDatabase: Fallback auch fehlgeschlagen:', fallbackError);
+        }
+      }
+    } else {
+      console.error('❌ useDatabase: toggleLike fehlgeschlagen, setze feedStore zurück');
+      // Falls fehlgeschlagen, feedStore zurücksetzen durch Neuladen
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        useFeedStore.getState().loadTracksFromDatabase();
+      } catch (error) {
+        console.error('❌ useDatabase: Fehler beim Zurücksetzen des feedStore:', error);
+      }
+    }
+    
+    console.log('🔄 useDatabase.toggleLike: Ende, Result:', success);
     return success;
   };
 
   const toggleBookmark = async (trackId: string, userId: string): Promise<boolean> => {
-    const success = await DatabaseService.toggleBookmark(trackId, userId);
-    if (success) {
-      // Lade alle Daten neu, um sicherzustellen, dass alle Komponenten aktualisiert werden
-      loadData();
+    console.log('🔖 useDatabase.toggleBookmark: Start für Track', trackId, 'User', userId);
+    
+    // Optimistisches Update für sofortige UI-Reaktion
+    try {
+      const { useFeedStore } = await import('../stores/feedStore');
+      const feedStore = useFeedStore.getState();
+      const currentTrack = feedStore.tracks.find(t => t.id === trackId);
+      
+      if (currentTrack) {
+        const newIsBookmarked = !currentTrack.isBookmarked;
+        
+        console.log('📝 useDatabase: Optimistisches Bookmark-Update:', {
+          trackId,
+          oldIsBookmarked: currentTrack.isBookmarked,
+          newIsBookmarked
+        });
+        
+        // Optimistisches Update - NUR isBookmarked ändern, Like-Daten NICHT anfassen!
+        feedStore.updateTrack(trackId, {
+          isBookmarked: newIsBookmarked
+        });
+        
+        console.log('✅ useDatabase: Optimistisches Bookmark-Update abgeschlossen');
+      } else {
+        console.warn('⚠️ useDatabase: Track nicht im feedStore gefunden:', trackId);
+      }
+    } catch (error) {
+      console.error('❌ useDatabase: Fehler beim optimistischen Bookmark-Update:', error);
     }
+    
+    const success = await DatabaseService.toggleBookmark(trackId, userId);
+    console.log('🔖 useDatabase.toggleBookmark: DatabaseService Result:', success);
+    
+    if (success) {
+      // Cache invalidieren
+      invalidateTracksCache();
+      
+      // WICHTIG: Warte kurz, damit die Datenbank-Zeit hat, das Bookmark zu speichern
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Aktualisiere feedStore mit den korrekten Daten aus der Datenbank
+      // WICHTIG: Hole die Daten DIREKT aus centralDB, nicht über loadData()
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const { centralDB } = await import('../database/centralDatabase_simple');
+        
+        // Hole die aktualisierte Bookmark-Zählung direkt aus der Datenbank
+        const updatedTracks = DatabaseService.getTracks(userId);
+        const updatedTrack = updatedTracks.find(t => t.id === trackId);
+        
+        if (updatedTrack) {
+          console.log('🔖 useDatabase: Aktualisiere Track mit korrekten Bookmark-Daten:', {
+            trackId,
+            isBookmarked: updatedTrack.isBookmarked,
+            // WICHTIG: Behalte Like-Daten vom aktuellen Track im Store!
+            isLiked: useFeedStore.getState().tracks.find(t => t.id === trackId)?.isLiked ?? updatedTrack.isLiked,
+            likes: useFeedStore.getState().tracks.find(t => t.id === trackId)?.likes ?? updatedTrack.likes
+          });
+          
+          // WICHTIG: Update NUR isBookmarked, behalte alle anderen Daten (besonders Likes)!
+          const currentFeedTrack = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          useFeedStore.getState().updateTrack(trackId, {
+            isBookmarked: updatedTrack.isBookmarked,
+            // Behalte Like-Daten vom aktuellen Track, falls vorhanden
+            ...(currentFeedTrack && {
+              isLiked: currentFeedTrack.isLiked,
+              likes: currentFeedTrack.likes
+            })
+          });
+          
+          // Prüfe nach dem Update
+          const afterUpdate = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          console.log('✅ useDatabase: FeedStore Track aktualisiert:', {
+            trackId,
+            isBookmarked: afterUpdate?.isBookmarked,
+            isLiked: afterUpdate?.isLiked,
+            likes: afterUpdate?.likes
+          });
+          
+          // WICHTIG: NICHT loadData() oder loadTracksFromDatabase() aufrufen!
+          // Das würde die Like-Daten überschreiben
+        } else {
+          console.warn('⚠️ useDatabase: Aktualisierter Track nicht in Datenbank gefunden:', trackId);
+        }
+      } catch (error) {
+        console.error('❌ useDatabase: Fehler beim Aktualisieren des feedStore:', error);
+        // Fallback: Versuche es nochmal, aber BEHALTE Like-Daten
+        try {
+          const { useFeedStore } = await import('../stores/feedStore');
+          const currentTrack = useFeedStore.getState().tracks.find(t => t.id === trackId);
+          if (currentTrack) {
+            // Lade nur Bookmark-Daten neu, behalte Like-Daten
+            const { centralDB } = await import('../database/centralDatabase_simple');
+            const updatedTracks = DatabaseService.getTracks(userId);
+            const updatedTrack = updatedTracks.find(t => t.id === trackId);
+            if (updatedTrack) {
+              useFeedStore.getState().updateTrack(trackId, {
+                isBookmarked: updatedTrack.isBookmarked,
+                // Behalte Like-Daten
+                isLiked: currentTrack.isLiked,
+                likes: currentTrack.likes
+              });
+            }
+          }
+        } catch (fallbackError) {
+          console.error('❌ useDatabase: Fallback auch fehlgeschlagen:', fallbackError);
+        }
+      }
+    } else {
+      console.error('❌ useDatabase: toggleBookmark fehlgeschlagen, setze feedStore zurück');
+      // Falls fehlgeschlagen, feedStore zurücksetzen - aber BEHALTE Like-Daten
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const currentTrack = useFeedStore.getState().tracks.find(t => t.id === trackId);
+        if (currentTrack) {
+          // Setze nur Bookmark zurück, behalte Like-Daten
+          useFeedStore.getState().updateTrack(trackId, {
+            isBookmarked: !currentTrack.isBookmarked // Zurück zum alten Zustand
+          });
+        }
+      } catch (error) {
+        console.error('❌ useDatabase: Fehler beim Zurücksetzen des feedStore:', error);
+      }
+    }
+    
+    console.log('🔖 useDatabase.toggleBookmark: Ende, Result:', success);
     return success;
   };
 

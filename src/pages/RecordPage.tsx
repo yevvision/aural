@@ -15,6 +15,8 @@ import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudio
 export const RecordPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recordButtonRef = useRef<HTMLDivElement>(null);
+  const [buttonPosition, setButtonPosition] = useState({ centerX: 51, centerY: 44 });
   const { recordedBlob, duration, reset: resetRecording, isRecording, startRecording: startRecordingStore, stopRecording: stopRecordingStore, pauseRecording: pauseRecordingStore, resumeRecording: resumeRecordingStore } = useRecordingStore();
   const [recordingDuration, setRecordingDuration] = useState(0);
   
@@ -80,11 +82,34 @@ export const RecordPage = () => {
     },
     onError: (error) => {
       console.error('Recording error:', error);
-      setIsRecording(false);
+      stopRecordingStore();
       setRecordingDuration(0);
       stopAnalyzing();
     }
   });
+
+  // Berechne die Position des Record-Buttons
+  const updateButtonPosition = () => {
+    if (recordButtonRef.current) {
+      const rect = recordButtonRef.current.getBoundingClientRect();
+      const centerX = ((rect.left + rect.right) / 2 / window.innerWidth) * 100;
+      const centerY = ((rect.top + rect.bottom) / 2 / window.innerHeight) * 100;
+      setButtonPosition({ centerX, centerY });
+    }
+  };
+
+  useEffect(() => {
+    updateButtonPosition();
+    
+    // Update position on scroll and resize
+    window.addEventListener('scroll', updateButtonPosition, true);
+    window.addEventListener('resize', updateButtonPosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updateButtonPosition, true);
+      window.removeEventListener('resize', updateButtonPosition);
+    };
+  }, [isRecording]);
 
   useEffect(() => {
     if (recordedBlob) {
@@ -231,7 +256,60 @@ export const RecordPage = () => {
 
   return (
     <PageTransition>
-      <div className="max-w-md mx-auto px-4 py-6 pb-24 relative min-h-screen">
+      {/* Radialer Audio-Feedback - zentriert auf dem Button */}
+      {isRecording && (() => {
+        const vol = visualizerData.volume || 0;
+        // Erhöhte Sensibilität - reagiert bereits auf sehr leise Töne
+        const intensity = Math.max(vol * 3.5, 0.15); // Von 2 auf 3.5 erhöht + Minimum von 0.05 auf 0.15
+        
+        return (
+          <>
+            {/* Hintergrund-Rötung - mittlere Intensität */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: 'easeInOut' }}
+              className="fixed pointer-events-none"
+              style={{
+                zIndex: 1,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: `rgba(220, 50, 40, ${0.04 + intensity * 0.12})`,
+                mixBlendMode: 'screen',
+              }}
+            />
+            
+            {/* Radialer Verlauf - stärkere Deckkraft */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.8, ease: 'easeInOut' }}
+              className="fixed pointer-events-none"
+              style={{
+                zIndex: 5,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                mixBlendMode: 'screen',
+                background: `radial-gradient(circle at ${buttonPosition.centerX}% ${buttonPosition.centerY}%, 
+                  rgba(220, 50, 40, ${0.40 + intensity * 0.35}) 0%,
+                  rgba(180, 30, 25, ${0.32 + intensity * 0.40}) ${3 + intensity * 30}%,
+                  rgba(150, 20, 15, ${0.28 + intensity * 0.35}) ${8 + intensity * 50}%,
+                  rgba(120, 15, 10, ${0.18 + intensity * 0.25}) ${15 + intensity * 65}%,
+                  transparent ${Math.min(30 + intensity * 70, 100)}%
+                )`,
+              }}
+            />
+          </>
+        );
+      })()}
+
+      <div className="max-w-md mx-auto px-4 py-6 pb-24 relative min-h-screen flex flex-col">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -239,14 +317,22 @@ export const RecordPage = () => {
           className="h-full relative"
         >
           {/* Title - oben positioniert */}
-          <div className="text-center pt-8 pb-4 desktop-title-spacing" style={{ zIndex: 30 }}>
-            <Heading level={1} className="text-3xl font-bold text-white mb-2">
-              {isRecording ? 'Have fun!' : 'Ready?'}
-            </Heading>
+          <div className="text-center pt-8 pb-4 desktop-title-spacing" style={{ zIndex: 1000, position: 'relative' }}>
+            <motion.div
+              key={isRecording ? 'recording' : 'ready'}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+            >
+              <Heading level={1} className="text-3xl font-bold text-white mb-2">
+                {isRecording ? 'Have fun!' : 'Ready?'}
+              </Heading>
+            </motion.div>
           </div>
 
           {/* Audio Visualizer with Record Button - centered and scrollable */}
-          <div className="flex flex-col items-center justify-center py-8 relative">
+          <div ref={recordButtonRef} className="flex flex-col items-center justify-center py-8 relative">
             {/* Audio Visualizer */}
             <UnicornBeamAudioVisualizer
               frequencies={visualizerData.frequencies}
@@ -291,14 +377,14 @@ export const RecordPage = () => {
         {!isRecording && (
           <div className="upload-hint-container">
             <Body color="secondary" className="text-sm text-white/60">
-              Alternatively to recording, you can also upload an audio file from your device.
+              Click the record button or<br />
+              <button
+                onClick={handleUploadClick}
+                className="text-[#ff4e3a] hover:text-[#ff4e3a] underline transition-colors duration-200 inline"
+              >
+                upload a file
+              </button>
             </Body>
-            <button
-              onClick={handleUploadClick}
-              className="mt-2 text-[#ff4e3a] hover:text-[#ff4e3a] text-sm underline transition-colors duration-200"
-            >
-              Upload file
-            </button>
           </div>
         )}
 

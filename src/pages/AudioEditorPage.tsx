@@ -255,8 +255,8 @@ export const AudioEditorPage = () => {
       <div className="px-4 sm:px-6 pb-6 min-h-[calc(100vh-72px)] flex flex-col">
 
         {/* Mobile-optimized Title */}
-        <Heading level={1} className="text-3xl sm:text-4xl mb-4 sm:mb-6">
-          Sounds good!<br />Time to polish it up?
+        <Heading level={1} className="text-3xl font-normal mb-4 sm:mb-6">
+          Spicy take! Want to refine it?
         </Heading>
         <div className="mb-6"></div>
 

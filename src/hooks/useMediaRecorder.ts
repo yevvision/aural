@@ -18,6 +18,18 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
   const isCancellingRef = useRef(false);
   const { setRecordedBlob, isRecording, isPaused, duration, startRecording: startRecordingStore, stopRecording: stopRecordingStore, pauseRecording: pauseRecordingStore, resumeRecording: resumeRecordingStore, setDuration: setDurationStore } = useRecordingStore();
 
+  // Check for API support without requesting microphone access
+  useEffect(() => {
+    const checkSupport = () => {
+      const hasMediaDevices = !!navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia;
+      const hasMediaRecorder = !!window.MediaRecorder;
+      setIsSupported(hasMediaDevices && hasMediaRecorder);
+      setIsCheckingSupport(false);
+    };
+    
+    checkSupport();
+  }, []);
+
   // Debug logging helper
   const addDebugLog = (message: string, data?: any) => {
     console.log(`🎤 MediaRecorder: ${message}`, data || '');
@@ -215,15 +227,29 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
   }, [options, setRecordedBlob, stopRecordingStore]);
 
   const startRecording = useCallback(async () => {
-    if (!mediaRecorderRef.current || isRecording) {
-      addDebugLog('Cannot start recording', { 
-        hasRecorder: !!mediaRecorderRef.current, 
-        isRecording 
-      });
+    if (isRecording) {
+      addDebugLog('Already recording');
       return;
     }
 
     try {
+      // Initialize MediaRecorder if not already initialized
+      if (!mediaRecorderRef.current) {
+        addDebugLog('MediaRecorder not initialized, initializing now...');
+        const initialized = await initializeMediaRecorder();
+        if (!initialized) {
+          addDebugLog('Failed to initialize MediaRecorder');
+          options.onError?.('Fehler beim Initialisieren der Aufnahme');
+          return;
+        }
+      }
+
+      if (!mediaRecorderRef.current) {
+        addDebugLog('MediaRecorder still not available after initialization');
+        options.onError?.('Fehler beim Initialisieren der Aufnahme');
+        return;
+      }
+
       addDebugLog('Starting recording...');
       // Set global recording state immediately when recording starts
       startRecordingStore();
@@ -235,7 +261,7 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
       // Reset global state if recording failed
       stopRecordingStore();
     }
-  }, [isRecording, options, startRecordingStore, stopRecordingStore]);
+  }, [isRecording, options, startRecordingStore, stopRecordingStore, initializeMediaRecorder]);
 
   const pauseRecording = useCallback(() => {
     if (!mediaRecorderRef.current || !isRecording || isPaused) {
@@ -335,22 +361,8 @@ export const useMediaRecorder = (options: UseMediaRecorderOptions = {}) => {
     return streamRef.current;
   }, []);
 
-  // Initialize on mount - only once
-  useEffect(() => {
-    let mounted = true;
-    
-    const init = async () => {
-      if (mounted) {
-        await initializeMediaRecorder();
-      }
-    };
-    
-    init();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []); // Empty dependency array
+  // DON'T initialize on mount - wait for user to click record button
+  // This prevents the microphone from being accessed before the user wants to record
 
   // Cleanup on unmount
   useEffect(() => {

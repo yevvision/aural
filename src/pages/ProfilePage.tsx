@@ -17,6 +17,7 @@ import { useFeedStore } from '../stores/feedStore';
 import { Settings, Mic, Save, X } from 'lucide-react';
 import { CalendarElement } from '../components/ui/CalendarElement';
 import { Upload, Bookmark } from 'lucide-react';
+import { VoidOfSoundIcon } from '../components/icons/VoidOfSoundIcon';
 
 export const ProfilePage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -355,32 +356,21 @@ export const ProfilePage: React.FC = () => {
         {/* Audio Tracks */}
         <div className="mb-8">
           {displayTracks.length === 0 ? (
-            <Panel variant="secondary" className="p-6">
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Mic className="w-8 h-8 text-white" />
-                </div>
-                <Heading level={4} className="mb-2">
-                  {activeTab === 'uploads' && 'No recordings yet'}
-                  {activeTab === 'liked' && 'No liked recordings yet'}
-                  {activeTab === 'bookmarked' && 'No bookmarked recordings yet'}
-                </Heading>
-                <Text color="secondary" className="mb-6">
-                  {activeTab === 'uploads' && 'Teile deine erste Sprachaufnahme!'}
-                  {activeTab === 'liked' && 'Like some recordings to see them here!'}
-                  {activeTab === 'bookmarked' && 'Bookmark some recordings to see them here!'}
-                </Text>
-                {activeTab === 'uploads' && (
-                  <Button 
-                    onClick={() => navigate('/record')} 
-                    variant="primary" 
-                    className="w-full"
-                  >
-                    Aufnahme starten
-                  </Button>
-                )}
+            <div className="text-center py-16 -mt-[50px]">
+              <div className="mb-6 flex items-center justify-center">
+                <VoidOfSoundIcon size={96} color="#ffffff" />
               </div>
-            </Panel>
+              <h3 className="text-white text-xl font-normal mb-2">Void of sound. No audio yet.</h3>
+              {activeTab === 'uploads' && (
+                <Button 
+                  onClick={() => navigate('/record')} 
+                  variant="primary" 
+                  className="w-full mt-4"
+                >
+                  Aufnahme starten
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {displayTracks.map((audio, index) => (

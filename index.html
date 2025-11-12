@@ -23,7 +23,8 @@
       }
       
       /* Prevent navigation from being pushed by keyboard */
-      .fixed.top-0 {
+      .fixed.top-0,
+      nav.fixed {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
@@ -31,16 +32,27 @@
         z-index: 9999 !important;
         transform: translateZ(0) !important;
         will-change: transform !important;
+        height: 72px !important;
+        overflow: visible !important;
+      }
+      
+      /* Prevent viewport height change from affecting fixed elements */
+      @supports (height: 100dvh) {
+        html {
+          height: 100dvh;
+        }
+        body {
+          height: 100dvh;
+          overflow-x: hidden;
+        }
       }
     </style>
     <script>
       // Prevent viewport changes from affecting navigation
       let initialViewportHeight = window.innerHeight;
       
-      function handleResize() {
-        const currentHeight = window.innerHeight;
+      function updateNavPosition() {
         const nav = document.querySelector('nav[class*="fixed"]');
-        
         if (nav) {
           // Force navigation to stay at top
           nav.style.position = 'fixed';
@@ -49,8 +61,28 @@
           nav.style.right = '0px';
           nav.style.zIndex = '9999';
           nav.style.transform = 'translateZ(0)';
+          nav.style.height = '72px';
+          nav.style.overflow = 'visible';
         }
       }
+      
+      function handleResize() {
+        updateNavPosition();
+      }
+      
+      // Listen for input focus to ensure nav stays visible
+      document.addEventListener('focusin', function(e) {
+        const target = e.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          // Use setTimeout to ensure this runs after any potential viewport changes
+          setTimeout(updateNavPosition, 100);
+        }
+      });
+      
+      // Listen for input blur
+      document.addEventListener('focusout', function(e) {
+        updateNavPosition();
+      });
       
       // Listen for viewport changes
       window.addEventListener('resize', handleResize);
@@ -59,16 +91,18 @@
       // Prevent iOS Safari from hiding navigation
       if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
         document.addEventListener('DOMContentLoaded', function() {
-          const nav = document.querySelector('nav[class*="fixed"]');
-          if (nav) {
-            nav.style.position = 'fixed';
-            nav.style.top = '0px';
-            nav.style.left = '0px';
-            nav.style.right = '0px';
-            nav.style.zIndex = '9999';
-            nav.style.transform = 'translate3d(0, 0, 0)';
-            nav.style.webkitTransform = 'translate3d(0, 0, 0)';
-          }
+          updateNavPosition();
+          
+          // Use MutationObserver to watch for navigation changes
+          const observer = new MutationObserver(function(mutations) {
+            updateNavPosition();
+          });
+          
+          // Observe the body for changes
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true
+          });
         });
       }
     </script>
@@ -79,3 +113,4 @@
     
   </body>
 </html>
+

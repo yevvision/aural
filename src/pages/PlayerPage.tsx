@@ -1,15 +1,79 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Play, Pause, Heart, MessageCircle, Bookmark, Share, Send, Flag, User, Calendar } from 'lucide-react';
 import { usePlayerStore } from '../stores/playerStore';
 import { useUserStore } from '../stores/userStore';
 import { useDatabase } from '../hooks/useDatabase';
+import { useFeedStore } from '../stores/feedStore';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { getGlobalAudio } from '../hooks/useGlobalAudioManager';
 import { formatDuration } from '../utils';
 import { EnhancedAudioVisualizer } from '../components/audio/EnhancedAudioVisualizer';
 import { UnicornBeamAudioVisualizer } from '../components/audio/UnicornBeamAudioVisualizer';
 import { DynamicPlayIcon } from '../components/ui/DynamicPlayIcon';
+import { VoidOfSoundIcon } from '../components/icons/VoidOfSoundIcon';
+import type { Comment as CommentType } from '../types';
+
+// Separate Komponente für Kommentare (damit Hooks korrekt verwendet werden können)
+const CommentItem = ({ 
+  comment, 
+  onLike, 
+  isCommentLikedByUser, 
+  getCommentLikeCount 
+}: { 
+  comment: CommentType; 
+  onLike: (commentId: string) => void;
+  isCommentLikedByUser: (commentId: string, userId: string) => Promise<boolean>;
+  getCommentLikeCount: (commentId: string) => Promise<number>;
+}) => {
+  const { currentUser } = useUserStore();
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  
+  useEffect(() => {
+    const loadCommentData = async () => {
+      try {
+        const userId = currentUser?.id || 'user-1';
+        const [liked, count] = await Promise.all([
+          isCommentLikedByUser(comment.id, userId),
+          getCommentLikeCount(comment.id)
+        ]);
+        setIsLiked(liked);
+        setLikeCount(count);
+      } catch (error) {
+        console.error('Error loading comment data:', error);
+      }
+    };
+    loadCommentData();
+  }, [comment.id, currentUser?.id, isCommentLikedByUser, getCommentLikeCount]);
+  
+  return (
+    <div className="border-b border-gray-800 pb-4">
+      <div className="flex items-center mb-2">
+        <span className="text-[#ff4e3a] text-sm font-medium">{comment.user.username}</span>
+        <span className="text-gray-500 text-xs ml-2">
+          {new Date(comment.createdAt).toLocaleDateString('de-DE')}
+        </span>
+      </div>
+      <p className="text-gray-300 text-sm">{comment.content}</p>
+      <div className="flex items-center mt-2">
+        <button 
+          onClick={() => onLike(comment.id)}
+          className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors"
+        >
+          <Heart 
+            size={14} strokeWidth={2} 
+            className={isLiked ? "fill-red-500 text-red-500" : ""} 
+          />
+          {likeCount > 0 && (
+            <span className="text-xs">{likeCount}</span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const PlayerPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,31 +81,89 @@ export const PlayerPage = () => {
   const { currentUser } = useUserStore();
   const { currentTrack, isPlaying, currentTime, duration, expand, collapse, setCurrentTrack } = usePlayerStore();
   const { tracks, toggleLike, toggleBookmark, addCommentToTrack, addReport, toggleCommentLike, isCommentLikedByUser, getCommentLikeCount, comments } = useDatabase(currentUser?.id);
+  const feedStoreTracks = useFeedStore((state) => state.tracks); // WICHTIG: Hole tracks aus feedStore für aktuelle Like-Daten
   const { toggle, seek } = useAudioPlayer();
   
-  // Get the global audio element for visualization
-  const globalAudio = getGlobalAudio();
-  
   const [commentText, setCommentText] = useState('');
+  const [pulseIntensity, setPulseIntensity] = useState(0);
+  const playButtonRef = useRef<HTMLDivElement>(null);
+  const [buttonPosition, setButtonPosition] = useState({ centerX: 50, centerY: 50 });
 
-  // Find the track by ID
+  // Find the track by ID - WICHTIG: Prüfe zuerst feedStore für aktuelle Like-Daten!
   const track = useMemo(() => {
     if (!id) return currentTrack;
     
-    // First try to find in the feed store tracks
+    // WICHTIG: Prüfe zuerst feedStore, da dort die aktuellen Like-Daten nach toggleLike sind
+    const feedTrack = feedStoreTracks.find(t => t.id === id);
+    if (feedTrack) return feedTrack;
+    
+    // Dann prüfe tracks von useDatabase
     const foundTrack = tracks.find(t => t.id === id);
     if (foundTrack) return foundTrack;
     
-    // If not found and we have a current track, check if it matches
+    // Wenn nicht gefunden und wir einen current track haben, prüfe ob es passt
     if (currentTrack && currentTrack.id === id) return currentTrack;
     
-    // If we still don't have a track, return null to show the not found message
+    // Wenn wir immer noch keinen track haben, return null um "nicht gefunden" zu zeigen
     return null;
-  }, [id, tracks, currentTrack]);
+  }, [id, tracks, feedStoreTracks, currentTrack]);
 
   // Calculate isTrackPlaying for the visualizer
   const isCurrentTrack = currentTrack?.id === track?.id;
   const isTrackPlaying = isCurrentTrack && isPlaying;
+
+  // Get the global audio element for visualization
+  const globalAudio = getGlobalAudio();
+
+  // Simuliere pulsierendes Feedback basierend auf isPlaying
+  useEffect(() => {
+    if (!isTrackPlaying) {
+      setPulseIntensity(0);
+      return;
+    }
+
+    let animationFrameId: number;
+    let startTime = Date.now();
+
+    const updatePulse = () => {
+      const elapsed = Date.now() - startTime;
+      // Sinus-Welle für kontinuierliches Pulsieren (0.5 Hz = 2 Sekunden pro Zyklus)
+      const intensity = 0.3 + 0.3 * Math.sin(elapsed / 1000 * Math.PI);
+      setPulseIntensity(intensity);
+      animationFrameId = requestAnimationFrame(updatePulse);
+    };
+
+    updatePulse();
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [isTrackPlaying]);
+
+  // Berechne die Position des Play-Buttons
+  const updateButtonPosition = () => {
+    if (playButtonRef.current) {
+      const rect = playButtonRef.current.getBoundingClientRect();
+      const centerX = ((rect.left + rect.right) / 2 / window.innerWidth) * 100;
+      const centerY = ((rect.top + rect.bottom) / 2 / window.innerHeight) * 100;
+      setButtonPosition({ centerX, centerY });
+    }
+  };
+
+  useEffect(() => {
+    updateButtonPosition();
+    
+    // Update position on scroll and resize
+    window.addEventListener('scroll', updateButtonPosition, true);
+    window.addEventListener('resize', updateButtonPosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updateButtonPosition, true);
+      window.removeEventListener('resize', updateButtonPosition);
+    };
+  }, [isTrackPlaying]);
 
   useEffect(() => {
     expand();
@@ -56,19 +178,11 @@ export const PlayerPage = () => {
   }, [track, currentTrack, setCurrentTrack]);
   
   if (!track) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-6 pb-24">
-        <div className="true-black-card text-center">
-          <h2 className="text-lg font-medium text-text-primary mb-2">Track not found</h2>
-          <button 
-            onClick={() => navigate('/')}
-            className="text-accent-blue hover:underline"
-          >
-            Go back to feed
-          </button>
-        </div>
-      </div>
-    );
+    // Falls kein Track gefunden wird (z. B. direkt nach Redirect), sofort zur Startseite umleiten
+    useEffect(() => {
+      navigate('/');
+    }, [navigate]);
+    return null;
   }
 
   // Fix for Infinity:NaN issue - ensure we have valid numbers
@@ -98,10 +212,43 @@ export const PlayerPage = () => {
     seek(newTime);
   };
 
-  const handleLike = () => {
+  const handleLike = async () => {
+    if (!track || !currentUser?.id) return;
+    
     console.log('❤️ PlayerPage: Like button clicked for track:', track.id);
-    const success = currentUser?.id ? toggleLike(track.id, currentUser.id) : false;
+    const success = await toggleLike(track.id, currentUser.id);
     console.log('❤️ PlayerPage: Like result:', success);
+    
+    if (success) {
+      // WICHTIG: Aktualisiere den Track-State nach dem Like
+      // Hole den aktualisierten Track aus dem feedStore
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const feedStore = useFeedStore.getState();
+        const updatedTrack = feedStore.tracks.find(t => t.id === track.id);
+        
+        if (updatedTrack) {
+          // Aktualisiere currentTrack im playerStore, falls es derselbe Track ist
+          if (currentTrack?.id === track.id) {
+            setCurrentTrack(updatedTrack);
+          }
+          
+          // Aktualisiere auch den feedStore für tracks von useDatabase
+          // Der useMemo für 'track' wird automatisch neu berechnet wenn tracks sich ändert
+          // Aber wir müssen sicherstellen, dass tracks aktualisiert wird
+          // Das wird über den feedStore gemacht, aber tracks von useDatabase muss auch aktualisiert werden
+          console.log('✅ PlayerPage: Track nach Like aktualisiert:', {
+            trackId: updatedTrack.id,
+            likes: updatedTrack.likes,
+            isLiked: updatedTrack.isLiked
+          });
+        } else {
+          console.warn('⚠️ PlayerPage: Aktualisierter Track nicht im feedStore gefunden');
+        }
+      } catch (error) {
+        console.error('❌ PlayerPage: Fehler beim Aktualisieren des Tracks:', error);
+      }
+    }
   };
 
   const handleComment = () => {
@@ -109,29 +256,85 @@ export const PlayerPage = () => {
     navigate(`/comments`);
   };
 
-  const handleAddComment = () => {
-    if (commentText.trim() && track && currentUser) {
-      const newComment = {
-        id: `comment-${Date.now()}`,
-        content: commentText.trim(),
-        user: currentUser,
-        createdAt: new Date(),
-        likes: 0,
-        isLiked: false
-      };
-      console.log('💬 PlayerPage: Adding comment to track:', track.id);
-      const success = addCommentToTrack(track.id, newComment);
-      console.log('💬 PlayerPage: Comment result:', success);
-      if (success) {
-        setCommentText('');
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !track || !currentUser) return;
+    
+    const newComment = {
+      id: `comment-${Date.now()}`,
+      trackId: track.id, // WICHTIG: trackId für Server-Speicherung!
+      content: commentText.trim(),
+      user: currentUser,
+      createdAt: new Date(),
+      likes: 0,
+      isLiked: false
+    };
+    console.log('💬 PlayerPage: Adding comment to track:', track.id);
+    const success = await addCommentToTrack(track.id, newComment);
+    console.log('💬 PlayerPage: Comment result:', success);
+    
+    if (success) {
+      setCommentText('');
+      
+      // WICHTIG: Aktualisiere den Track-State nach dem Hinzufügen des Kommentars
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const feedStore = useFeedStore.getState();
+        const updatedTrack = feedStore.tracks.find(t => t.id === track.id);
+        
+        if (updatedTrack) {
+          // Aktualisiere currentTrack im playerStore, falls es derselbe Track ist
+          if (currentTrack?.id === track.id) {
+            setCurrentTrack(updatedTrack);
+          }
+          
+          console.log('✅ PlayerPage: Track nach Kommentar aktualisiert:', {
+            trackId: updatedTrack.id,
+            commentsCount: updatedTrack.commentsCount || (updatedTrack.comments?.length || 0)
+          });
+        } else {
+          // Fallback: Lade Track direkt aus der Datenbank
+          const { DatabaseService } = await import('../services/databaseService');
+          const allTracks = DatabaseService.getTracks(currentUser.id);
+          const dbTrack = allTracks.find(t => t.id === track.id);
+          if (dbTrack && currentTrack?.id === track.id) {
+            setCurrentTrack(dbTrack);
+          }
+        }
+      } catch (error) {
+        console.error('❌ PlayerPage: Fehler beim Aktualisieren des Tracks nach Kommentar:', error);
       }
     }
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
+    if (!track || !currentUser?.id) return;
+    
     console.log('🔖 PlayerPage: Bookmark button clicked for track:', track.id);
-    const success = currentUser?.id ? toggleBookmark(track.id, currentUser.id) : false;
+    const success = await toggleBookmark(track.id, currentUser.id);
     console.log('🔖 PlayerPage: Bookmark result:', success);
+    
+    if (success) {
+      // WICHTIG: Aktualisiere den Track-State nach dem Bookmark
+      try {
+        const { useFeedStore } = await import('../stores/feedStore');
+        const feedStore = useFeedStore.getState();
+        const updatedTrack = feedStore.tracks.find(t => t.id === track.id);
+        
+        if (updatedTrack) {
+          // Aktualisiere currentTrack im playerStore, falls es derselbe Track ist
+          if (currentTrack?.id === track.id) {
+            setCurrentTrack(updatedTrack);
+          }
+          
+          console.log('✅ PlayerPage: Track nach Bookmark aktualisiert:', {
+            trackId: updatedTrack.id,
+            isBookmarked: updatedTrack.isBookmarked
+          });
+        }
+      } catch (error) {
+        console.error('❌ PlayerPage: Fehler beim Aktualisieren des Tracks:', error);
+      }
+    }
   };
 
   // Handle comment like interaction
@@ -166,10 +369,61 @@ export const PlayerPage = () => {
 
   // Get track comments - only show real comments, no sample comments
   // Get comments for this track from the database
-  const trackComments = comments.filter(comment => comment.trackId === track.id);
+  // WICHTIG: Kommentare kommen aus track.comments, nicht aus der separaten comments Liste!
+  // track.comments ist die Quelle der Wahrheit, da Kommentare direkt in Tracks gespeichert werden
+  const trackComments = track?.comments && Array.isArray(track.comments) 
+    ? track.comments 
+    : comments.filter(comment => comment.trackId === track?.id);
+  
+  console.log('💬 PlayerPage: Track-Kommentare:', {
+    trackId: track?.id,
+    fromTrackComments: track?.comments?.length || 0,
+    fromCommentsList: comments.filter(c => c.trackId === track?.id).length,
+    finalCount: trackComments.length
+  });
 
   return (
     <div className="max-w-md mx-auto min-h-screen relative bg-transparent">
+      {/* Radialer Audio-Feedback beim Abspielen */}
+      {isTrackPlaying && (
+        <>
+            {/* Hintergrund-Rötung - pulsierend - sehr schwach */}
+            <div
+              className="fixed pointer-events-none"
+              style={{
+                zIndex: 1,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: `rgba(220, 50, 40, ${0.02 + pulseIntensity * 0.05})`,
+                mixBlendMode: 'screen',
+                transition: 'background-color 0.06s linear',
+              }}
+            />
+            
+            {/* Radialer Verlauf - pulsierend - sehr schwach */}
+            <div
+              className="fixed pointer-events-none"
+              style={{
+                zIndex: 5,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                mixBlendMode: 'screen',
+                background: `radial-gradient(circle at ${buttonPosition.centerX}% ${buttonPosition.centerY}%, 
+                  rgba(220, 50, 40, ${0.08 + pulseIntensity * 0.1}) 0%,
+                  rgba(180, 30, 25, ${0.06 + pulseIntensity * 0.08}) ${10 + pulseIntensity * 25}%,
+                  rgba(150, 20, 15, ${0.04 + pulseIntensity * 0.06}) ${20 + pulseIntensity * 40}%,
+                  rgba(120, 15, 10, ${0.02 + pulseIntensity * 0.04}) ${30 + pulseIntensity * 50}%,
+                  transparent ${Math.min(50 + pulseIntensity * 50, 100)}%
+                )`,
+                transition: 'background 0.06s linear',
+              }}
+            />
+        </>
+      )}
       
       {/* Spacer for fixed header */}
       <div className="h-[72px]"></div>
@@ -219,7 +473,7 @@ export const PlayerPage = () => {
         </div>
 
         {/* Title - large and white */}
-        <h1 className="text-white text-4xl font-bold leading-tight mb-4">
+        <h1 className="text-white text-3xl font-normal leading-tight mb-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
           {track.title}
         </h1>
 
@@ -244,7 +498,7 @@ export const PlayerPage = () => {
             return sortedTags.map((tag, index) => (
               <span
                 key={index}
-                className="border border-gray-500 px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1"
+                className="bg-[#0f0f0f] border-none px-4 py-1.5 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1"
               >
                 <span className="text-gray-500">#</span>
                 {tag}
@@ -264,16 +518,16 @@ export const PlayerPage = () => {
           >
             <svg width="36" height="36" viewBox="0 0 90.675 81.032" className="text-white">
               <g>
-                <path style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} d="M50.166,78.872c21.184,0,38.356-17.173,38.356-38.356
+                <path style={{fill:"none",stroke:"white",strokeWidth:"2.5",strokeMiterlimit:"10"}} d="M50.166,78.872c21.184,0,38.356-17.173,38.356-38.356
                   S71.35,2.16,50.166,2.16s-38.356,17.173-38.356,38.356"/>
-                <polyline style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} points="1.306,27.653 11.809,40.569 24.726,30.066"/>
-                <text x="48.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="900" stroke="white" strokeWidth="1.5">15</text>
+                <polyline style={{fill:"none",stroke:"white",strokeWidth:"2.5",strokeMiterlimit:"10"}} points="1.306,27.653 11.809,40.569 24.726,30.066"/>
+                <text x="48.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="400" stroke="white" strokeWidth="0.5">15</text>
               </g>
             </svg>
           </button>
           
           {/* Play button with visualizer - like on Record page */}
-          <div className="relative flex items-center justify-center">
+          <div ref={playButtonRef} className="relative flex items-center justify-center">
             {/* Unicorn Beam Audio Visualizer as container */}
             <UnicornBeamAudioVisualizer
               frequencies={[]}
@@ -306,7 +560,7 @@ export const PlayerPage = () => {
                 isCurrentTrack={isCurrentTrack}
                 isPlaying={isTrackPlaying}
                 isFinished={false}
-                variant="white-outline"
+                variant="white-outline-thin"
               />
             </button>
           </div>
@@ -320,10 +574,10 @@ export const PlayerPage = () => {
           >
             <svg width="36" height="36" viewBox="0 0 90.675 81.032" className="text-white">
               <g>
-                <path style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} d="M40.509,78.872c-21.184,0-38.356-17.173-38.356-38.356
+                <path style={{fill:"none",stroke:"white",strokeWidth:"2.5",strokeMiterlimit:"10"}} d="M40.509,78.872c-21.184,0-38.356-17.173-38.356-38.356
                   S19.326,2.16,40.509,2.16s38.356,17.173,38.356,38.356"/>
-                <polyline style={{fill:"none",stroke:"white",strokeWidth:"4",strokeMiterlimit:"10"}} points="89.369,27.653 78.866,40.569 65.949,30.066"/>
-                <text x="42.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="900" stroke="white" strokeWidth="1.5">15</text>
+                <polyline style={{fill:"none",stroke:"white",strokeWidth:"2.5",strokeMiterlimit:"10"}} points="89.369,27.653 78.866,40.569 65.949,30.066"/>
+                <text x="42.338" y="50" textAnchor="middle" fontSize="29" fill="white" fontFamily="monospace" fontWeight="400" stroke="white" strokeWidth="0.5">15</text>
               </g>
             </svg>
           </button>
@@ -358,12 +612,12 @@ export const PlayerPage = () => {
         </div>
         
         {/* Comment input and action buttons at the bottom of content */}
-        <div className="mt-4 py-4 px-6 flex items-center gap-[15px] bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '20px' }}>
+        <div className="mt-4 py-4 px-6 flex items-center gap-[15px] bg-transparent backdrop-blur-sm -mx-6" style={{ marginTop: '7.5px' }}>
           <div className="relative flex-1">
             <input
               type="text"
               placeholder="comment …"
-              className="w-full h-10 px-4 bg-transparent border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5 transition-all duration-200 border-gray-500"
+              className="w-full h-10 px-4 bg-transparent border rounded-full text-white placeholder-gray-400 focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5 transition-all duration-200 border-white"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               onKeyPress={(e) => {
@@ -382,48 +636,56 @@ export const PlayerPage = () => {
           </div>
           
           {/* Button group with minimal spacing */}
-          <div className="flex items-center gap-1">
-            <button
+          <div className="flex items-center gap-3">
+            {/* Like button with enhanced visual feedback */}
+            <motion.button
               onClick={handleLike}
-              className={`w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center transition-all duration-200 hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 ${
-                track.isLiked 
-                  ? "border-red-500 bg-gradient-to-r from-red-500/30 to-red-600/20" 
-                  : ""
+              className={`h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+                track.isLiked
+                  ? 'border border-red-500 bg-red-500/20' 
+                  : 'border border-white hover:border-red-400'
               }`}
-              style={{ aspectRatio: '1/1' }}
+              style={{ aspectRatio: '1/1', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label={track.isLiked ? 'Unlike' : 'Like'}
               title={track.isLiked ? 'Unlike' : 'Like'}
             >
               <Heart 
-                size={16} 
-                strokeWidth={2}
+                size={14} 
                 className={`transition-all duration-200 ${
                   track.isLiked 
                     ? "fill-red-500 text-red-500" 
-                    : "text-gray-300"
+                    : "text-white hover:text-red-400"
                 }`}
+                strokeWidth={1.5}
               />
-            </button>
-            
-            <button
+            </motion.button>
+
+            {/* Bookmark button with enhanced visual feedback */}
+            <motion.button
               onClick={handleBookmark}
-              className={`w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center transition-all duration-200 hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 ${
-                track.isBookmarked 
-                  ? "border-yellow-500 bg-gradient-to-r from-yellow-500/30 to-yellow-600/20" 
-                  : ""
+              className={`h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+                track.isBookmarked
+                  ? 'border border-yellow-500 bg-yellow-500/20' 
+                  : 'border border-white hover:border-yellow-400'
               }`}
-              style={{ aspectRatio: '1/1' }}
+              style={{ aspectRatio: '1/1', minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
               title={track.isBookmarked ? 'Remove bookmark' : 'Bookmark'}
             >
               <Bookmark 
-                size={16} 
-                strokeWidth={2}
+                size={14} 
                 className={`transition-all duration-200 ${
                   track.isBookmarked 
                     ? "fill-yellow-500 text-yellow-500" 
-                    : "text-gray-300"
+                    : "text-white hover:text-yellow-400"
                 }`}
+                strokeWidth={1.5}
               />
-            </button>
+            </motion.button>
           </div>
         </div>
         
@@ -431,65 +693,27 @@ export const PlayerPage = () => {
         <div className="mt-4">
           {trackComments.length > 0 ? (
             <div className="space-y-4">
-              {trackComments.map((comment) => {
-                const [isLiked, setIsLiked] = useState(false);
-                const [likeCount, setLikeCount] = useState(0);
-                
-                useEffect(() => {
-                  const loadCommentData = async () => {
-                    try {
-                      const [liked, count] = await Promise.all([
-                        isCommentLikedByUser(comment.id, 'user-1'),
-                        getCommentLikeCount(comment.id)
-                      ]);
-                      setIsLiked(liked);
-                      setLikeCount(count);
-                    } catch (error) {
-                      console.error('Error loading comment data:', error);
-                    }
-                  };
-                  loadCommentData();
-                }, [comment.id]);
-                
-                return (
-                  <div key={comment.id} className="border-b border-gray-800 pb-4">
-                    <div className="flex items-center mb-2">
-                      <span className="text-[#ff4e3a] text-sm font-medium">{comment.user.username}</span>
-                      <span className="text-gray-500 text-xs ml-2">
-                        {new Date(comment.createdAt).toLocaleDateString('de-DE')}
-                      </span>
-                    </div>
-                    <p className="text-gray-300 text-sm">{comment.content}</p>
-                    <div className="flex items-center mt-2">
-                      <button 
-                        onClick={() => handleCommentLike(comment.id)}
-                        className="flex items-center space-x-1 text-gray-400 hover:text-white transition-colors"
-                      >
-                        <Heart 
-                          size={14} strokeWidth={2} 
-                          className={isLiked ? "fill-red-500 text-red-500" : ""} 
-                        />
-                        {likeCount > 0 && (
-                          <span className="text-xs">{likeCount}</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {trackComments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  onLike={handleCommentLike}
+                  isCommentLikedByUser={isCommentLikedByUser}
+                  getCommentLikeCount={getCommentLikeCount}
+                />
+              ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <MessageCircle className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">No comments yet</p>
-              <p className="text-gray-600 text-xs mt-1">Be the first to comment!</p>
+            <div className="flex items-center justify-center gap-3 py-12">
+              <VoidOfSoundIcon size={32} color="#6b7280" />
+              <p className="text-gray-500 text-sm">No comments yet. Be the first!</p>
             </div>
           )}
         </div>
 
         {/* Report Link - centered at bottom */}
-        <div className="mt-8 pt-6">
-          <div className="text-center">
+        <div className="mt-8 pt-6 px-6 -mx-6">
+          <div className="true-black-card px-6 py-4 text-center">
             <button
               onClick={() => navigate('/report', { 
                 state: { 
@@ -500,7 +724,7 @@ export const PlayerPage = () => {
               className="flex items-center justify-center space-x-2 text-gray-400 hover:text-red-400 text-sm transition-colors mx-auto"
             >
               <Flag size={14} strokeWidth={1.5} />
-              <span>Report inappropriate content</span>
+              <span className="underline">Report inappropriate content</span>
             </button>
           </div>
         </div>

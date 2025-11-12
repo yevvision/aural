@@ -5,32 +5,37 @@ import { ZoomIn, ZoomOut } from 'lucide-react';
 const sliderStyles = `
   .slider {
     background: transparent !important;
-    height: 2px !important;
+    /* Vergrößerte Touch-Fläche bei gleichbleibender visueller Höhe */
+    height: 36px !important; /* große, aber transparente Touch-Area */
+    padding: 0 !important;
+    margin: 0 !important;
   }
   
   .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 24px;
-    height: 24px;
+    /* 60% größer als 8px (8px * 1.6 = 13px) */
+    width: 13px;
+    height: 13px;
     border-radius: 50%;
-    background: #f97316;
+    background: #ff4e3a;
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     position: relative;
     z-index: 2;
-    margin-top: -11px; /* Zentriert den 24px Regler auf der 2px Linie */
+    /* Zentriert den 13px Regler auf der 2px Linie */
+    margin-top: -5.5px;
   }
   
   .slider::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
+    width: 13px;
+    height: 13px;
     border-radius: 50%;
-    background: #f97316;
+    background: #ff4e3a;
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    margin-top: -11px; /* Zentriert den 24px Regler auf der 2px Linie */
+    margin-top: -5.5px; /* Zentriert den 13px Regler auf der 2px Linie */
   }
   
   .slider::-webkit-slider-track {
@@ -86,7 +91,8 @@ export const ZoomSlider: React.FC<ZoomSliderProps> = ({
         <div className="flex items-center space-x-3 w-full" style={{ marginTop: '5px' }}>
           <button
             onClick={onZoomOut}
-            className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30 active:bg-white/30 flex items-center justify-center transition-all duration-200 disabled:bg-gray-600/20 disabled:border-gray-600/30 disabled:cursor-not-allowed disabled:text-gray-400"
+            className="text-white flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ minHeight: '44px', minWidth: '44px', background: 'transparent', border: 'none', marginTop: '-12px' }}
             disabled={zoomLevel <= minZoom}
           >
             <ZoomOut size={16} strokeWidth={2} />
@@ -98,13 +104,14 @@ export const ZoomSlider: React.FC<ZoomSliderProps> = ({
               max={maxZoom}
               value={zoomLevel}
               onChange={handleSliderChange}
-              className="w-full h-1 bg-transparent appearance-none cursor-pointer slider relative z-10"
-              style={{ height: '2px' }}
+              className="w-full bg-transparent appearance-none cursor-pointer slider relative z-10"
+              style={{ height: '36px' }}
             />
           </div>
           <button
             onClick={onZoomIn}
-            className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30 active:bg-white/30 flex items-center justify-center transition-all duration-200 disabled:bg-gray-600/20 disabled:border-gray-600/30 disabled:cursor-not-allowed disabled:text-gray-400"
+            className="text-white flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ minHeight: '44px', minWidth: '44px', background: 'transparent', border: 'none', marginTop: '-12px' }}
             disabled={zoomLevel >= maxZoom}
           >
             <ZoomIn size={16} strokeWidth={2} />

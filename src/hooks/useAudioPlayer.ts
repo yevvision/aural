@@ -41,7 +41,12 @@ export const useAudioPlayer = () => {
   }, [isPlaying, togglePlay]);
 
   const seek = useCallback((time: number) => {
-    // Set the current time in the store, and the global audio manager will sync it
+    // Update the audio element directly
+    const audio = getGlobalAudio();
+    if (audio) {
+      audio.currentTime = time;
+    }
+    // Also update the store
     const { setCurrentTime } = usePlayerStore.getState();
     setCurrentTime(time);
   }, []);

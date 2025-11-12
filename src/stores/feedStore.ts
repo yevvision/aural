@@ -30,6 +30,13 @@ interface FeedStore {
   totalPages: number;
   cursor: string | null;
   
+  // Like-Update Lock (verhindert Überschreibung während Update)
+  isUpdatingLikes: boolean;
+  lastLikeUpdate: { trackId: string; timestamp: number } | null;
+  // Bookmark-Update Lock (verhindert Überschreibung von Like-Daten während Bookmark-Update)
+  isUpdatingBookmark: boolean;
+  lastBookmarkUpdate: { trackId: string; timestamp: number } | null;
+  
   // Actions
   setTracks: (tracks: AudioTrack[]) => void;
   addTrack: (track: AudioTrack) => void;
@@ -37,6 +44,7 @@ interface FeedStore {
   toggleLike: (trackId: string) => void;
   toggleBookmark: (trackId: string) => void; // New bookmark functionality
   addComment: (trackId: string, commentText: string) => void; // New comment functionality
+  addCommentToTrack?: (trackId: string, commentText: string) => void; // Compatibility alias
   toggleCommentLike: (trackId: string, commentId: string) => void; // New comment like functionality
   setFilter: (filter: FeedFilter['type']) => void;
   setLoading: (loading: boolean) => void;
@@ -84,6 +92,13 @@ const initialState = {
   currentPage: 1,
   totalPages: 1,
   cursor: null,
+  
+  // Lock für Like-Updates (verhindert Überschreibung während Update)
+  isUpdatingLikes: false,
+  lastLikeUpdate: null as { trackId: string; timestamp: number } | null,
+  // Lock für Bookmark-Updates (verhindert Überschreibung von Like-Daten)
+  isUpdatingBookmark: false,
+  lastBookmarkUpdate: null as { trackId: string; timestamp: number } | null,
 };
 
 export const useFeedStore = create<FeedStore>()(
@@ -138,11 +153,36 @@ export const useFeedStore = create<FeedStore>()(
       },
       
       updateTrack: (trackId, updates) => {
-        set((state) => ({
-          tracks: state.tracks.map(track =>
-            track.id === trackId ? { ...track, ...updates } : track
-          )
-        }));
+        set((state) => {
+          const isLikeUpdate = 'isLiked' in updates || 'likes' in updates;
+          const isBookmarkUpdate = 'isBookmarked' in updates;
+          
+          return {
+            tracks: state.tracks.map(track =>
+              track.id === trackId ? { ...track, ...updates } : track
+            ),
+            // Markiere Like-Update, damit loadTracksFromDatabase es nicht überschreibt
+            isUpdatingLikes: isLikeUpdate,
+            lastLikeUpdate: isLikeUpdate ? { trackId, timestamp: Date.now() } : state.lastLikeUpdate,
+            // Markiere Bookmark-Update, damit loadTracksFromDatabase Like-Daten nicht überschreibt
+            isUpdatingBookmark: isBookmarkUpdate,
+            lastBookmarkUpdate: isBookmarkUpdate ? { trackId, timestamp: Date.now() } : state.lastBookmarkUpdate
+          };
+        });
+        
+        // Setze isUpdatingLikes nach 1 Sekunde zurück
+        if ('isLiked' in updates || 'likes' in updates) {
+          setTimeout(() => {
+            set((state) => ({ ...state, isUpdatingLikes: false }));
+          }, 1000);
+        }
+        
+        // Setze isUpdatingBookmark nach 1 Sekunde zurück
+        if ('isBookmarked' in updates) {
+          setTimeout(() => {
+            set((state) => ({ ...state, isUpdatingBookmark: false }));
+          }, 1000);
+        }
       },
       
       toggleLike: (trackId) => {
@@ -326,6 +366,11 @@ export const useFeedStore = create<FeedStore>()(
           });
         }
       },
+
+      // Compatibility alias for legacy callers
+      addCommentToTrack: (trackId, commentText) => {
+        get().addComment(trackId, commentText);
+      },
       
       toggleCommentLike: (trackId, commentId) => {
         set((state) => ({
@@ -507,15 +552,99 @@ export const useFeedStore = create<FeedStore>()(
         }));
       },
 
-      // Load tracks from centralDB
+      // Load tracks from centralDB (nutzer-spezifisch angereichert)
       loadTracksFromDatabase: () => {
         try {
-          console.log('FeedStore: Lade Tracks aus Datenbank...');
-          const dbTracks = centralDB.getAllTracks();
-          console.log('FeedStore: Geladene Tracks:', dbTracks.length, dbTracks.map(t => ({ id: t.id, title: t.title, user: t.user.username })));
+          const state = get();
+          
+          // WICHTIG: Wenn gerade ein Like- oder Bookmark-Update läuft, warte kurz bevor du lädst
+          const isLikeUpdateActive = state.isUpdatingLikes || (state.lastLikeUpdate && Date.now() - state.lastLikeUpdate.timestamp < 500);
+          const isBookmarkUpdateActive = state.isUpdatingBookmark || (state.lastBookmarkUpdate && Date.now() - state.lastBookmarkUpdate.timestamp < 500);
+          
+          if (isLikeUpdateActive || isBookmarkUpdateActive) {
+            console.log('⏳ FeedStore: Überspringe loadTracksFromDatabase - Update läuft gerade', {
+              likeUpdate: isLikeUpdateActive,
+              bookmarkUpdate: isBookmarkUpdateActive
+            });
+            setTimeout(() => {
+              get().loadTracksFromDatabase();
+            }, 500);
+            return;
+          }
+          
+          console.log('📥 FeedStore: Lade Tracks aus Datenbank...');
+          const userId = useUserStore.getState().currentUser?.id;
+          const currentState = get();
+          
+          // Hole Tracks direkt aus der Datenbank (bereits mit Like-Daten bereichert)
+          const dbTracks = centralDB.getAllTracks(userId);
+          
+          // WICHTIG: Merge Like- und Bookmark-Daten - behalte aktuelle Daten für Tracks, die kürzlich aktualisiert wurden
+          const mergedTracks = dbTracks.map(dbTrack => {
+            const existingTrack = currentState.tracks.find(t => t.id === dbTrack.id);
+            
+            if (!existingTrack) {
+              return dbTrack;
+            }
+            
+            // Wenn dieser Track kürzlich aktualisiert wurde (innerhalb der letzten 2 Sekunden), behalte die Store-Daten
+            const hasRecentLikeUpdate = state.lastLikeUpdate && state.lastLikeUpdate.trackId === dbTrack.id;
+            const hasRecentBookmarkUpdate = state.lastBookmarkUpdate && state.lastBookmarkUpdate.trackId === dbTrack.id;
+            
+            if (hasRecentLikeUpdate) {
+              const timeSinceUpdate = Date.now() - state.lastLikeUpdate!.timestamp;
+              if (timeSinceUpdate < 2000) {
+                console.log('🔒 FeedStore: Behalte Like-Daten für kürzlich aktualisierten Track', dbTrack.id, {
+                  store: { likes: existingTrack.likes, isLiked: existingTrack.isLiked },
+                  database: { likes: dbTrack.likes, isLiked: dbTrack.isLiked }
+                });
+                // Behalte Like-Daten vom Store, aber verwende andere Daten aus DB
+                return {
+                  ...dbTrack,
+                  likes: existingTrack.likes,
+                  isLiked: existingTrack.isLiked
+                };
+              }
+            }
+            
+            if (hasRecentBookmarkUpdate) {
+              const timeSinceUpdate = Date.now() - state.lastBookmarkUpdate!.timestamp;
+              if (timeSinceUpdate < 2000) {
+                console.log('🔒 FeedStore: Behalte Bookmark-Daten für kürzlich aktualisierten Track', dbTrack.id, {
+                  store: { isBookmarked: existingTrack.isBookmarked },
+                  database: { isBookmarked: dbTrack.isBookmarked }
+                });
+                // Behalte Bookmark-Daten vom Store, aber verwende Like-Daten aus DB (falls diese neuer sind)
+                return {
+                  ...dbTrack,
+                  isBookmarked: existingTrack.isBookmarked,
+                  // WICHTIG: Behalte auch Like-Daten vom Store, falls vorhanden
+                  ...(existingTrack.isLiked !== undefined && {
+                    likes: existingTrack.likes,
+                    isLiked: existingTrack.isLiked
+                  })
+                };
+              }
+            }
+            
+            // Ansonsten verwende DB-Daten (Quelle der Wahrheit), aber logge Unterschiede
+            if (existingTrack.likes !== dbTrack.likes || existingTrack.isLiked !== dbTrack.isLiked) {
+              console.log('🔄 FeedStore: Like-Daten Unterschied für Track', dbTrack.id, {
+                store: { likes: existingTrack.likes, isLiked: existingTrack.isLiked },
+                database: { likes: dbTrack.likes, isLiked: dbTrack.isLiked }
+              });
+            }
+            
+            return dbTrack;
+          });
+          
+          // Debug: Prüfe Like-Daten für alle Tracks
+          const tracksWithLikes = mergedTracks.filter(t => (t.likes || 0) > 0 || t.isLiked);
+          console.log('📥 FeedStore: Geladene Tracks:', mergedTracks.length);
+          console.log('📥 FeedStore: Tracks mit Likes:', tracksWithLikes.length, tracksWithLikes.map(t => ({ id: t.id, title: t.title, likes: t.likes, isLiked: t.isLiked })));
           
           // Process tracks to ensure base64 URLs are preserved
-          const processedTracks = dbTracks.map(track => {
+          const processedTracks = mergedTracks.map(track => {
             // Log URL type for debugging
             if (track.url?.startsWith('data:audio/')) {
               console.log('FeedStore: Found base64 audio URL for track:', track.title);
@@ -527,12 +656,9 @@ export const useFeedStore = create<FeedStore>()(
           });
           
           set({ tracks: processedTracks, isLoading: false });
-          console.log('FeedStore: Tracks erfolgreich gesetzt');
-          
-          // WICHTIG: Speichere Tracks nicht mehr im localStorage - Datenbank ist die Quelle der Wahrheit
-          // localStorage.removeItem('aural-feed-store');
+          console.log('✅ FeedStore: Tracks erfolgreich gesetzt mit Like-Daten');
         } catch (error) {
-          console.error('Fehler beim Laden der Tracks aus der Datenbank:', error);
+          console.error('❌ Fehler beim Laden der Tracks aus der Datenbank:', error);
           set({ tracks: [], isLoading: false });
         }
       },
@@ -557,21 +683,26 @@ export const useFeedStore = create<FeedStore>()(
               try {
                 // Versuche Server-Daten zu laden
                 const { serverDatabaseService } = await import('../services/serverDatabaseService');
+                const userId = useUserStore.getState().currentUser?.id;
                 const serverTracks = await serverDatabaseService.getAllTracks();
-                
-                if (serverTracks && serverTracks.length > 0) {
+
+                // In Dev/Local immer nutzer-spezifisch aus centralDB anreichern
+                const enrichedLocal = centralDB.getAllTracks(userId);
+                if (enrichedLocal && enrichedLocal.length > 0) {
+                  console.log('📱 FeedStore: Using enriched local database tracks:', enrichedLocal.length);
+                  state.setTracks(enrichedLocal);
+                } else if (serverTracks && serverTracks.length > 0) {
                   console.log('🌐 FeedStore: Loaded tracks from server:', serverTracks.length);
                   state.setTracks(serverTracks);
                 } else {
-                  // Fallback zu lokaler Datenbank
-                  const dbTracks = centralDB.getAllTracks();
-                  console.log('📱 FeedStore: Fallback to local database:', dbTracks.length);
-                  state.setTracks(dbTracks);
+                  console.log('📭 FeedStore: No tracks available from server or local');
+                  state.setTracks([]);
                 }
               } catch (error) {
                 console.error('❌ FeedStore: Server load failed, using local database:', error);
                 // Fallback zu lokaler Datenbank
-                const dbTracks = centralDB.getAllTracks();
+                const userId = useUserStore.getState().currentUser?.id;
+                const dbTracks = centralDB.getAllTracks(userId);
                 state.setTracks(dbTracks);
               }
               

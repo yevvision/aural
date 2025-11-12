@@ -402,26 +402,25 @@ export default function AudioEditor({
         <button
           onClick={handleExport}
           disabled={!canExport || busy}
-          className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-3 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ minHeight: '64px' }}
+          className="w-full h-12 rounded-full bg-[#ff4e3a] hover:bg-[#e63e2e] active:bg-[#cc2e1e] flex items-center justify-center space-x-3 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? (
             <>
               {/* Subtile Loading-Animation statt Spinner */}
-              <div className="w-16 h-2 bg-[#ff4e3a] rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-transparent via-[#ff4e3a]/30 to-transparent animate-pulse"></div>
-                <div className="absolute inset-0 h-full w-4 bg-gradient-to-r from-transparent via-[#ff4e3a]/50 to-transparent" 
+              <div className="w-16 h-2 bg-white/30 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-transparent via-white/50 to-transparent animate-pulse"></div>
+                <div className="absolute inset-0 h-full w-4 bg-gradient-to-r from-transparent via-white/70 to-transparent" 
                      style={{ 
                        animation: 'shimmer 1.5s ease-in-out infinite',
                        animationDelay: '0.2s'
                      }}></div>
               </div>
-              <span className="text-[#ff4e3a] text-base font-semibold">Exporting...</span>
+              <span className="text-white text-base font-semibold">Exporting...</span>
             </>
           ) : (
             <>
-              <ArrowRight size={20} className="text-[#ff4e3a]" strokeWidth={2} />
-              <span className="text-[#ff4e3a] text-base font-semibold">Next Step</span>
+              <ArrowRight size={20} className="text-white" strokeWidth={2} />
+              <span className="text-white text-base font-semibold">Next Step</span>
             </>
           )}
         </button>

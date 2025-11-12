@@ -6,6 +6,31 @@ import type { AudioTrack, ContentReport } from '../types';
 class DatabaseServiceClass {
   private listeners: Set<() => void> = new Set();
   private serverDataLoaded = false;
+  private syncInterval: NodeJS.Timeout | null = null;
+  
+  // Initialisiere automatische Server-Synchronisation beim Start
+  constructor() {
+    // Starte automatische Synchronisation beim ersten App-Start
+    this.initializeServerSync();
+  }
+  
+  // Initialisiere automatische Server-Synchronisation
+  private initializeServerSync(): void {
+    // Lade sofort vom Server beim Start
+    this.loadTracksFromServer();
+    
+    // Synchronisiere alle 30 Sekunden automatisch mit dem Server
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
+    
+    this.syncInterval = setInterval(() => {
+      console.log('🔄 DatabaseService: Periodische Server-Synchronisation...');
+      this.loadTracksFromServer();
+    }, 30000); // Alle 30 Sekunden
+    
+    console.log('✅ DatabaseService: Automatische Server-Synchronisation aktiviert (alle 30 Sekunden)');
+  }
 
   // =============================================================================
   // SERVER-FIRST DATA LOADING (nur für Tracks)
@@ -19,13 +44,203 @@ class DatabaseServiceClass {
       const { serverDatabaseService } = await import('./serverDatabaseService');
       const serverTracks = await serverDatabaseService.getAllTracks();
       
+      // WICHTIG: Lade auch Kommentare vom Server und integriere sie in Tracks!
+      let serverComments: any[] = [];
+      try {
+        serverComments = await serverDatabaseService.getAllComments();
+        console.log('💬 DatabaseService: Server comments loaded:', serverComments.length);
+        
+        // Integriere Kommentare in Tracks basierend auf trackId
+        const commentsByTrackId = new Map<string, any[]>();
+        serverComments.forEach((comment: any) => {
+          if (comment.trackId) {
+            if (!commentsByTrackId.has(comment.trackId)) {
+              commentsByTrackId.set(comment.trackId, []);
+            }
+            commentsByTrackId.get(comment.trackId)!.push(comment);
+          }
+        });
+        
+        // Füge Kommentare zu den entsprechenden Tracks hinzu
+        serverTracks.forEach((track: any) => {
+          const trackComments = commentsByTrackId.get(track.id) || [];
+          if (trackComments.length > 0) {
+            track.comments = trackComments;
+            console.log(`💬 DatabaseService: ${trackComments.length} Kommentare zu Track ${track.id} hinzugefügt`);
+          } else if (!track.comments) {
+            track.comments = []; // Stelle sicher, dass comments immer ein Array ist
+          }
+        });
+      } catch (error) {
+        console.warn('⚠️ DatabaseService: Fehler beim Laden der Kommentare vom Server:', error);
+        // Fallback: Verwende Kommentare aus den Tracks selbst, falls vorhanden
+      }
+      
       if (serverTracks && serverTracks.length > 0) {
         console.log('🌐 DatabaseService: Server tracks loaded:', serverTracks.length);
         
         // Sync local database with server tracks
-        // Clear existing tracks and add server tracks
-        const currentData = centralDB.getDatabase();
-        currentData.tracks = serverTracks;
+        // WICHTIG: Überschreibe NUR die Tracks, behalte Likes/Bookmarks-Maps!
+        // Prüfe ob getDatabase verfügbar ist, sonst verwende direkten Zugriff
+        let currentData: any;
+        try {
+          if (centralDB && typeof centralDB.getDatabase === 'function') {
+            currentData = centralDB.getDatabase();
+          } else {
+            // Fallback: Zugriff über internes data-Property (falls verfügbar)
+            console.warn('⚠️ DatabaseService: getDatabase nicht verfügbar, verwende direkten Zugriff');
+            currentData = (centralDB as any).data || {
+              likes: new Map(),
+              bookmarks: new Map(),
+              playsMap: new Map(),
+              commentLikesMap: new Map(),
+              tracks: []
+            };
+          }
+        } catch (error) {
+          console.error('❌ DatabaseService: Fehler beim Zugriff auf Datenbank:', error);
+          // Verwende leere Maps als Fallback
+          currentData = {
+            likes: new Map(),
+            bookmarks: new Map(),
+            playsMap: new Map(),
+            commentLikesMap: new Map(),
+            tracks: []
+          };
+        }
+        
+        // Stelle sicher, dass Maps existieren (könnte Array sein nach JSON-Parsing)
+        if (!(currentData.likes instanceof Map)) {
+          const likesMap = new Map<string, Set<string>>();
+          if (Array.isArray(currentData.likes)) {
+            currentData.likes.forEach((item: any) => {
+              if (item.trackId && Array.isArray(item.userIds)) {
+                likesMap.set(item.trackId, new Set(item.userIds));
+              }
+            });
+          }
+          currentData.likes = likesMap;
+        }
+        
+        if (!(currentData.bookmarks instanceof Map)) {
+          const bookmarksMap = new Map<string, Set<string>>();
+          if (Array.isArray(currentData.bookmarks)) {
+            currentData.bookmarks.forEach((item: any) => {
+              if (item.trackId && Array.isArray(item.userIds)) {
+                bookmarksMap.set(item.trackId, new Set(item.userIds));
+              }
+            });
+          }
+          currentData.bookmarks = bookmarksMap;
+        }
+        
+        if (!(currentData.playsMap instanceof Map)) {
+          const playsMap = new Map<string, number>();
+          if (Array.isArray(currentData.playsMap)) {
+            currentData.playsMap.forEach((item: any) => {
+              if (item.trackId && typeof item.count === 'number') {
+                playsMap.set(item.trackId, item.count);
+              }
+            });
+          }
+          currentData.playsMap = playsMap;
+        }
+        
+        // WICHTIG: Lade Likes, Bookmarks und Plays vom Server und merge sie mit lokalen!
+        try {
+          // Lade Likes vom Server
+          const serverLikes = await serverDatabaseService.getAllLikes();
+          console.log('❤️ DatabaseService: Server likes loaded:', serverLikes.length);
+          
+          // Konvertiere Server-Likes in Map-Format
+          serverLikes.forEach((like: any) => {
+            if (like.trackId && like.userId) {
+              if (!currentData.likes.has(like.trackId)) {
+                currentData.likes.set(like.trackId, new Set<string>());
+              }
+              currentData.likes.get(like.trackId)!.add(like.userId);
+            }
+          });
+          
+          // Lade Bookmarks vom Server
+          const serverBookmarks = await serverDatabaseService.getAllBookmarks();
+          console.log('🔖 DatabaseService: Server bookmarks loaded:', serverBookmarks.length);
+          
+          // Konvertiere Server-Bookmarks in Map-Format
+          serverBookmarks.forEach((bookmark: any) => {
+            if (bookmark.trackId && bookmark.userId) {
+              if (!currentData.bookmarks.has(bookmark.trackId)) {
+                currentData.bookmarks.set(bookmark.trackId, new Set<string>());
+              }
+              currentData.bookmarks.get(bookmark.trackId)!.add(bookmark.userId);
+            }
+          });
+          
+          // Lade Plays vom Server
+          const serverPlays = await serverDatabaseService.getAllPlays();
+          console.log('▶️ DatabaseService: Server plays loaded:', serverPlays.length);
+          
+          // Konvertiere Server-Plays in Map-Format
+          serverPlays.forEach((play: any) => {
+            if (play.trackId && typeof play.count === 'number') {
+              // Merge: Verwende Maximum zwischen Server und lokal
+              const localPlays = currentData.playsMap.get(play.trackId) || 0;
+              currentData.playsMap.set(play.trackId, Math.max(localPlays, play.count));
+            }
+          });
+          
+          console.log('✅ DatabaseService: Likes/Bookmarks/Plays vom Server synchronisiert:', {
+            likes: currentData.likes.size,
+            bookmarks: currentData.bookmarks.size,
+            plays: currentData.playsMap.size
+          });
+        } catch (error) {
+          console.warn('⚠️ DatabaseService: Fehler beim Laden von Likes/Bookmarks/Plays vom Server:', error);
+          // Fallback: Verwende lokale Daten
+        }
+        
+        // Speichere die Like/Bookmark/Plays-Maps nach dem Merge
+        const savedLikes = new Map(currentData.likes);
+        const savedBookmarks = new Map(currentData.bookmarks);
+        const savedPlaysMap = new Map(currentData.playsMap);
+        
+        // WICHTIG: Bereinige Server-Tracks von dynamischen Werten!
+        const cleanedServerTracks = serverTracks.map(track => {
+          const { 
+            likes: _likes, 
+            isLiked: _isLiked, 
+            isBookmarked: _isBookmarked, 
+            plays: _plays,
+            commentsCount: _commentsCount,
+            ...cleanTrack 
+          } = track;
+          
+          // Bereinige auch Kommentare innerhalb der Tracks
+          if (cleanTrack.comments) {
+            cleanTrack.comments = cleanTrack.comments.map((comment: any) => {
+              const { likes: _cLikes, isLiked: _cIsLiked, ...cleanComment } = comment;
+              return cleanComment;
+            });
+          }
+          
+          return cleanTrack;
+        });
+        
+        // Überschreibe nur die Tracks (bereinigt!)
+        currentData.tracks = cleanedServerTracks;
+        
+        // Stelle die Like/Bookmark/Plays-Maps wieder her (mit Server-Daten gemerged)
+        currentData.likes = savedLikes;
+        currentData.bookmarks = savedBookmarks;
+        currentData.playsMap = savedPlaysMap;
+        
+        console.log('💾 DatabaseService: Tracks aktualisiert, Likes/Bookmarks/Plays vom Server synchronisiert:', {
+          tracksCount: currentData.tracks.length,
+          likesCount: currentData.likes.size,
+          bookmarksCount: currentData.bookmarks.size,
+          playsCount: currentData.playsMap.size
+        });
+        
         centralDB.saveDatabase(currentData);
         
         this.serverDataLoaded = true;
@@ -47,16 +262,28 @@ class DatabaseServiceClass {
 
   // GET: Alle Tracks abrufen (server-first)
   getTracks(currentUserId?: string): AudioTrack[] {
-    // Load from server first if not already loaded
+    // Lade IMMER vom Server, auch wenn bereits geladen (für aktuelle Daten)
+    // Aber nur wenn noch nicht geladen oder wenn genug Zeit vergangen ist
     if (!this.serverDataLoaded) {
       this.loadTracksFromServer();
     }
     return centralDB.getAllTracks(currentUserId);
   }
+  
+  // Manuelle Synchronisation mit dem Server
+  async syncWithServer(): Promise<void> {
+    console.log('🔄 DatabaseService: Manuelle Server-Synchronisation gestartet...');
+    await this.loadTracksFromServer();
+  }
 
   // GET: Track by ID
   getTrack(id: string): AudioTrack | undefined {
     return centralDB.getTrackById(id);
+  }
+
+  // GET: Database object (for direct access to maps)
+  getDatabase(): any {
+    return centralDB.getDatabase();
   }
 
   // ADD: Neuen Track hinzufügen (server-first)
@@ -225,23 +452,45 @@ class DatabaseServiceClass {
 
   // ADD: Kommentar zu Track hinzufügen
   async addCommentToTrack(trackId: string, comment: any): Promise<boolean> {
+    // WICHTIG: Stelle sicher, dass trackId im Kommentar enthalten ist für Server-Speicherung!
+    const commentWithTrackId = {
+      ...comment,
+      trackId: trackId // Stelle sicher, dass trackId gesetzt ist
+    };
+    
+    // WICHTIG: Aktualisiere IMMER die lokale Datenbank, auch wenn Server erfolgreich ist!
+    // Das stellt sicher, dass Kommentare sofort verfügbar sind
+    let serverSuccess = false;
     try {
-      // Server-first approach
+      // Server-first approach - sende Kommentar mit trackId zum Server
       const { serverDatabaseService } = await import('./serverDatabaseService');
-      const success = await serverDatabaseService.addComment(comment);
-      if (success) {
-        this.notifyListeners();
+      serverSuccess = await serverDatabaseService.addComment(commentWithTrackId);
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Server addComment erfolgreich (trackId:', trackId, ')');
       }
-      return success;
     } catch (error) {
       console.error('❌ DatabaseService: Server addCommentToTrack failed, using local fallback:', error);
-      // Fallback to local
-      const success = centralDB.addCommentToTrack(trackId, comment);
-      if (success) {
-        this.notifyListeners();
-      }
-      return success;
     }
+    
+    // WICHTIG: Aktualisiere IMMER die lokale Datenbank, unabhängig vom Server-Ergebnis!
+    // Das stellt sicher, dass Kommentare sofort im UI sichtbar sind
+    const localSuccess = centralDB.addCommentToTrack(trackId, comment);
+    
+    if (localSuccess) {
+      console.log('✅ DatabaseService: Lokaler Kommentar hinzugefügt');
+      this.notifyListeners();
+    } else {
+      console.error('❌ DatabaseService: Lokaler Kommentar konnte nicht hinzugefügt werden');
+    }
+    
+    // WICHTIG: Wenn Server erfolgreich war, synchronisiere lokal mit Server-Daten
+    if (serverSuccess) {
+      console.log('✅ DatabaseService: Kommentar erfolgreich auf Server gespeichert');
+      setTimeout(() => this.loadTracksFromServer(), 5000);
+    }
+    
+    // Return true wenn Server ODER lokal erfolgreich war
+    return serverSuccess || localSuccess;
   }
 
   // DELETE: Kommentar von Track löschen
@@ -272,15 +521,23 @@ class DatabaseServiceClass {
       const { serverDatabaseService } = await import('./serverDatabaseService');
       
       // Check if like already exists
-      const existingLike = await serverDatabaseService.getLikeByUserAndTrack(userId, trackId);
+      let existingLike: any = null;
+      try {
+        existingLike = await serverDatabaseService.getLikeByUserAndTrack(userId, trackId);
+      } catch (error) {
+        console.warn('⚠️ DatabaseService: getLikeByUserAndTrack fehlgeschlagen, verwende lokalen Fallback:', error);
+        // Falle direkt zum lokalen Fallback
+        throw error;
+      }
+      
+      let serverSuccess = false;
       
       if (existingLike) {
         // Remove like
-        const success = await serverDatabaseService.removeLike(existingLike.id);
-        if (success) {
-          this.notifyListeners();
+        serverSuccess = await serverDatabaseService.removeLike(existingLike.id);
+        if (serverSuccess) {
+          console.log('✅ DatabaseService: Server removeLike erfolgreich');
         }
-        return success;
       } else {
         // Add like
         const like = {
@@ -289,17 +546,77 @@ class DatabaseServiceClass {
           userId,
           createdAt: new Date().toISOString()
         };
-        const success = await serverDatabaseService.addLike(like);
-        if (success) {
-          this.notifyListeners();
+        serverSuccess = await serverDatabaseService.addLike(like);
+        if (serverSuccess) {
+          console.log('✅ DatabaseService: Server addLike erfolgreich');
         }
-        return success;
       }
+      
+      // WICHTIG: Aktualisiere IMMER die lokale Datenbank, auch wenn Server erfolgreich ist!
+      // Das stellt sicher, dass Likes sofort im UI sichtbar sind
+      const localSuccess = centralDB.toggleLike(trackId, userId);
+      
+      if (localSuccess) {
+        console.log('✅ DatabaseService: Lokaler Like aktualisiert');
+        this.notifyListeners();
+      } else {
+        console.error('❌ DatabaseService: Lokaler Like konnte nicht aktualisiert werden');
+      }
+      
+      // WICHTIG: Wenn Server erfolgreich war, synchronisiere lokal mit Server-Daten
+      // Das stellt sicher, dass lokale und Server-Daten übereinstimmen
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Like erfolgreich auf Server gespeichert');
+        // Optional: Trigger periodische Sync, um sicherzustellen, dass alles synchronisiert ist
+        setTimeout(() => this.loadTracksFromServer(), 5000);
+      }
+      
+      // Return true wenn Server ODER lokal erfolgreich war
+      return serverSuccess || localSuccess;
     } catch (error) {
       console.error('❌ DatabaseService: Server toggleLike failed, using local fallback:', error);
-      // Fallback to local
+      // Fallback to local - WICHTIG: Dies ist die primäre Methode, da Server fehlschlägt
+      console.log('📱 DatabaseService: Verwende lokalen Fallback für toggleLike');
       const success = centralDB.toggleLike(trackId, userId);
+      console.log('📱 DatabaseService: Lokaler toggleLike Result:', success);
+      
       if (success) {
+        // WICHTIG: Warte kurz, damit saveToStorage() fertig ist
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Stelle sicher, dass die Daten gespeichert sind
+        console.log('📱 DatabaseService: Prüfe Like-Daten nach Speicherung...');
+        
+        // Prüfe direkt in der Datenbank
+        let trackLikes: Set<string> | undefined;
+        try {
+          const dbData = (centralDB as any).getDatabase?.();
+          if (dbData?.likes) {
+            trackLikes = dbData.likes.get(trackId);
+          }
+        } catch (error) {
+          console.warn('⚠️ DatabaseService: getDatabase nicht verfügbar:', error);
+        }
+        console.log('📱 DatabaseService: Like-Daten direkt aus Map:', {
+          trackId,
+          hasLikesSet: !!trackLikes,
+          likesSize: trackLikes?.size || 0,
+          userIdInMap: trackLikes?.has(userId) || false,
+          allUserIds: trackLikes ? Array.from(trackLikes) : []
+        });
+        
+        const tracks = centralDB.getAllTracks(userId);
+        const updatedTrack = tracks.find(t => t.id === trackId);
+        if (updatedTrack) {
+          console.log('📱 DatabaseService: Track nach toggleLike (via getAllTracks):', {
+            trackId,
+            isLiked: updatedTrack.isLiked,
+            likes: updatedTrack.likes
+          });
+        } else {
+          console.warn('⚠️ DatabaseService: Track nicht gefunden nach toggleLike:', trackId);
+        }
+        
         this.notifyListeners();
       }
       return success;
@@ -313,15 +630,22 @@ class DatabaseServiceClass {
       const { serverDatabaseService } = await import('./serverDatabaseService');
       
       // Check if bookmark already exists
-      const existingBookmark = await serverDatabaseService.getBookmarkByUserAndTrack(userId, trackId);
+      let existingBookmark: any = null;
+      try {
+        existingBookmark = await serverDatabaseService.getBookmarkByUserAndTrack(userId, trackId);
+      } catch (error) {
+        console.warn('⚠️ DatabaseService: getBookmarkByUserAndTrack fehlgeschlagen, verwende lokalen Fallback:', error);
+        throw error;
+      }
+      
+      let serverSuccess = false;
       
       if (existingBookmark) {
         // Remove bookmark
-        const success = await serverDatabaseService.removeBookmark(existingBookmark.id);
-        if (success) {
-          this.notifyListeners();
+        serverSuccess = await serverDatabaseService.removeBookmark(existingBookmark.id);
+        if (serverSuccess) {
+          console.log('✅ DatabaseService: Server removeBookmark erfolgreich');
         }
-        return success;
       } else {
         // Add bookmark
         const bookmark = {
@@ -330,17 +654,72 @@ class DatabaseServiceClass {
           userId,
           createdAt: new Date().toISOString()
         };
-        const success = await serverDatabaseService.addBookmark(bookmark);
-        if (success) {
-          this.notifyListeners();
+        serverSuccess = await serverDatabaseService.addBookmark(bookmark);
+        if (serverSuccess) {
+          console.log('✅ DatabaseService: Server addBookmark erfolgreich');
         }
-        return success;
       }
+      
+      // WICHTIG: Aktualisiere IMMER die lokale Datenbank, auch wenn Server erfolgreich ist!
+      // Das stellt sicher, dass Bookmarks sofort im UI sichtbar sind
+      const localSuccess = centralDB.toggleBookmark(trackId, userId);
+      
+      if (localSuccess) {
+        console.log('✅ DatabaseService: Lokaler Bookmark aktualisiert');
+        this.notifyListeners();
+      } else {
+        console.error('❌ DatabaseService: Lokaler Bookmark konnte nicht aktualisiert werden');
+      }
+      
+      // WICHTIG: Wenn Server erfolgreich war, synchronisiere lokal mit Server-Daten
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Bookmark erfolgreich auf Server gespeichert');
+        setTimeout(() => this.loadTracksFromServer(), 5000);
+      }
+      
+      // Return true wenn Server ODER lokal erfolgreich war
+      return serverSuccess || localSuccess;
     } catch (error) {
       console.error('❌ DatabaseService: Server toggleBookmark failed, using local fallback:', error);
-      // Fallback to local
+      // Fallback to local - WICHTIG: Dies ist die primäre Methode, da Server fehlschlägt
+      console.log('📱 DatabaseService: Verwende lokalen Fallback für toggleBookmark');
       const success = centralDB.toggleBookmark(trackId, userId);
+      
       if (success) {
+        // WICHTIG: Warte kurz, damit saveToStorage() fertig ist
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Stelle sicher, dass die Daten gespeichert sind
+        console.log('📱 DatabaseService: Prüfe Bookmark-Daten nach Speicherung...');
+        
+        // Prüfe direkt in der Datenbank
+        let trackBookmarks: Set<string> | undefined;
+        try {
+          const dbData = (centralDB as any).getDatabase?.();
+          if (dbData?.bookmarks) {
+            trackBookmarks = dbData.bookmarks.get(trackId);
+          }
+        } catch (error) {
+          console.warn('⚠️ DatabaseService: getDatabase nicht verfügbar:', error);
+        }
+        
+        console.log('📱 DatabaseService: Bookmark-Daten direkt aus Map:', {
+          trackId,
+          hasBookmarksSet: !!trackBookmarks,
+          bookmarksSize: trackBookmarks?.size || 0,
+          userIdInMap: trackBookmarks?.has(userId) || false,
+          allUserIds: trackBookmarks ? Array.from(trackBookmarks) : []
+        });
+        
+        const tracks = centralDB.getAllTracks(userId);
+        const updatedTrack = tracks.find(t => t.id === trackId);
+        if (updatedTrack) {
+          console.log('📱 DatabaseService: Track nach toggleBookmark (via getAllTracks):', {
+            trackId,
+            isBookmarked: updatedTrack.isBookmarked
+          });
+        }
+        
         this.notifyListeners();
       }
       return success;
@@ -349,23 +728,37 @@ class DatabaseServiceClass {
 
   // PLAY: Play-Anzahl erhöhen
   async incrementPlay(trackId: string): Promise<boolean> {
+    let serverSuccess = false;
     try {
       // Server-first approach
       const { serverDatabaseService } = await import('./serverDatabaseService');
-      const success = await serverDatabaseService.incrementPlay(trackId);
-      if (success) {
-        this.notifyListeners();
+      serverSuccess = await serverDatabaseService.incrementPlay(trackId);
+      if (serverSuccess) {
+        console.log('✅ DatabaseService: Server incrementPlay erfolgreich für Track:', trackId);
       }
-      return success;
     } catch (error) {
       console.error('❌ DatabaseService: Server incrementPlay failed, using local fallback:', error);
-      // Fallback to local
-      const success = centralDB.incrementPlay(trackId);
-      if (success) {
-        this.notifyListeners();
-      }
-      return success;
     }
+    
+    // WICHTIG: Aktualisiere IMMER die lokale Datenbank, auch wenn Server erfolgreich ist!
+    // Das stellt sicher, dass Plays sofort im UI sichtbar sind
+    const localSuccess = centralDB.incrementPlay(trackId);
+    
+    if (localSuccess) {
+      console.log('✅ DatabaseService: Lokaler Play erhöht');
+      this.notifyListeners();
+    } else {
+      console.error('❌ DatabaseService: Lokaler Play konnte nicht erhöht werden');
+    }
+    
+    // WICHTIG: Wenn Server erfolgreich war, synchronisiere lokal mit Server-Daten
+    if (serverSuccess) {
+      console.log('✅ DatabaseService: Play erfolgreich auf Server gespeichert');
+      setTimeout(() => this.loadTracksFromServer(), 5000);
+    }
+    
+    // Return true wenn Server ODER lokal erfolgreich war
+    return serverSuccess || localSuccess;
   }
 
   // GET: User's liked tracks

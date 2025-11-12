@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenbank-Viewer</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            margin: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 {
+            color: #4ec9b0;
+        }
+        .info {
+            background: #252526;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #569cd6;
+            border-bottom: 1px solid #3e3e42;
+            padding-bottom: 5px;
+        }
+        pre {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #252526;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #4ec9b0;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #4ec9b0;
+            font-size: 14px;
+        }
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .track-item {
+            background: #252526;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 3px solid #569cd6;
+        }
+        .track-item strong {
+            color: #4ec9b0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Datenbank-Viewer</h1>
+    
+    <div class="info">
+        <p><strong>Wie zu verwenden:</strong></p>
+        <ol>
+            <li>Öffnen Sie diese Datei im Browser (nachdem die App gelaufen ist)</li>
+            <li>Klicken Sie auf "Datenbank laden"</li>
+            <li>Die Daten werden aus localStorage geladen und angezeigt</li>
+        </ol>
+    </div>
+
+    <button onclick="loadDatabase()">📥 Datenbank laden</button>
+    <button onclick="exportDatabase()">💾 Als JSON exportieren</button>
+    <button onclick="clearDisplay()">🗑️ Anzeige löschen</button>
+
+    <div id="content"></div>
+
+    <script>
+        function loadDatabase() {
+            try {
+                const rawData = localStorage.getItem('aural-central-database');
+                
+                if (!rawData) {
+                    document.getElementById('content').innerHTML = '<div class="info"><p>❌ Keine Datenbank gefunden im localStorage!</p></div>';
+                    return;
+                }
+
+                const data = JSON.parse(rawData);
+                
+                // Statistiken
+                const statsHtml = `
+                    <div class="stats">
+                        <div class="stat-card">
+                            <h3>Tracks</h3>
+                            <div class="number">${data.tracks?.length || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Users</h3>
+                            <div class="number">${data.users?.length || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Likes (Sets)</h3>
+                            <div class="number">${data.likes?.length || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Bookmarks (Sets)</h3>
+                            <div class="number">${data.bookmarks?.length || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Comments</h3>
+                            <div class="number">${data.comments?.length || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Timestamp</h3>
+                            <div class="number" style="font-size: 12px;">${data.timestamp || 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+
+                // Likes-Details
+                let likesHtml = '<div class="section"><h2>❤️ Likes-Details</h2>';
+                if (data.likes && Array.isArray(data.likes)) {
+                    data.likes.forEach((like, idx) => {
+                        likesHtml += `
+                            <div class="track-item">
+                                <strong>Track ID:</strong> ${like.trackId || 'N/A'}<br>
+                                <strong>Anzahl Likes:</strong> ${like.userIds?.length || 0}<br>
+                                <strong>User IDs:</strong> ${JSON.stringify(like.userIds || [])}
+                            </div>
+                        `;
+                    });
+                    if (data.likes.length === 0) {
+                        likesHtml += '<p>Keine Likes vorhanden</p>';
+                    }
+                } else {
+                    likesHtml += '<p>Keine Likes-Daten vorhanden</p>';
+                }
+                likesHtml += '</div>';
+
+                // Tracks mit Likes
+                let tracksHtml = '<div class="section"><h2>🎵 Tracks mit Like-Daten</h2>';
+                if (data.tracks && Array.isArray(data.tracks)) {
+                    const tracksWithLikes = data.tracks
+                        .map(track => {
+                            const likeData = data.likes?.find(l => l.trackId === track.id);
+                            const likesCount = likeData?.userIds?.length || 0;
+                            return { track, likesCount, likeData };
+                        })
+                        .filter(t => t.likesCount > 0)
+                        .sort((a, b) => b.likesCount - a.likesCount);
+
+                    tracksWithLikes.forEach(({ track, likesCount, likeData }) => {
+                        tracksHtml += `
+                            <div class="track-item">
+                                <strong>ID:</strong> ${track.id}<br>
+                                <strong>Titel:</strong> ${track.title || 'N/A'}<br>
+                                <strong>Likes:</strong> ${likesCount}<br>
+                                <strong>Is Liked:</strong> ${track.isLiked ? '✅' : '❌'}<br>
+                                <strong>Like User IDs:</strong> ${JSON.stringify(likeData?.userIds || [])}
+                            </div>
+                        `;
+                    });
+                    
+                    if (tracksWithLikes.length === 0) {
+                        tracksHtml += '<p>Keine Tracks mit Likes gefunden</p>';
+                    }
+                }
+                tracksHtml += '</div>';
+
+                // Vollständige JSON-Daten
+                const fullDataHtml = `
+                    <div class="section">
+                        <h2>📋 Vollständige Datenbank (JSON)</h2>
+                        <pre id="json-output">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+
+                document.getElementById('content').innerHTML = statsHtml + likesHtml + tracksHtml + fullDataHtml;
+                
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="info">
+                        <p>❌ Fehler beim Laden der Datenbank:</p>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        function exportDatabase() {
+            try {
+                const rawData = localStorage.getItem('aural-central-database');
+                if (!rawData) {
+                    alert('Keine Datenbank gefunden!');
+                    return;
+                }
+
+                const data = JSON.parse(rawData);
+                const jsonString = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `aural_database_${new Date().toISOString().replace(/:/g, '-')}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('Fehler beim Exportieren: ' + error.message);
+            }
+        }
+
+        function clearDisplay() {
+            document.getElementById('content').innerHTML = '';
+        }
+
+        // Auto-Laden beim Öffnen
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Datenbank-Viewer geladen. Klicken Sie auf "Datenbank laden" um zu starten.');
+        });
+    </script>
+</body>
+</html>
+

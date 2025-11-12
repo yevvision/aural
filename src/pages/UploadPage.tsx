@@ -21,6 +21,7 @@ import { capClient } from '../utils/capClient';
 import { uploadSecurityManager } from '../utils/uploadSecurity';
 import { AudioUrlManager } from '../services/audioUrlManager';
 import { unifiedAudioManager } from '../services/unifiedAudioManager';
+import { centralDB } from '../database/centralDatabase_simple';
 import { compressAudioForUpload, formatFileSize, type CompressionResult } from '../utils/audioCompression';
 import { uploadWithProgress, formatUploadSpeed, formatRemainingTime, formatUploadSize, type UploadProgress } from '../utils/uploadWithProgress';
 
@@ -166,8 +167,10 @@ export const UploadPage = () => {
             const fileName = file.name || (data.edited ? 'edited-audio.wav' : 'recording.wav');
             const fileObj = new File([blob], fileName, { type: blob.type });
             setSelectedFile(fileObj);
-            const today = new Date().toLocaleDateString('de-DE');
-            setTitle(recordedTitle || (data.edited ? `Moments of ${today}` : `Moments of ${today}`));
+            const now = new Date();
+            const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            setTitle(recordedTitle || `${day} ${time}`);
             
             // Get duration
             try {
@@ -237,10 +240,22 @@ export const UploadPage = () => {
 
   const handleTitleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     // Clear the field if it contains the default value
-    const today = new Date().toLocaleDateString('de-DE');
-    const defaultTitle = `Moments of ${today}`;
-    if (title === defaultTitle || title === 'Meine Aufnahme' || title.startsWith('Moments of')) {
+    const isDefaultPattern = /^[A-Za-z]+\s\d{2}:\d{2}\s(AM|PM)$/.test(title);
+    if (isDefaultPattern || title === 'Meine Aufnahme') {
       setTitle('');
+    }
+  };
+
+  // Restore default placeholder title on blur if left empty
+  const handleTitleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const trimmed = (e.target.value || '').trim();
+    if (!trimmed) {
+      const now = new Date();
+      const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+      const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const defaultTitle = `${day} ${time}`;
+      setTitle(defaultTitle);
+      setTitleError('');
     }
   };
 
@@ -433,7 +448,12 @@ export const UploadPage = () => {
     // Kompression-Check entfernt (deaktiviert)
     
     // Set fallback title if empty
-    const finalTitle = title.trim() || `Moments of ${new Date().toLocaleDateString('de-DE')}`;
+    const finalTitle = title.trim() || (() => {
+      const now = new Date();
+      const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+      const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${day} ${time}`;
+    })();
     
     // Final validation
     if (!validateTitle(finalTitle)) {
@@ -537,7 +557,7 @@ export const UploadPage = () => {
       
       try {
         // Use uploadWithProgress for better UX
-        const response = await uploadWithProgress('https://goaural.com/upload.php', formData, {
+        const response = await uploadWithProgress(`${window.location.origin}/upload.php?action=upload`, formData, {
           onProgress: (progress) => {
             setUploadProgress(progress);
           },
@@ -612,6 +632,12 @@ export const UploadPage = () => {
         };
         
         console.log('✅ Creating local track:', localTrack.title);
+        // Persistiere in zentrale lokale DB, damit der Feed nach Reload korrekt ist
+        try {
+          centralDB.addTrack(localTrack);
+        } catch (e) {
+          console.warn('⚠️ Konnte lokalen Track nicht in centralDB speichern:', e);
+        }
         console.log('🎵 UploadPage: Adding local track to FeedStore:', localTrack.title);
         addTrack(localTrack);
         addMyTrack(localTrack);
@@ -642,7 +668,7 @@ export const UploadPage = () => {
       // 5. Device-Stats wurden bereits oben aktualisiert
       
       // 6. Prüfen ob Review erforderlich ist (berücksichtige Auto-Approve Status)
-      const requiresManualReview = (result.requiresReview || securityCheck.requiresReview) && !result.data.autoApproved;
+      const requiresManualReview = ((result.data && result.data.requiresReview) || securityCheck.requiresReview) && !(result.data && result.data.autoApproved);
       
       if (requiresManualReview) {
         console.log('📋 Upload requires manual review, showing pending modal...');
@@ -696,11 +722,12 @@ export const UploadPage = () => {
       }
       
       // 7. Normale Verarbeitung - Track erstellen
-      const trackId = result.data.trackId || generateId();
+      const trackId = (result.data && (result.data.trackId || result.data.id)) || generateId();
       
       // OPTION C: SYNCHRONISIERUNG - upload.php hat bereits Audio + Info gespeichert!
       // Verwende die Server-URL für die Audio-Datei
-      const audioUrl = result.data.url || `https://goaural.com/uploads/${result.data.filename}`;
+      const baseUrl = window.location.origin;
+      const audioUrl = (result.data && result.data.url) || `${baseUrl}/uploads/${result.data.filename}`;
       
       const newTrack: AudioTrack = {
         id: trackId,
@@ -736,6 +763,12 @@ export const UploadPage = () => {
       // Server-Upload war erfolgreich - nur lokal hinzufügen
       console.log('✅ UploadPage: Server upload successful, adding to local database...');
       
+      // Auch lokal persistieren, damit der Feed (lokal/dev) die Daten sofort und nach Reload hat
+      try {
+        centralDB.addTrack(newTrack);
+      } catch (e) {
+        console.warn('⚠️ Konnte Server-Track nicht in centralDB spiegeln:', e);
+      }
       // Nur lokal hinzufügen (Server hat bereits gespeichert)
       console.log('🎵 UploadPage: Adding track to FeedStore:', newTrack.title);
       addTrack(newTrack);
@@ -771,31 +804,10 @@ export const UploadPage = () => {
 
         {/* Title */}
         <Heading level={1} className="text-4xl mb-8">
-          Share your recording
+          Add details before publishing
         </Heading>
 
-        {/* Auto Approve Active Warning */}
-        {isAutoApproveActive && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-green-500/20 border border-green-500/30 rounded-xl"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-              </div>
-              <div>
-                <h3 className="text-green-400 font-medium text-sm">
-                  Auto-approval active
-                </h3>
-                <p className="text-green-300/80 text-xs mt-1">
-                  Your upload will be automatically approved
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {/* Auto Approve Hinweis entfernt */}
 
         {/* File Upload Area */}
         {!selectedFile ? (
@@ -980,13 +992,14 @@ export const UploadPage = () => {
             {/* Title Input */}
             <div>
               <Label className="block mb-3 normal-case">
-                What is the title of this recording?
+                Give it a name.
               </Label>
               <input
                 type="text"
                 value={title}
                 onChange={handleTitleChange}
                 onFocus={handleTitleFocus}
+                onBlur={handleTitleBlur}
                 placeholder="Create title"
                 className={`w-full px-4 py-4 bg-transparent border rounded-lg
                          text-white placeholder-gray-400
@@ -1010,7 +1023,7 @@ export const UploadPage = () => {
             {/* Description */}
             <div>
               <Label className="block mb-3 normal-case">
-                Add a description if you like
+                Add a short description (optional)
               </Label>
               <textarea
                 value={description}
@@ -1031,17 +1044,17 @@ export const UploadPage = () => {
             {/* Gender Selection */}
             <div>
               <Label className="block mb-4 normal-case">
-                Who is on the recording?
+                Who’s featured in this recording?
               </Label>
               <div className="flex flex-wrap gap-2">
                 {genderOptions.map((option) => (
                   <button
                     key={option.value}
                     onClick={() => setSelectedGender(option.value)}
-                    className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 ${
+                    className={`px-3 py-1.5 text-sm rounded-full transition-all duration-200 bg-[#181c1f] ${
                       selectedGender === option.value
-                        ? 'bg-[#ff4e3a]/20 text-[#ff4e3a] border-[#ff4e3a]/50'
-                        : 'bg-white/5 text-text-secondary border-white/30 hover:bg-white/10 hover:text-text-primary hover:border-white/40'
+                        ? 'text-[#ff4e3a] font-medium'
+                        : 'text-gray-300 hover:text-white'
                     }`}
                   >
                     {option.label}
@@ -1053,7 +1066,7 @@ export const UploadPage = () => {
             {/* Tags */}
             <div style={{ marginTop: '50px' }}>
               <Label className="block mb-4 normal-case">
-                Add tags to your recording
+                Add tags to help others find it
               </Label>
 
               {/* Predefined Tags - nur nicht ausgewählte anzeigen */}
@@ -1068,6 +1081,7 @@ export const UploadPage = () => {
                       onSelectionChange={setSelectedTags}
                       size="md"
                       showHashtag={true}
+                      className="border-0 bg-gradient-to-r from-gray-700/30 to-gray-600/20 text-gray-300 hover:text-white"
                       aria-label={`Tag: ${tag}, not selected`}
                     >
                       {tag}
@@ -1075,28 +1089,27 @@ export const UploadPage = () => {
                   ))}
               </div>
 
-              {/* Custom Tag Input */}
-              <div className="flex space-x-2 mb-4">
-                <input
-                  type="text"
-                  value={customTag}
-                  onChange={(e) => setCustomTag(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTag()}
-                  placeholder="Enter your own tag"
-                  className="flex-1 px-3 py-2 bg-transparent border border-gray-500 rounded-lg text-sm
-                           text-white placeholder-gray-400
-                           focus:outline-none focus:border-[#ff4e3a] focus:bg-[#ff4e3a]/5
-                           transition-all duration-200"
-                  maxLength={24}
-                  aria-label="Enter your own tag"
-                />
+              {/* Custom Tag Input as rounded pill with inline + icon */}
+              <div className="mb-4 relative">
+                <div className="w-full h-10 rounded-full border border-gray-600 bg-transparent flex items-center pr-12 pl-3">
+                  <input
+                    type="text"
+                    value={customTag}
+                    onChange={(e) => setCustomTag(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddCustomTag()}
+                    placeholder="Enter your own tag"
+                    className="w-full bg-transparent outline-none border-none text-sm text-white placeholder-gray-400"
+                    maxLength={24}
+                    aria-label="Enter your own tag"
+                  />
+                </div>
                 <button
                   onClick={handleAddCustomTag}
                   disabled={!customTag.trim() || selectedTags.length >= 10}
-                  className="w-10 h-10 rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-2 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label={selectedTags.length >= 10 ? 'Maximum 10 tags allowed' : 'Add tag'}
                 >
-                  <Plus size={16} className="text-gray-300" strokeWidth={2} />
+                  <Plus size={18} className="text-gray-300 hover:text-white" strokeWidth={2} />
                 </button>
               </div>
 
@@ -1107,8 +1120,8 @@ export const UploadPage = () => {
                     {selectedTags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#ff4e3a]/20
-                                 text-[#ff4e3a] text-sm rounded-full border border-[#ff4e3a]/50"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-gray-700/30 to-gray-600/20
+                                 text-[#ff4e3a] text-sm rounded-full"
                       >
                         <span>{tag}</span>
                         <button
@@ -1125,9 +1138,7 @@ export const UploadPage = () => {
               )}
 
               {selectedTags.length === 0 && (
-                <Caption color="secondary" className="mt-2">
-                  You can set tags to be found better
-                </Caption>
+                <></>
               )}
             </div>
 
@@ -1147,30 +1158,47 @@ export const UploadPage = () => {
             <button
               onClick={handleUpload}
               disabled={!title.trim() || titleError !== '' || isUploading || isCompressing || uploadProgress !== null}
-              className="w-full px-8 py-5 sm:py-4 rounded-full border-2 border-[#ff4e3a] bg-gradient-to-r from-[#ff4e3a]/30 to-[#ff4e3a]/20 flex items-center justify-center space-x-3 hover:from-[#ff4e3a]/40 hover:to-[#ff4e3a]/30 active:from-[#ff4e3a]/50 active:to-[#ff4e3a]/40 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: '64px' }}
+              className="relative overflow-visible w-full h-12 rounded-full bg-[#ff4e3a] hover:bg-[#e63e2e] active:bg-[#cc2e1e] flex items-center justify-center space-x-3 transition-all duration-200 touch-manipulation shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              {/* Äußerer, pulsierender Verlaufsglow um den Button herum (stärker) */}
+              <div
+                className="absolute -inset-8 rounded-full pointer-events-none animate-glow"
+                style={{
+                  background: 'radial-gradient(closest-side, rgba(255,78,58,0.8), rgba(255,78,58,0.5), rgba(255,78,58,0.0))',
+                  filter: 'blur(20px)',
+                  animationDuration: '1.6s'
+                }}
+              />
+              {/* Zusätzliche weite Glow-Ebene für sichtbaren Schimmer im Umfeld */}
+              <div
+                className="absolute -inset-10 rounded-full pointer-events-none animate-glow"
+                style={{
+                  background: 'radial-gradient(closest-side, rgba(255,78,58,0.2), rgba(255,78,58,0.1), rgba(255,78,58,0.0))',
+                  filter: 'blur(28px)',
+                  animationDuration: '1.6s'
+                }}
+              />
               {isCompressing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-[#ff4e3a] text-base font-semibold">Optimiere Audio...</span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin relative z-10"></div>
+                  <span className="text-white text-base font-semibold relative z-10">Optimiere Audio...</span>
                 </>
               ) : uploadProgress ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-[#ff4e3a] text-base font-semibold">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin relative z-10"></div>
+                  <span className="text-white text-base font-semibold relative z-10">
                     Lade hoch... {uploadProgress.percent}%
                   </span>
                 </>
               ) : isUploading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#ff4e3a] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-[#ff4e3a] text-base font-semibold">Publishing...</span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin relative z-10"></div>
+                  <span className="text-white text-base font-semibold relative z-10">Publishing...</span>
                 </>
               ) : (
                 <>
-                  <Upload size={20} className="text-[#ff4e3a]" strokeWidth={2} />
-                  <span className="text-[#ff4e3a] text-base font-semibold">Publish Recording</span>
+                  <Upload size={20} className="text-white relative z-10" strokeWidth={2} />
+                  <span className="text-white text-base font-semibold relative z-10">Publish Recording</span>
                 </>
               )}
             </button>

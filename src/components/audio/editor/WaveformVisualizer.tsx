@@ -270,7 +270,7 @@ export default function WaveformVisualizer({
   }
 
   return (
-    <div className={className ?? ''}>
+    <div className={className ?? ''} style={{ paddingTop: '73px', marginTop: '-73px' }}>
       {/* Mobile-optimized waveform container with better touch support */}
         <div 
           ref={containerRef} 
@@ -282,7 +282,9 @@ export default function WaveformVisualizer({
             WebkitTouchCallout: 'none',
             height: '120px',
             width: '100%',
-            backgroundColor: '#000000'
+            backgroundColor: '#000000',
+            position: 'relative',
+            overflow: 'visible'
           }}
         />
       
@@ -328,13 +330,13 @@ export default function WaveformVisualizer({
       {/* Region Play Button - erscheint nur wenn eine Region ausgewählt oder verändert wurde */}
       {showRegionPlayButton && lastModifiedRegion && (
         <div className="mt-4 w-full">
-          <div className="bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 rounded-lg p-4">
+          <div className="true-black-card p-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h4 className="text-orange-300 font-medium text-sm mb-1">Active Region</h4>
-                <p className="text-orange-400/80 text-xs">
+                <h4 className="text-white font-medium text-sm mb-1">Active Region</h4>
+                <p className="text-white text-xs">
                   {Math.round(lastModifiedRegion.start)}s - {Math.round(lastModifiedRegion.end)}s
-                  <span className="ml-2 text-orange-500/60">
+                  <span className="ml-2 text-gray-400">
                     ({Math.round(lastModifiedRegion.end - lastModifiedRegion.start)}s)
                   </span>
                 </p>
@@ -350,12 +352,13 @@ export default function WaveformVisualizer({
                       playRegion(lastModifiedRegion);
                     }
                   }}
-                  className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 flex items-center justify-center transition-colors duration-200 shadow-lg"
+                  className="w-9 h-9 rounded-full border border-gray-500 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:bg-gray-500/10"
+                  style={{ aspectRatio: '1/1', minWidth: '36px', minHeight: '36px', maxWidth: '36px', maxHeight: '36px' }}
                 >
                   {isPlaying && currentPlayingRegionId === lastModifiedRegion.id ? (
-                    <Pause size={18} className="text-white" strokeWidth={2} />
+                    <Pause size={16} className="text-white" strokeWidth={2} />
                   ) : (
-                    <Play size={18} className="text-white ml-0.5" strokeWidth={2} />
+                    <Play size={16} className="text-white ml-0.5" strokeWidth={2} />
                   )}
                 </button>
                 
@@ -385,14 +388,15 @@ export default function WaveformVisualizer({
                      }
                    }}
                    disabled={allRegions.length <= 1}
-                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                   className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 ${
                      allRegions.length <= 1 
-                       ? 'bg-gray-700 cursor-not-allowed opacity-50' 
-                       : 'bg-red-600 hover:bg-red-500 active:bg-red-700'
+                       ? 'border-gray-700 cursor-not-allowed opacity-50' 
+                       : 'border-gray-500 hover:border-red-400 hover:bg-red-500/10'
                    }`}
+                   style={{ aspectRatio: '1/1', minWidth: '36px', minHeight: '36px', maxWidth: '36px', maxHeight: '36px' }}
                    title={allRegions.length <= 1 ? 'Mindestens eine Region muss vorhanden bleiben' : 'Region löschen'}
                  >
-                   <Trash2 size={14} className="text-white" strokeWidth={2} />
+                   <Trash2 size={16} className={allRegions.length <= 1 ? 'text-white/70' : 'text-white'} strokeWidth={2} />
                  </button>
               </div>
             </div>
@@ -400,37 +404,43 @@ export default function WaveformVisualizer({
         </div>
       )}
       
-      {/* Mobile-optimized control buttons with larger touch targets */}
-      <div className="mt-6 flex items-center gap-4">
-        {/* Play/Pause Button - linksbündig, kreisförmig, Secondary-Style */}
-        <button 
-          onClick={() => {
-            triggerHaptic();
-            isPlaying ? pause() : play();
-          }} 
-          className="w-16 h-16 rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 transition-all duration-200 touch-manipulation shadow-lg"
-          style={{ minHeight: '64px', minWidth: '64px' }}
-        >
-          {isPlaying ? (
-            <Pause size={20} className="text-gray-300" strokeWidth={2} />
-          ) : (
-            <Play size={20} className="text-gray-300 ml-0.5" strokeWidth={2} />
-          )}
-        </button>
-        
-        {/* Set new Area Button - nimmt restliche Breite, Secondary-Style */}
-        <button 
+      {/* Action Buttons unter der Active Region */}
+      <div className="mt-4">
+        {/* Vollbreite: Set new Area */}
+        <button
           onClick={handleAddNewRegion}
-          className="flex-1 px-8 py-5 sm:py-4 rounded-full border-2 border-gray-600 bg-gradient-to-r from-gray-700/30 to-gray-600/20 flex items-center justify-center space-x-3 hover:from-gray-600/40 hover:to-gray-500/30 active:from-gray-600/50 active:to-gray-500/40 transition-all duration-200 touch-manipulation shadow-lg"
-          style={{ minHeight: '64px' }}
+          className="w-full h-12 rounded-full border border-gray-500 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:bg-gray-500/10"
         >
-          <Plus size={20} className="text-gray-300" strokeWidth={2} />
-          <span className="text-gray-300 text-base font-semibold">Set new Area</span>
+          <Plus size={16} className="text-white mr-2" strokeWidth={2} />
+          <span className="text-white text-sm font-medium">Set new Area</span>
         </button>
-        
+
+        {/* Zwei Buttons nebeneinander */}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button
+            onClick={() => {
+              triggerHaptic();
+              playAllRegions();
+            }}
+            className="w-full h-12 rounded-full border border-gray-500 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:bg-gray-500/10"
+          >
+            <Play size={16} className="text-white mr-2" strokeWidth={2} />
+            <span className="text-white text-sm font-medium">Play all Areas</span>
+          </button>
+          <button
+            onClick={() => {
+              triggerHaptic();
+              play();
+            }}
+            className="w-full h-12 rounded-full border border-gray-500 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:bg-gray-500/10"
+          >
+            <Play size={16} className="text-white mr-2" strokeWidth={2} />
+            <span className="text-white text-sm font-medium">Play full audio</span>
+          </button>
+        </div>
+
         {!isReady && (
-          <div className="flex items-center space-x-2">
-            {/* Subtile Loading-Animation statt Spinner */}
+          <div className="mt-3 flex items-center space-x-2">
             <div className="w-16 h-2 bg-gray-600 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-transparent via-[#ff4e3a]/30 to-transparent animate-pulse"></div>
               <div className="absolute inset-0 h-full w-4 bg-gradient-to-r from-transparent via-[#ff4e3a]/50 to-transparent" 

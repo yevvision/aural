@@ -46,6 +46,8 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // WICHTIG: Stelle sicher, dass .ts Dateien bevorzugt werden
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
   },
   base: '/',
   server: {

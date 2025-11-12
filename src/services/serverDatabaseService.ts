@@ -18,21 +18,17 @@ import type {
  * Ersetzt die lokale localStorage-basierte Datenbank
  */
 class ServerDatabaseServiceClass {
-  private baseUrl = 'http://localhost:5175';
+  // Nutze Same-Origin standardmäßig – funktioniert lokal (Vite preview/serve) und im Deployment
+  private baseUrl = (typeof window !== 'undefined' && window.location?.origin)
+    ? window.location.origin
+    : '';
   private isInitialized = false;
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
     
     try {
-      // Im Development-Modus (localhost:5175) verwende lokale Datenbank
-      if (this.baseUrl.includes('localhost:5175')) {
-        console.log('🔧 ServerDatabaseService: Development mode - using local database');
-        this.isInitialized = true;
-        return;
-      }
-      
-      // Teste Server-Verbindung nur in Production
+      // Teste Server-Verbindung (gleiches Origin)
       const response = await fetch(`${this.baseUrl}/upload.php?action=getDatabase`);
       if (!response.ok) {
         throw new Error(`Server connection failed: ${response.status}`);
@@ -353,6 +349,41 @@ class ServerDatabaseServiceClass {
     }
   }
 
+  async getAllBookmarks(): Promise<any[]> {
+    await this.initialize();
+    
+    try {
+      const response = await fetch(`${this.baseUrl}/upload.php?action=getDatabase`);
+      if (!response.ok) {
+        throw new Error(`Failed to get database: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.bookmarks || [];
+    } catch (error) {
+      console.error('❌ ServerDatabaseService: Failed to get bookmarks:', error);
+      return [];
+    }
+  }
+
+  async getAllPlays(): Promise<any[]> {
+    await this.initialize();
+    
+    try {
+      const response = await fetch(`${this.baseUrl}/upload.php?action=getDatabase`);
+      if (!response.ok) {
+        throw new Error(`Failed to get database: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      // Server speichert plays als Array mit {trackId, count}
+      return data.plays || [];
+    } catch (error) {
+      console.error('❌ ServerDatabaseService: Failed to get plays:', error);
+      return [];
+    }
+  }
+
   async getTrackById(id: string): Promise<AudioTrack | undefined> {
     await this.initialize();
     
@@ -609,11 +640,24 @@ class ServerDatabaseServiceClass {
         throw new Error(`Failed to get database: ${response.status}`);
       }
       
-      const data = await response.json();
+      // Prüfe ob Response JSON ist
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Response ist nicht JSON (wahrscheinlich PHP-Fehler)
+        throw new Error('Server returned non-JSON response');
+      }
+      
+      const text = await response.text();
+      if (text.trim().startsWith('<?php') || text.trim().startsWith('<')) {
+        // PHP-Fehler oder HTML statt JSON
+        throw new Error('Server returned PHP/HTML instead of JSON');
+      }
+      
+      const data = JSON.parse(text);
       const commentLikes = data.commentLikes || [];
       return commentLikes.find((like: any) => like.userId === userId && like.commentId === commentId);
     } catch (error) {
-      console.error('❌ ServerDatabaseService: Failed to get comment like:', error);
+      // Stummes Failover - kein Console-Error, da dies lokal behandelt wird
       return null;
     }
   }
@@ -673,11 +717,24 @@ class ServerDatabaseServiceClass {
         throw new Error(`Failed to get database: ${response.status}`);
       }
       
-      const data = await response.json();
+      // Prüfe ob Response JSON ist
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Response ist nicht JSON (wahrscheinlich PHP-Fehler)
+        throw new Error('Server returned non-JSON response');
+      }
+      
+      const text = await response.text();
+      if (text.trim().startsWith('<?php') || text.trim().startsWith('<')) {
+        // PHP-Fehler oder HTML statt JSON
+        throw new Error('Server returned PHP/HTML instead of JSON');
+      }
+      
+      const data = JSON.parse(text);
       const commentLikes = data.commentLikes || [];
       return commentLikes.filter((like: any) => like.commentId === commentId).length;
     } catch (error) {
-      console.error('❌ ServerDatabaseService: Failed to get comment like count:', error);
+      // Stummes Failover - kein Console-Error, da dies lokal behandelt wird
       return 0;
     }
   }
